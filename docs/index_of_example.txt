@@ -1,0 +1,42 @@
+task:
+	- index of item in an array
+
+how it's displayed:
+
+find index of item in array
+    return
+		loop over array
+			if element is item then break with index
+		else not found
+
+alternative:
+
+find index of 'item in 'array
+ <- loop over array
+		element == item ? index
+	: not found
+
+
+- it's not a plain text
+- each item has additional visual elements, like icons, highlights and lines
+- some items can be expanded to show extra details
+	- memory allocation
+	- types
+	- etc.
+
+contexts:
+- memory context:
+	- show where each entity is allocated
+		- array is a name of an array, allocated on the stack
+	- show as an icon?
+
+- types context
+	- show and edit types of variables
+	
+- types of statements context
+	- is it a declaration or something else?
+
+- display context:
+	- e.g. rename loop variable
+	
+

@@ -1,0 +1,17 @@
+overall goal:
+- make programming easier, faster and more enjoyable
+
+solution ideas:
+- separate displaying from editing
+	- bind names explicitly
+	- no ambiguity in identifiers
+	- can display anything that makes sense without worrying about parsing ambiguity
+	- question: how to edit such a representation?
+	- negative: lose some editing speed?
+
+- contexts:
+	- filter out information by contexts
+		- semantic: problem, that is solved
+		- types   : types of the variables
+		- memory  : how the memory is managed
+		- codegen : how the code is generated (?)

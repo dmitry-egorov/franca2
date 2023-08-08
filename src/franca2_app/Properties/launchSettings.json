@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "franca2_app (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "franca2_app (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
