@@ -38,5 +38,9 @@ contexts:
 
 - display context:
 	- e.g. rename loop variable
-	
+	- display functions differently
+
+- runtime function context
+	- context passed to each function
+	- allocator, thread_local etc.
 
