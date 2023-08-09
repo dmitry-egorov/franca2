@@ -1,6 +1,9 @@
 .vs/
+.idea/
 _ReSharper.Caches/
 obj/
 bin/
+cmake-build-debug-emscripten/
+cmake-build-release-emscripten/
 
 franca2.10x

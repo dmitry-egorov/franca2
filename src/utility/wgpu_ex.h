@@ -1,0 +1,317 @@
+#ifndef FRANCA2_WEB_WGPU_EX_H
+#define FRANCA2_WEB_WGPU_EX_H
+
+#include <webgpu/webgpu.h>
+#include "syntax.h"
+
+namespace wgpu_ex {
+    inline WGPUInstance make_instance(const WGPUInstanceDescriptor& descriptor) { return wgpuCreateInstance(&descriptor); }
+    inline WGPUProc     get_proc_address(WGPUDevice device, char const * proc_name);
+
+    // Methods of Adapter
+    inline size_t enumerate_features(WGPUAdapter adapter, WGPUFeatureName * features);
+    inline bool   get_limits        (WGPUAdapter adapter, WGPUSupportedLimits * limits);
+    inline void   get_properties    (WGPUAdapter adapter, WGPUAdapterProperties * properties);
+    inline bool   has_feature       (WGPUAdapter adapter, WGPUFeatureName feature);
+    inline void   request_device    (WGPUAdapter adapter, WGPU_NULLABLE const WGPUDeviceDescriptor& descriptor, WGPURequestDeviceCallback callback, void * userdata);
+    inline void   reference         (WGPUAdapter adapter);
+    inline void   release           (WGPUAdapter adapter);
+
+    // Methods of Bind_group
+    inline void set_label(WGPUBindGroup bind_group, char const * label);
+    inline void reference(WGPUBindGroup bind_group);
+    inline void release  (WGPUBindGroup bind_group);
+
+    // Methods of BindGroupLayout
+    inline void set_label(WGPUBindGroupLayout bind_group_layout, char const * label);
+    inline void reference(WGPUBindGroupLayout bind_group_layout);
+    inline void release  (WGPUBindGroupLayout bind_group_layout) { wgpuBindGroupLayoutRelease(bind_group_layout); }
+
+    // Methods of Buffer
+    inline void const *         get_const_mapped_range(WGPUBuffer buffer, size_t offset, size_t size);
+    inline WGPUBufferMapState   get_map_state         (WGPUBuffer buffer);
+    inline void *               get_mapped_range      (WGPUBuffer buffer, size_t offset, size_t size);
+    inline uint64_t             get_size              (WGPUBuffer buffer);
+    inline WGPUBufferUsageFlags get_usage             (WGPUBuffer buffer);
+
+    inline void map_async(WGPUBuffer buffer, WGPUMapModeFlags mode, size_t offset, size_t size, WGPUBufferMapCallback callback, void * userdata);
+    inline void set_label(WGPUBuffer buffer, char const * label);
+    inline void unmap    (WGPUBuffer buffer);
+    inline void reference(WGPUBuffer buffer);
+    inline void release  (WGPUBuffer buffer);
+    inline void destroy  (WGPUBuffer buffer);
+
+    // Methods of CommandBuffer
+    inline void set_label(WGPUCommandBuffer command_buffer, char const * label);
+    inline void reference(WGPUCommandBuffer command_buffer);
+    inline void release  (WGPUCommandBuffer command_buffer) { wgpuCommandBufferRelease(command_buffer); }
+
+    // Methods of CommandEncoder
+    inline WGPUComputePassEncoder begin_compute_pass(WGPUCommandEncoder command_encoder, WGPU_NULLABLE const WGPUComputePassDescriptor& descriptor);
+    inline WGPURenderPassEncoder  begin_render_pass (WGPUCommandEncoder command_encoder, const WGPURenderPassDescriptor& descriptor) { return wgpuCommandEncoderBeginRenderPass(command_encoder, &descriptor); }
+    inline WGPUCommandBuffer      finish            (WGPUCommandEncoder command_encoder, const WGPUCommandBufferDescriptor& desc = {}) { return wgpuCommandEncoderFinish(command_encoder, (desc.label == nullptr && desc.nextInChain == nullptr) ? nullptr : &desc); }
+    inline void clear_buffer           (WGPUCommandEncoder command_encoder, WGPUBuffer buffer, uint64_t offset, uint64_t size);
+    inline void copy_buffer_to_buffer  (WGPUCommandEncoder command_encoder, WGPUBuffer source, uint64_t source_offset, WGPUBuffer destination, uint64_t destination_offset, uint64_t size);
+    inline void copy_buffer_to_texture (WGPUCommandEncoder command_encoder, const WGPUImageCopyBuffer& source, const WGPUImageCopyTexture& destination, const WGPUExtent3D& copy_size);
+    inline void copy_texture_to_buffer (WGPUCommandEncoder command_encoder, const WGPUImageCopyTexture& source, const WGPUImageCopyBuffer& destination, const WGPUExtent3D& copy_size);
+    inline void copy_texture_to_texture(WGPUCommandEncoder command_encoder, const WGPUImageCopyTexture& source, const WGPUImageCopyTexture& destination, const WGPUExtent3D& copy_size);
+    inline void insert_debug_marker    (WGPUCommandEncoder command_encoder, char const * marker_label);
+    inline void pop_debug_group        (WGPUCommandEncoder command_encoder);
+    inline void push_debug_group       (WGPUCommandEncoder command_encoder, char const * group_label);
+    inline void resolve_query_set      (WGPUCommandEncoder command_encoder, WGPUQuerySet query_set, uint32_t first_query, uint32_t query_count, WGPUBuffer destination, uint64_t destination_offset);
+    inline void set_label              (WGPUCommandEncoder command_encoder, char const * label);
+    inline void write_timestamp        (WGPUCommandEncoder command_encoder, WGPUQuerySet query_set, uint32_t query_index);
+    inline void reference              (WGPUCommandEncoder command_encoder);
+    inline void release                (WGPUCommandEncoder command_encoder) { wgpuCommandEncoderRelease(command_encoder); }
+
+    // Methods of ComputePassEncoder
+    inline void begin_pipeline_statistics_query(WGPUComputePassEncoder compute_pass_encoder, WGPUQuerySet query_set, uint32_t query_index);
+    inline void dispatch_workgroups            (WGPUComputePassEncoder compute_pass_encoder, uint32_t workgroup_count_x, uint32_t workgroup_count_y, uint32_t workgroup_count_z);
+    inline void dispatch_workgroups_indirect   (WGPUComputePassEncoder compute_pass_encoder, WGPUBuffer indirect_buffer, uint64_t indirect_offset);
+    inline void end                            (WGPUComputePassEncoder compute_pass_encoder);
+    inline void end_pipeline_statistics_query  (WGPUComputePassEncoder compute_pass_encoder);
+    inline void insert_debug_marker            (WGPUComputePassEncoder compute_pass_encoder, char const * marker_label);
+    inline void pop_debug_group                (WGPUComputePassEncoder compute_pass_encoder);
+    inline void push_debug_group               (WGPUComputePassEncoder compute_pass_encoder, char const * group_label);
+    inline void set_bind_group                 (WGPUComputePassEncoder compute_pass_encoder, uint32_t group_index, WGPU_NULLABLE WGPUBindGroup group, size_t dynamic_offset_count, uint32_t const * dynamic_offsets);
+    inline void set_label                      (WGPUComputePassEncoder compute_pass_encoder, char const * label);
+    inline void set_pipeline                   (WGPUComputePassEncoder compute_pass_encoder, WGPUComputePipeline pipeline);
+    inline void write_timestamp                (WGPUComputePassEncoder compute_pass_encoder, WGPUQuerySet query_set, uint32_t query_index);
+    inline void reference                      (WGPUComputePassEncoder compute_pass_encoder);
+    inline void release                        (WGPUComputePassEncoder compute_pass_encoder);
+
+    // Methods of ComputePipeline
+    inline WGPUBindGroupLayout wgpu_compute_pipeline_get_bind_group_layout(WGPUComputePipeline compute_pipeline, uint32_t group_index);
+    inline void set_label(WGPUComputePipeline compute_pipeline, char const * label);
+    inline void reference(WGPUComputePipeline compute_pipeline);
+    inline void release  (WGPUComputePipeline compute_pipeline);
+
+    // Methods of Device
+    inline WGPUBindGroup           make_bind_group            (WGPUDevice device, const WGPUBindGroupDescriptor& descriptor) { return wgpuDeviceCreateBindGroup(device, &descriptor); }
+    inline WGPUBindGroupLayout     make_bind_group_layout     (WGPUDevice device, const WGPUBindGroupLayoutDescriptor& descriptor) { return wgpuDeviceCreateBindGroupLayout(device, &descriptor); }
+    inline WGPUBuffer              make_buffer                (WGPUDevice device, const WGPUBufferDescriptor& descriptor) {return wgpuDeviceCreateBuffer(device, &descriptor); }
+    inline WGPUCommandEncoder      make_command_encoder       (WGPUDevice device, const WGPUCommandEncoderDescriptor& desc = {}) { return wgpuDeviceCreateCommandEncoder(device, (desc.label == nullptr && desc.nextInChain == nullptr) ? nullptr : &desc); }
+    inline WGPUComputePipeline     make_compute_pipeline      (WGPUDevice device, const WGPUComputePipelineDescriptor& descriptor);
+    inline void                    make_compute_pipeline_async(WGPUDevice device, const WGPUComputePipelineDescriptor& descriptor, WGPUCreateComputePipelineAsyncCallback callback, void * userdata);
+    inline WGPUPipelineLayout      make_pipeline_layout       (WGPUDevice device, const WGPUPipelineLayoutDescriptor& descriptor) { return wgpuDeviceCreatePipelineLayout(device, &descriptor); }
+    inline WGPUQuerySet            make_query_set             (WGPUDevice device, const WGPUQuerySetDescriptor& descriptor);
+    inline WGPURenderBundleEncoder make_render_bundle_encoder (WGPUDevice device, const WGPURenderBundleEncoderDescriptor& descriptor);
+    inline WGPURenderPipeline      make_render_pipeline       (WGPUDevice device, const WGPURenderPipelineDescriptor& descriptor) { return wgpuDeviceCreateRenderPipeline(device, &descriptor); }
+    inline void                    make_render_pipeline_async (WGPUDevice device, const WGPURenderPipelineDescriptor& descriptor, WGPUCreateRenderPipelineAsyncCallback callback, void * userdata);
+    inline WGPUSampler             make_sampler               (WGPUDevice device, WGPU_NULLABLE const WGPUSamplerDescriptor& descriptor);
+    inline WGPUShaderModule        make_shader_module         (WGPUDevice device, const WGPUShaderModuleDescriptor& descriptor) { return wgpuDeviceCreateShaderModule(device, &descriptor); }
+    inline WGPUSwapChain           make_swap_chain            (WGPUDevice device, WGPUSurface surface, const WGPUSwapChainDescriptor& descriptor) { return wgpuDeviceCreateSwapChain(device, surface, &descriptor); }
+    inline WGPUTexture             make_texture               (WGPUDevice device, const WGPUTextureDescriptor& descriptor);
+
+    inline bool      has_feature       (WGPUDevice device, WGPUFeatureName feature);
+    inline size_t    enumerate_features(WGPUDevice device, WGPUFeatureName * features);
+    inline bool      get_limits        (WGPUDevice device, WGPUSupportedLimits * limits);
+    inline WGPUQueue get_queue         (WGPUDevice device) { return wgpuDeviceGetQueue(device); }
+
+    inline void set_uncaptured_error_callback(WGPUDevice device, WGPUErrorCallback callback, void * userdata);
+    inline void pop_error_scope (WGPUDevice device, WGPUErrorCallback callback, void * userdata);
+    inline void push_error_scope(WGPUDevice device, WGPUErrorFilter filter);
+    inline void set_label       (WGPUDevice device, char const * label);
+    inline void reference(WGPUDevice device);
+    inline void release  (WGPUDevice device);
+    inline void destroy  (WGPUDevice device);
+
+    // Methods of Instance
+    inline WGPUSurface make_surface(WGPUInstance instance, const WGPUSurfaceDescriptor& descriptor) { return wgpuInstanceCreateSurface(instance, &descriptor); }
+    inline void process_events (WGPUInstance instance);
+    inline void request_adapter(WGPUInstance instance, WGPU_NULLABLE const WGPURequestAdapterOptions& options, WGPURequestAdapterCallback callback, void * userdata);
+    inline void reference      (WGPUInstance instance);
+    inline void release        (WGPUInstance instance);
+
+    // Methods of PipelineLayout
+    inline void set_label(WGPUPipelineLayout pipeline_layout, char const * label);
+    inline void reference(WGPUPipelineLayout pipeline_layout);
+    inline void release  (WGPUPipelineLayout pipeline_layout) { wgpuPipelineLayoutRelease(pipeline_layout); }
+
+    // Methods of QuerySet
+    inline uint32_t      get_count(WGPUQuerySet query_set);
+    inline WGPUQueryType get_type (WGPUQuerySet query_set);
+    inline void set_label(WGPUQuerySet query_set, char const * label);
+    inline void reference(WGPUQuerySet query_set);
+    inline void release  (WGPUQuerySet query_set);
+    inline void destroy  (WGPUQuerySet query_set);
+
+    // Methods of Queue
+    inline void on_submitted_work_done(WGPUQueue queue, uint64_t signal_value, WGPUQueueWorkDoneCallback callback, void * userdata);
+    inline void set_label    (WGPUQueue queue, char const * label);
+    inline void submit       (WGPUQueue queue, WGPUCommandBuffer command_buffer) { wgpuQueueSubmit(queue, 1, &command_buffer); }
+    inline void submit       (WGPUQueue queue, size_t command_count, const WGPUCommandBuffer* commands) { wgpuQueueSubmit(queue, command_count, commands); }
+    inline void write_buffer (WGPUQueue queue, WGPUBuffer buffer, uint64_t buffer_offset, void const * data, size_t size) { return wgpuQueueWriteBuffer(queue, buffer, buffer_offset, data, size); }
+    inline void write_texture(WGPUQueue queue, const WGPUImageCopyTexture& destination, void const * data, size_t data_size, const WGPUTextureDataLayout& data_layout, const WGPUExtent3D& write_size);
+    inline void reference    (WGPUQueue queue);
+    inline void release      (WGPUQueue queue);
+
+    // Methods of RenderBundle
+    inline void set_label(WGPURenderBundle render_bundle, char const * label);
+    inline void reference(WGPURenderBundle render_bundle);
+    inline void release  (WGPURenderBundle render_bundle);
+
+    // Methods of RenderBundleEncoder
+    inline WGPURenderBundle finish   (WGPURenderBundleEncoder render_bundle_encoder, WGPU_NULLABLE const WGPURenderBundleDescriptor& descriptor);
+    inline void draw                 (WGPURenderBundleEncoder render_bundle_encoder, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance);
+    inline void draw_indexed         (WGPURenderBundleEncoder render_bundle_encoder, uint32_t index_count, uint32_t instance_count, uint32_t first_index, int32_t base_vertex, uint32_t first_instance);
+    inline void draw_indexed_indirect(WGPURenderBundleEncoder render_bundle_encoder, WGPUBuffer indirect_buffer, uint64_t indirect_offset);
+    inline void draw_indirect        (WGPURenderBundleEncoder render_bundle_encoder, WGPUBuffer indirect_buffer, uint64_t indirect_offset);
+    inline void insert_debug_marker  (WGPURenderBundleEncoder render_bundle_encoder, char const * marker_label);
+    inline void pop_debug_group      (WGPURenderBundleEncoder render_bundle_encoder);
+    inline void push_debug_group     (WGPURenderBundleEncoder render_bundle_encoder, char const * group_label);
+    inline void set_bind_group       (WGPURenderBundleEncoder render_bundle_encoder, uint32_t group_index, WGPU_NULLABLE WGPUBindGroup group, size_t dynamic_offset_count, uint32_t const * dynamic_offsets);
+    inline void set_index_buffer     (WGPURenderBundleEncoder render_bundle_encoder, WGPUBuffer buffer, WGPUIndexFormat format, uint64_t offset, uint64_t size);
+    inline void set_label            (WGPURenderBundleEncoder render_bundle_encoder, char const * label);
+    inline void set_pipeline         (WGPURenderBundleEncoder render_bundle_encoder, WGPURenderPipeline pipeline);
+    inline void set_vertex_buffer    (WGPURenderBundleEncoder render_bundle_encoder, uint32_t slot, WGPU_NULLABLE WGPUBuffer buffer, uint64_t offset, uint64_t size);
+    inline void reference            (WGPURenderBundleEncoder render_bundle_encoder);
+    inline void release              (WGPURenderBundleEncoder render_bundle_encoder);
+
+    // Methods of RenderPassEncoder
+    inline void begin_occlusion_query          (WGPURenderPassEncoder render_pass_encoder, uint32_t query_index);
+    inline void begin_pipeline_statistics_query(WGPURenderPassEncoder render_pass_encoder, WGPUQuerySet query_set, uint32_t queryIndex);
+    inline void draw                           (WGPURenderPassEncoder render_pass_encoder, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance);
+    inline void draw_indexed                   (WGPURenderPassEncoder render_pass_encoder, uint32_t index_count, uint32_t instance_count, uint32_t first_index, int32_t base_vertex, uint32_t first_instance) { wgpuRenderPassEncoderDrawIndexed(render_pass_encoder, index_count, instance_count, first_index, base_vertex, first_instance); }
+    inline void draw_indexed_indirect          (WGPURenderPassEncoder render_pass_encoder, WGPUBuffer indirect_buffer, uint64_t indirect_offset);
+    inline void draw_indirect                  (WGPURenderPassEncoder render_pass_encoder, WGPUBuffer indirect_buffer, uint64_t indirect_offset);
+    inline void end                            (WGPURenderPassEncoder render_pass_encoder) { wgpuRenderPassEncoderEnd(render_pass_encoder); }
+    inline void end_occlusion_query            (WGPURenderPassEncoder render_pass_encoder);
+    inline void end_pipeline_statistics_query  (WGPURenderPassEncoder render_pass_encoder);
+    inline void execute_bundles                (WGPURenderPassEncoder render_pass_encoder, size_t bundle_count, const WGPURenderBundle& bundles);
+    inline void insert_debug_marker            (WGPURenderPassEncoder render_pass_encoder, char const * marker_label);
+    inline void pop_debug_group                (WGPURenderPassEncoder render_pass_encoder);
+    inline void push_debug_group               (WGPURenderPassEncoder render_pass_encoder, char const * group_label);
+    inline void set_bind_group                 (WGPURenderPassEncoder render_pass_encoder, uint32_t group_index, WGPU_NULLABLE WGPUBindGroup group, size_t dynamic_offset_count, uint32_t const * dynamic_offsets) { wgpuRenderPassEncoderSetBindGroup(render_pass_encoder, group_index, group, dynamic_offset_count, dynamic_offsets); }
+    inline void set_blend_constant             (WGPURenderPassEncoder render_pass_encoder, WGPUColor const * color);
+    inline void set_index_buffer               (WGPURenderPassEncoder render_pass_encoder, WGPUBuffer buffer, WGPUIndexFormat format, uint64_t offset, uint64_t size) { wgpuRenderPassEncoderSetIndexBuffer(render_pass_encoder, buffer, format, offset, size); }
+    inline void set_label                      (WGPURenderPassEncoder render_pass_encoder, char const * label);
+    inline void set_pipeline                   (WGPURenderPassEncoder render_pass_encoder, WGPURenderPipeline pipeline) { wgpuRenderPassEncoderSetPipeline(render_pass_encoder, pipeline); }
+    inline void set_scissor_rect               (WGPURenderPassEncoder render_pass_encoder, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+    inline void set_stencil_reference          (WGPURenderPassEncoder render_pass_encoder, uint32_t reference);
+    inline void set_vertex_buffer              (WGPURenderPassEncoder render_pass_encoder, uint32_t slot, WGPU_NULLABLE WGPUBuffer buffer, uint64_t offset, uint64_t size) { wgpuRenderPassEncoderSetVertexBuffer(render_pass_encoder, slot, buffer, offset, size); }
+    inline void set_viewport                   (WGPURenderPassEncoder render_pass_encoder, float x, float y, float width, float height, float min_depth, float max_depth);
+    inline void write_timestamp                (WGPURenderPassEncoder render_pass_encoder, WGPUQuerySet query_set, uint32_t query_index);
+    inline void reference                      (WGPURenderPassEncoder render_pass_encoder);
+    inline void release                        (WGPURenderPassEncoder render_pass_encoder) { wgpuRenderPassEncoderRelease(render_pass_encoder); }
+
+    // Methods of RenderPipeline
+    inline WGPUBindGroupLayout get_bind_group_layout(WGPURenderPipeline render_pipeline, uint32_t group_index);
+    inline void set_label(WGPURenderPipeline render_pipeline, char const * label);
+    inline void reference(WGPURenderPipeline render_pipeline);
+    inline void release  (WGPURenderPipeline render_pipeline);
+
+    // Methods of Sampler
+    inline void set_label(WGPUSampler sampler, char const * label);
+    inline void reference(WGPUSampler sampler);
+    inline void release  (WGPUSampler sampler);
+
+    // Methods of ShaderModule
+    inline void get_compilation_info(WGPUShaderModule shader_module, WGPUCompilationInfoCallback callback, void * userdata);
+    inline void set_label           (WGPUShaderModule shader_module, char const * label);
+    inline void reference           (WGPUShaderModule shader_module);
+    inline void release             (WGPUShaderModule shader_module) { wgpuShaderModuleRelease(shader_module); }
+
+    // Methods of Surface
+    inline WGPUTextureFormat get_preferred_format(WGPUSurface surface, WGPUAdapter adapter);
+    inline void reference(WGPUSurface surface);
+    inline void release  (WGPUSurface surface);
+
+    // Methods of SwapChain
+    inline WGPUTextureView get_current_texture_view(WGPUSwapChain swap_chain) { return wgpuSwapChainGetCurrentTextureView(swap_chain); }
+    inline void present  (WGPUSwapChain swap_chain) { wgpuSwapChainPresent(swap_chain); }
+    inline void reference(WGPUSwapChain swap_chain);
+    inline void release  (WGPUSwapChain swap_chain);
+
+    // Methods of Texture
+    inline WGPUTextureView       make_view    (WGPUTexture texture, WGPU_NULLABLE const WGPUTextureViewDescriptor& descriptor);
+    inline WGPUTextureDimension  get_dimension(WGPUTexture texture);
+    inline WGPUTextureFormat     get_format   (WGPUTexture texture);
+    inline WGPUTextureUsageFlags get_usage    (WGPUTexture texture);
+    inline uint32_t get_depth_or_array_layers (WGPUTexture texture);
+    inline uint32_t get_width          (WGPUTexture texture);
+    inline uint32_t get_height         (WGPUTexture texture);
+    inline uint32_t get_mip_level_count(WGPUTexture texture);
+    inline uint32_t get_sample_count   (WGPUTexture texture);
+    inline void set_label(WGPUTexture texture, char const * label);
+    inline void reference(WGPUTexture texture);
+    inline void release  (WGPUTexture texture);
+    inline void destroy  (WGPUTexture texture);
+
+    // Methods of TextureView
+    inline void set_label(WGPUTextureView texture_view, char const * label);
+    inline void reference(WGPUTextureView texture_view);
+    inline void release  (WGPUTextureView texture_view) { wgpuTextureViewRelease(texture_view); }
+
+    // extras
+    inline WGPUBindGroup make_bind_group(WGPUDevice device, WGPUBindGroupLayout layout, const WGPUBindGroupEntry& descriptor) {
+        return make_bind_group(device, {
+            .layout = layout,
+            .entryCount = 1,
+            .entries = &descriptor,
+        });
+    }
+
+    inline WGPUBindGroupLayout make_bind_group_layout(WGPUDevice device, const WGPUBindGroupLayoutEntry& entry) {
+        return make_bind_group_layout(device, {
+            .entryCount = 1,
+            .entries    = &entry,
+        });
+    }
+
+    inline WGPUShaderModule make_spirv_shader(WGPUDevice device, const uint32_t* code, uint32_t size, const char* label = nullptr) {
+        let desc = WGPUShaderModuleSPIRVDescriptor {
+            .chain    = { .sType = WGPUSType_ShaderModuleSPIRVDescriptor },
+            .codeSize = size / sizeof(uint32_t),
+            .code     = code,
+        };
+
+        return make_shader_module(device, {
+            .nextInChain = &desc.chain,
+            .label = label,
+        });
+    }
+
+    inline WGPURenderPassEncoder  begin_pass(WGPUCommandEncoder command_encoder, const WGPURenderPassColorAttachment& attachment) {
+        return begin_render_pass(command_encoder, {
+            .colorAttachmentCount = 1,
+            .colorAttachments = &attachment,
+        });
+    }
+
+    inline WGPUShaderModule make_wgsl_shader_module(WGPUDevice device, const char* const code, const char* label = nullptr) {
+        let wgsl = WGPUShaderModuleWGSLDescriptor {
+            .chain = { .sType = WGPUSType_ShaderModuleWGSLDescriptor },
+            .code = code,
+        };
+        return make_shader_module(device, {
+            .nextInChain = &wgsl.chain,
+            .label = label,
+        });
+    }
+
+    inline WGPUBuffer make_buffer(WGPUDevice device, WGPUQueue queue, const void* data, size_t size, WGPUBufferUsage usage) {
+        let buffer = make_buffer(device, {
+            .usage = (WGPUBufferUsageFlags) WGPUBufferUsage_CopyDst | usage,
+            .size  = size,
+        });
+        write_buffer(queue, buffer, 0, data, size);
+        return buffer;
+    }
+
+    inline void set_clear_color(WGPURenderPassColorAttachment& color_desc, WGPUColor color) {
+    #ifdef __EMSCRIPTEN__
+        // Dawn has both clearValue/clearColor but only Color works; Emscripten only has Value
+        color_desc.clearValue = color;
+    #else
+        color_desc.clearColor = color;
+    #endif
+    }
+
+    inline void submit(WGPUQueue queue, WGPUCommandEncoder command_encoder) {
+        tmp(commands, finish(command_encoder));
+        submit(queue, commands);
+    }
+}
+
+#endif //FRANCA2_WEB_WGPU_EX_H
