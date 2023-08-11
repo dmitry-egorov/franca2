@@ -2,7 +2,9 @@
 #define FRANCA2_WEB_EMSC_EX_H
 
 #include <emscripten/html5.h>
+#include "syntax.h"
 #include "maths2.h"
+#include "wgpu_ex.h"
 
 namespace emsc_ex {
     namespace {
@@ -31,11 +33,30 @@ namespace emsc_ex {
         return emscripten_webgpu_get_device();
     }
 
+    inline void remake_swap_chain_from_html_canvas(WGPUInstance instance, WGPUDevice device, const char *selector, WGPUSwapChain& swap_chain, usize2& size) {
+        using namespace wgpu_ex;
+
+        release(swap_chain);
+
+        size = get_element_css_usize2(selector);
+        set_canvas_element_size(selector, size);
+
+        tmp(surface, make_surface_from_html_canvas(instance, selector));
+
+        swap_chain = make_swap_chain(device, surface, {
+            .usage  = WGPUTextureUsage_RenderAttachment,
+            .format = WGPUTextureFormat_BGRA8Unorm,
+            .width  = size.w,
+            .height = size.h,
+            .presentMode = WGPUPresentMode_Fifo,
+        });
+    }
+
     int on_resize(EM_BOOL (*cb)()) {
         return emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, (void*)cb, false, resize_cb);
     }
 
-    int loop(int (*cb)(double time)) {
+    void loop(int (*cb)(double time)) {
         emscripten_request_animation_frame_loop(loop_cb, (void*)cb);
     }
 }

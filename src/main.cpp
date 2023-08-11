@@ -16,51 +16,54 @@
 #include "utility/wgsl_ex.h"
 
 using namespace wgpu_ex;
+using namespace wgsl_ex;
 using namespace arenas;
+
+let canvas_name = "canvas";
+
+let clear_color = WGPUColor {.r = 0.2f, .g = 0.2f, .b = 0.3f, .a = 1.0f};
 
 struct state_t {
     struct wgpu_state {
-        WGPUInstance       instance;
-        WGPUDevice         device;
-        WGPUQueue          queue;
-        WGPUSwapChain      swapchain;
+        WGPUInstance  instance;
+        WGPUDevice    device;
+        WGPUQueue     queue;
+        WGPUSwapChain swapchain;
+        usize2        size;
     } wgpu;
-
-    struct canvas_state {
-        const char *name;
-        usize2 size;
-    } canvas;
 
     struct resources_state {
         WGPUBuffer         uni_buf;
         WGPURenderPipeline pipeline;
         WGPUBindGroup      bind_group;
-    } resources;
+    } res;
 };
+
+#define using_state ref[wgpu, res] = state
 
 static state_t state;
 
-struct shader_uniforms {
-    wgsl_ex::transform2 world_to_clip;
+struct gpu_uniforms {
+    gpu_transform2 world_to_clip;
 };
 
 static char const triangle_wgsl[] = CODE(
-    struct transform2 {
+    struct gpu_transform2 {
         m: mat2x4f
     };
 
-    fn apply_to_point(t: transform2, p: vec2f) -> vec2f {return vec2f(
+    fn apply_to_point(t: gpu_transform2, p: vec2f) -> vec2f { return vec2f(
         t.m[0].x * p.x + t.m[0].y * p.y + t.m[0].z,
         t.m[1].x * p.x + t.m[1].y * p.y + t.m[1].z
     );}
 
     struct IO {
-        @location(0) vCol : vec3f,
-        @builtin(position) Position : vec4f
+        @location(0) vCol: vec3f,
+        @builtin(position) Position: vec4f
     }
 
     struct uniforms {
-        world_to_clip : transform2
+        world_to_clip : gpu_transform2
     }
 
     @group(0) @binding(0) var<uniform> uni : uniforms;
@@ -93,44 +96,27 @@ static char const triangle_wgsl[] = CODE(
 );
 
 int resize() {
-    state.canvas.size = emsc_ex::get_element_css_usize2(state.canvas.name);
-    emsc_ex::set_canvas_element_size(state.canvas.name, state.canvas.size);
-
-    release(state.wgpu.swapchain);
-
-    tmp(surface, make_surface(state.wgpu.instance, {
-        .nextInChain = &gta_one(WGPUSurfaceDescriptorFromCanvasHTMLSelector {
-            .chain = { .sType = WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector },
-            .selector = state.canvas.name
-        })->chain
-    }));
-
-    state.wgpu.swapchain = make_swap_chain(state.wgpu.device, surface, {
-        .usage  = WGPUTextureUsage_RenderAttachment,
-        .format = WGPUTextureFormat_BGRA8Unorm,
-        .width  = state.canvas.size.w,
-        .height = state.canvas.size.h,
-        .presentMode = WGPUPresentMode_Fifo,
-    });
-
+    using namespace emsc_ex;
+    using_state;
+    remake_swap_chain_from_html_canvas(wgpu.instance, wgpu.device, canvas_name, wgpu.swapchain, wgpu.size);
     return 1;
 }
 
 static bool init() {
+    using namespace emsc_ex;
     gta_init(8 * 1024 * 1024); // 8 MB of global temp storage
 
-    chk((state.wgpu.instance = make_instance({})           )) else return false;
-    chk((state.wgpu.device   = emsc_ex::get_wgpu_device()  )) else return false;
-    chk((state.wgpu.queue    = get_queue(state.wgpu.device))) else return false;
+    using_state;
 
-    state.canvas.name = "canvas";
-    resize();
-    emsc_ex::on_resize(resize);
+    chk((wgpu.instance = make_instance  ({})         )) else return false;
+    chk((wgpu.device   = get_wgpu_device()           )) else return false;
+    chk((wgpu.queue    = get_queue      (wgpu.device))) else return false;
 
-    // compile shaders
-    tmp(shader_module, make_wgsl_shader_module(state.wgpu.device, triangle_wgsl));
+    resize(); on_resize(resize);
 
-    state.resources.pipeline = make_render_pipeline(state.wgpu.device, {
+    tmp(shader_module, make_wgsl_shader_module(wgpu.device, triangle_wgsl));
+
+    res.pipeline = make_render_pipeline(wgpu.device, {
         .vertex = {
             .module     = shader_module,
             .entryPoint = "vs_main",
@@ -142,49 +128,49 @@ static bool init() {
             .count = 1,
             .mask  = 0xFFFFFFFF,
         },
-        .fragment = gta_one(WGPUFragmentState {
+        .fragment = &WGPUFragmentState{
             .module      = shader_module,
             .entryPoint  = "fs_main",
             .targetCount = 1,
-            .targets     = gta_one(WGPUColorTargetState {
+            .targets     = &WGPUColorTargetState{
                 .format    = WGPUTextureFormat_BGRA8Unorm,
                 .writeMask = WGPUColorWriteMask_All,
-            }),
-        }),
+            },
+        },
     });
 
-    state.resources.uni_buf = make_buffer<shader_uniforms>(state.wgpu.device, (WGPUBufferUsage) (WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform));
+    res.uni_buf = make_buffer<gpu_uniforms>(wgpu.device, (WGPUBufferUsage) (WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform));
 
-    state.resources.bind_group = make_single_entry_bind_group(state.wgpu.device, get_bind_group_layout(state.resources.pipeline, 0), {
-        .buffer = state.resources.uni_buf,
-        .size   = sizeof(shader_uniforms),
+    res.bind_group = make_single_entry_bind_group(wgpu.device, get_bind_group_layout(res.pipeline, 0), {
+        .buffer = res.uni_buf,
+        .size   = sizeof(gpu_uniforms),
     });
 
     return true;
 }
 
-/**
- * Draws using the above state.wgpu.pipeline and buffers.
- */
 static int draw(double time) {
     using namespace transforms;
+    using namespace wgsl_ex;
+    using_state;
+
     let world_to_clip =
            identity   ()
-        >> rotation   ({.v = (float) (0.0002 * time)})
-        //>> translation({.x = 0.3, .y = 0.3})
-        >> uniform_clip_to_clip(aspect_ratio_of(state.canvas.size))
+        >> rotation   ({.v = (float) (0.0001 * time)})
+        >> translation({.x = 0.3, .y = 0.3})
+        >> rotation   ({.v = (float) (0.00013 * time)})
+        >> uniform_clip_to_clip(wgpu.size)
     ;
 
-    write_buffer(state.wgpu.queue, state.resources.uni_buf, 0, wgsl_ex::to_wgsl_transform2(world_to_clip));
+    write_buffer(wgpu.queue, res.uni_buf, 0, to_gpu_transform2(world_to_clip));
 
     {
-        tmp(encoder, run_single_pass_encoder(state.wgpu.device, state.wgpu.swapchain, state.wgpu.queue, {
-            .clearValue = {.r = 0.2f, .g = 0.2f, .b = 0.3f, .a = 1.0f} // Note: might not work with Dawn
-        }));
+        tmp(encoder, run_single_pass_encoder(wgpu.device, wgpu.swapchain, wgpu.queue, { .clearValue = clear_color }));// Note: .clearValue might not work with Dawn
+        ref pass = encoder.pass;
 
-        set_pipeline  (encoder.pass, state.resources.pipeline);
-        set_bind_group(encoder.pass, 0, state.resources.bind_group);
-        draw          (encoder.pass, 3);
+        set_pipeline  (pass, res.pipeline);
+        set_bind_group(pass, 0, res.bind_group);
+        draw          (pass, 3);
 
 #ifndef __EMSCRIPTEN__
         present(state.wgpu.swapchain);
@@ -197,7 +183,6 @@ static int draw(double time) {
 }
 
 extern "C" __attribute__((used, visibility("default"))) void entry_point() {
-
     if (init()); else return;
     emsc_ex::loop(draw);
 }

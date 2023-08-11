@@ -245,6 +245,16 @@ namespace wgpu_ex {
     inline void release  (WGPUTextureView& texture_view) { if (texture_view) wgpuTextureViewRelease(texture_view); texture_view = nullptr; }
 
     // extras
+
+    inline WGPUSurface make_surface_from_html_canvas(WGPUInstance instance, const char *selector) {
+        return make_surface(instance, {
+            .nextInChain = (WGPUChainedStruct*)&WGPUSurfaceDescriptorFromCanvasHTMLSelector {
+                .chain    = {.sType = WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector},
+                .selector = selector
+            }
+        });
+    }
+
     inline WGPUBindGroup make_single_entry_bind_group(WGPUDevice device, WGPUBindGroupLayout layout, const WGPUBindGroupEntry& descriptor) {
         return make_bind_group(device, {
             .layout = layout,

@@ -31,6 +31,7 @@ public:
 #define var auto
 #define let const auto
 #define def constexpr
+#define ref auto&
 
 #define tmp(name, initializer) var name = (initializer); defer_release(name)
 

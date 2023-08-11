@@ -13,6 +13,7 @@
 
 namespace arenas {
     using namespace std;
+    using namespace arrays;
 
     struct arena {
         void*  memory;

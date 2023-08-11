@@ -102,6 +102,9 @@ namespace transforms {
     [[nodiscard]] inline transform2 uniform_clip_to_clip(const float aspect_ratio) { return scaling({ 1 / aspect_ratio, 1}); }
     [[nodiscard]] inline transform2 clip_to_uniform_clip(const float aspect_ratio) { return scaling({     aspect_ratio, 1}); }
 
+    [[nodiscard]] inline transform2 uniform_clip_to_clip(const usize2& size) { return scaling({ (float)size.h / (float)size.w, 1}); }
+    [[nodiscard]] inline transform2 clip_to_uniform_clip(const usize2& size) { return scaling({ (float)size.w / (float)size.h, 1}); }
+
     [[nodiscard]] inline transform2 uniform_uv_to_clip(const float aspect_ratio) { return uniform_uv_to_uv(aspect_ratio) >> uv_to_clip(); }
     [[nodiscard]] inline transform2 clip_to_uniform_uv(const float aspect_ratio) { return clip_to_uv() >> uv_to_uniform_uv(aspect_ratio); }
 
