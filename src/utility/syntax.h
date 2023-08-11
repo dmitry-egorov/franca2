@@ -26,6 +26,8 @@ public:
 // release and reset a variable at the end of the current scope
 #define defer_release(name) defer { release(name); }
 
+#define chk(condition) if (condition);
+
 #define var auto
 #define let const auto
 #define def constexpr

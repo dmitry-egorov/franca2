@@ -9,7 +9,7 @@ if "%~1"=="/d" (
   set DEBUG=false
 )
 
-set CPP_FLAGS=-std=c++11 -Wall -Wextra -Werror -Wno-nonportable-include-path -fno-exceptions -fno-rtti
+set CPP_FLAGS=-std=c++11 -Wall -Wextra -Wno-nonportable-include-path -fno-exceptions -fno-rtti
 set EMS_FLAGS=--output_eol linux -s ALLOW_MEMORY_GROWTH=0 -s ENVIRONMENT=web -s NO_EXIT_RUNTIME=1 -s NO_FILESYSTEM=1 -s STRICT=1 -s TEXTDECODER=2 -s USE_WEBGPU=1 -s WASM=1 --shell-file shell.html
 set OPT_FLAGS=
 

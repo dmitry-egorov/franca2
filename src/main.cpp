@@ -3,247 +3,203 @@
 #include <emscripten/html5.h>
 #include <emscripten/html5_webgpu.h>
 #include <cstdio>
+
+#include "utility/primitives.h"
+#include "utility/maths2.h"
 #include "utility/syntax.h"
+#include "utility/transforms.h"
+
+#include "utility/arenas.h"
+
 #include "utility/wgpu_ex.h"
+#include "utility/emsc_ex.h"
+#include "utility/wgsl_ex.h"
 
 using namespace wgpu_ex;
+using namespace arenas;
 
-WGPUDevice         wgpu_device;
-WGPUQueue          wgpu_queue;
-WGPUSwapChain      wgpu_swapchain;
-WGPURenderPipeline wgpu_pipeline;
+struct state_t {
+    struct wgpu_state {
+        WGPUInstance       instance;
+        WGPUDevice         device;
+        WGPUQueue          queue;
+        WGPUSwapChain      swapchain;
+    } wgpu;
 
-WGPUBuffer      vert_buf; // vertex buffer with triangle position and colours
-WGPUBuffer     index_buf; // index buffer
-WGPUBuffer       uni_buf; // uniform buffer (containing the rotation angle)
-WGPUBindGroup bind_group;
+    struct canvas_state {
+        const char *name;
+        usize2 size;
+    } canvas;
 
-/**
- * Current rotation angle (in degrees, updated per frame).
- */
-float rot_deg = 0.0f;
+    struct resources_state {
+        WGPUBuffer         uni_buf;
+        WGPURenderPipeline pipeline;
+        WGPUBindGroup      bind_group;
+    } resources;
+};
 
-/**
- * WGSL equivalent of \c triangle_vert_spirv.
- */
+static state_t state;
+
+struct shader_uniforms {
+    wgsl_ex::transform2 world_to_clip;
+};
+
 static char const triangle_wgsl[] = CODE(
-    struct VertexIn {
-        @location(0) aPos : vec2<f32>,
-        @location(1) aCol : vec3<f32>
+    struct transform2 {
+        m: mat2x4f
+    };
+
+    fn apply_to_point(t: transform2, p: vec2f) -> vec2f {return vec2f(
+        t.m[0].x * p.x + t.m[0].y * p.y + t.m[0].z,
+        t.m[1].x * p.x + t.m[1].y * p.y + t.m[1].z
+    );}
+
+    struct IO {
+        @location(0) vCol : vec3f,
+        @builtin(position) Position : vec4f
     }
-    struct VertexOut {
-        @location(0) vCol : vec3<f32>,
-        @builtin(position) Position : vec4<f32>
+
+    struct uniforms {
+        world_to_clip : transform2
     }
-    struct Rotation {
-        @location(0) degs : f32
-    }
-    @group(0) @binding(0) var<uniform> uRot : Rotation;
+
+    @group(0) @binding(0) var<uniform> uni : uniforms;
+
     @vertex
-    fn vs_main(input : VertexIn) -> VertexOut {
-        var rads : f32 = radians(uRot.degs);
-        var cosA : f32 = cos(rads);
-        var sinA : f32 = sin(rads);
-        var rot : mat3x3<f32> = mat3x3<f32>(
-            vec3<f32>( cosA, sinA, 0.0),
-            vec3<f32>(-sinA, cosA, 0.0),
-            vec3<f32>( 0.0,  0.0,  1.0));
-        var output : VertexOut;
-        output.Position = vec4<f32>(rot * vec3<f32>(input.aPos, 1.0), 1.0);
-        output.vCol = input.aCol;
-        return output;
+    fn vs_main(@builtin(vertex_index) index : u32) -> IO {
+        const poss = array<vec2f, 3>(
+            vec2f(-0.5,  0.5),
+            vec2f( 0.5,  0.5),
+            vec2f(-0.5, -0.5)
+        );
+
+        const cols = array<vec3f, 3>(
+            vec3f(0, 0, 1),
+            vec3f(0, 1, 0),
+            vec3f(1, 0, 0)
+        );
+
+        let pos = apply_to_point(uni.world_to_clip, poss[index]);
+        return IO(
+            cols[index],
+            vec4f(pos, 0, 1)
+        );
     }
 
     @fragment
-    fn fs_main(@location(0) vCol : vec3<f32>) -> @location(0) vec4<f32> {
-        return vec4<f32>(vCol, 1.0);
+    fn fs_main(@location(0) col : vec3f) -> @location(0) vec4f {
+        return vec4f(col, 1.0);
     }
 );
 
-// create the buffers (x, y, r, g, b)
-float const vertex_data[] = {
-    -0.8f, -0.8f, 0.0f, 0.0f, 1.0f, // BL
-     0.8f, -0.8f, 0.0f, 1.0f, 0.0f, // BR
-    -0.0f,  0.8f, 1.0f, 0.0f, 0.0f, // top
-};
-uint16_t const index_data[] = {
-    0, 1, 2,
-    0 // padding (better way of doing this?)
-};
+int resize() {
+    state.canvas.size = emsc_ex::get_element_css_usize2(state.canvas.name);
+    emsc_ex::set_canvas_element_size(state.canvas.name, state.canvas.size);
 
-/**
- * Helper to create a buffer.
- *
- * \param[in] data pointer to the start of the raw data
- * \param[in] size number of bytes in \a data
- * \param[in] usage type of buffer
- */
+    release(state.wgpu.swapchain);
 
-/**
- * Bare minimum wgpu_pipeline to draw a triangle using the above shaders.
- */
-static void init() {
-    wgpu_queue = get_queue(wgpu_device);
+    tmp(surface, make_surface(state.wgpu.instance, {
+        .nextInChain = &gta_one(WGPUSurfaceDescriptorFromCanvasHTMLSelector {
+            .chain = { .sType = WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector },
+            .selector = state.canvas.name
+        })->chain
+    }));
 
-    let canvas_desc = WGPUSurfaceDescriptorFromCanvasHTMLSelector {
-        .chain = { .sType = WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector },
-        .selector = "canvas"
-    };
-
-    let surface = make_surface(nullptr, {
-        .nextInChain = &canvas_desc.chain
-    });
-
-    wgpu_swapchain = make_swap_chain(wgpu_device, surface, {
+    state.wgpu.swapchain = make_swap_chain(state.wgpu.device, surface, {
         .usage  = WGPUTextureUsage_RenderAttachment,
         .format = WGPUTextureFormat_BGRA8Unorm,
-        .width  = 800,
-        .height = 450,
+        .width  = state.canvas.size.w,
+        .height = state.canvas.size.h,
         .presentMode = WGPUPresentMode_Fifo,
     });
 
-    // compile shaders
-    // NOTE: these are now the WGSL shaders (tested with Dawn and Chrome Canary)
-    tmp(shader_module, make_wgsl_shader_module(wgpu_device, triangle_wgsl));
-
-    // bind group layout (used by both the wgpu_pipeline layout and uniform bind group, released at the end of this function)
-    tmp(bind_group_layout, make_bind_group_layout(wgpu_device, {
-        .binding    = 0,
-        .visibility = WGPUShaderStage_Vertex,
-        .buffer     = {.type = WGPUBufferBindingType_Uniform},
-    }));
-
-    tmp(pipeline_layout, make_pipeline_layout(wgpu_device, {
-        .bindGroupLayoutCount = 1,
-        .bindGroupLayouts = &bind_group_layout,
-    }));
-
-    // describe buffer layouts
-    WGPUVertexAttribute vertex_attributes[2] = {{
-        .format = WGPUVertexFormat_Float32x2,
-        .offset = 0,
-        .shaderLocation = 0,
-    },                                          {
-        .format = WGPUVertexFormat_Float32x3,
-        .offset = 2 * sizeof(float),
-        .shaderLocation = 1,
-    }};
-
-    let vb_layout = WGPUVertexBufferLayout {
-        .arrayStride    = 5 * sizeof(float),
-        .attributeCount = 2,
-        .attributes     = vertex_attributes,
-    };
-
-    // Fragment state
-    let blend = WGPUBlendState {
-        .color = {
-            .operation = WGPUBlendOperation_Add,
-            .srcFactor = WGPUBlendFactor_One,
-            .dstFactor = WGPUBlendFactor_One,
-        },
-        .alpha = {
-            .operation = WGPUBlendOperation_Add,
-            .srcFactor = WGPUBlendFactor_One,
-            .dstFactor = WGPUBlendFactor_One,
-        }
-    };
-
-    let colorTarget = WGPUColorTargetState {
-        .format = WGPUTextureFormat_BGRA8Unorm,
-        .blend  = &blend,
-        .writeMask = WGPUColorWriteMask_All,
-    };
-
-    let fragment = WGPUFragmentState {
-        .module = shader_module,
-        .entryPoint = "fs_main",
-        .targetCount = 1,
-        .targets = &colorTarget,
-    };
-
-    // Other state
-    wgpu_pipeline = make_render_pipeline(wgpu_device, {
-        .layout = pipeline_layout,
-        .vertex = {
-            .module      = shader_module,
-            .entryPoint  = "vs_main",
-            .bufferCount = 1,//0,
-            .buffers     = &vb_layout,
-        },
-        .primitive = {
-            .topology         = WGPUPrimitiveTopology_TriangleList,
-            .stripIndexFormat = WGPUIndexFormat_Undefined,
-            .frontFace        = WGPUFrontFace_CCW,
-            .cullMode         = WGPUCullMode_None,
-        },
-        .depthStencil = nullptr,
-        .multisample = {
-            .count = 1,
-            .mask = 0xFFFFFFFF,
-            .alphaToCoverageEnabled = false,
-        },
-        .fragment = &fragment,
-    });
-
-     vert_buf = make_buffer(wgpu_device, wgpu_queue, vertex_data, sizeof(vertex_data), WGPUBufferUsage_Vertex );
-    index_buf = make_buffer(wgpu_device, wgpu_queue,  index_data, sizeof(index_data ), WGPUBufferUsage_Index  );
-      uni_buf = make_buffer(wgpu_device, wgpu_queue, &rot_deg   , sizeof(rot_deg    ), WGPUBufferUsage_Uniform);
-
-    bind_group = make_bind_group(wgpu_device, bind_group_layout, {
-        .binding = 0,
-        .buffer  = uni_buf,
-        .offset  = 0,
-        .size    = sizeof(rot_deg),
-    });
+    return 1;
 }
 
-/**
- * Draws using the above wgpu_pipeline and buffers.
- */
-static EM_BOOL draw(double /*time*/, void*) {
-    tmp(back_buf_view, get_current_texture_view(wgpu_swapchain));
+static bool init() {
+    gta_init(8 * 1024 * 1024); // 8 MB of global temp storage
 
-    var color_desc = WGPURenderPassColorAttachment {
-        .view    = back_buf_view,
-        .loadOp  = WGPULoadOp_Clear,
-        .storeOp = WGPUStoreOp_Store,
-    };
-    set_clear_color(color_desc, { .r = 0.3f, .g = 0.3f, .b = 0.3f, .a = 1.0f });
+    chk((state.wgpu.instance = make_instance({})           )) else return false;
+    chk((state.wgpu.device   = emsc_ex::get_wgpu_device()  )) else return false;
+    chk((state.wgpu.queue    = get_queue(state.wgpu.device))) else return false;
 
-    tmp(encoder, make_command_encoder(wgpu_device));
-    tmp(pass   , begin_pass(encoder, color_desc));
+    state.canvas.name = "canvas";
+    resize();
+    emsc_ex::on_resize(resize);
 
-    // update the rotation
-    rot_deg += 0.1f;
-    write_buffer(wgpu_queue, uni_buf, 0, &rot_deg, sizeof(rot_deg));
+    // compile shaders
+    tmp(shader_module, make_wgsl_shader_module(state.wgpu.device, triangle_wgsl));
 
-    // draw the triangle (comment these five lines to simply clear the screen)
-    set_pipeline     (pass, wgpu_pipeline);
-    set_bind_group   (pass, 0, bind_group, 0, nullptr);
-    set_vertex_buffer(pass, 0, vert_buf, 0, sizeof(vertex_data));
-    set_index_buffer (pass, index_buf, WGPUIndexFormat_Uint16, 0, sizeof(index_data));
-    draw_indexed     (pass, 3, 1, 0, 0, 0);
+    state.resources.pipeline = make_render_pipeline(state.wgpu.device, {
+        .vertex = {
+            .module     = shader_module,
+            .entryPoint = "vs_main",
+        },
+        .primitive = {
+            .topology = WGPUPrimitiveTopology_TriangleList,
+        },
+        .multisample = {
+            .count = 1,
+            .mask  = 0xFFFFFFFF,
+        },
+        .fragment = gta_one(WGPUFragmentState {
+            .module      = shader_module,
+            .entryPoint  = "fs_main",
+            .targetCount = 1,
+            .targets     = gta_one(WGPUColorTargetState {
+                .format    = WGPUTextureFormat_BGRA8Unorm,
+                .writeMask = WGPUColorWriteMask_All,
+            }),
+        }),
+    });
 
-    end(pass);
-    submit(wgpu_queue, encoder);
+    state.resources.uni_buf = make_buffer<shader_uniforms>(state.wgpu.device, (WGPUBufferUsage) (WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform));
 
-#ifndef __EMSCRIPTEN__
-    /*
-     * TODO: wgpuSwapChainPresent is unsupported in Emscripten, so what do we do?
-     */
-    present(wgpu_swapchain);
-#endif
+    state.resources.bind_group = make_single_entry_bind_group(state.wgpu.device, get_bind_group_layout(state.resources.pipeline, 0), {
+        .buffer = state.resources.uni_buf,
+        .size   = sizeof(shader_uniforms),
+    });
 
     return true;
 }
 
-extern "C" __attribute__((used, visibility("default"))) int entry_point() {
-    if ((wgpu_device = emscripten_webgpu_get_device())); else return -1;
+/**
+ * Draws using the above state.wgpu.pipeline and buffers.
+ */
+static int draw(double time) {
+    using namespace transforms;
+    let world_to_clip =
+           identity   ()
+        >> rotation   ({.v = (float) (0.0002 * time)})
+        //>> translation({.x = 0.3, .y = 0.3})
+        >> uniform_clip_to_clip(aspect_ratio_of(state.canvas.size))
+    ;
 
-    init();
-    emscripten_request_animation_frame_loop(draw, nullptr);
-    return 0;
+    write_buffer(state.wgpu.queue, state.resources.uni_buf, 0, wgsl_ex::to_wgsl_transform2(world_to_clip));
+
+    {
+        tmp(encoder, run_single_pass_encoder(state.wgpu.device, state.wgpu.swapchain, state.wgpu.queue, {
+            .clearValue = {.r = 0.2f, .g = 0.2f, .b = 0.3f, .a = 1.0f} // Note: might not work with Dawn
+        }));
+
+        set_pipeline  (encoder.pass, state.resources.pipeline);
+        set_bind_group(encoder.pass, 0, state.resources.bind_group);
+        draw          (encoder.pass, 3);
+
+#ifndef __EMSCRIPTEN__
+        present(state.wgpu.swapchain);
+#endif
+    }
+
+    gta_reset();
+
+    return true;
+}
+
+extern "C" __attribute__((used, visibility("default"))) void entry_point() {
+
+    if (init()); else return;
+    emsc_ex::loop(draw);
 }
 
 namespace impl {

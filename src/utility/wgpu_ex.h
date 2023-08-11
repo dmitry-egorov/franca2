@@ -3,6 +3,7 @@
 
 #include <webgpu/webgpu.h>
 #include "syntax.h"
+#include "arrays.h"
 
 namespace wgpu_ex {
     inline WGPUInstance make_instance(const WGPUInstanceDescriptor& descriptor) { return wgpuCreateInstance(&descriptor); }
@@ -25,7 +26,7 @@ namespace wgpu_ex {
     // Methods of BindGroupLayout
     inline void set_label(WGPUBindGroupLayout bind_group_layout, char const * label);
     inline void reference(WGPUBindGroupLayout bind_group_layout);
-    inline void release  (WGPUBindGroupLayout bind_group_layout) { wgpuBindGroupLayoutRelease(bind_group_layout); }
+    inline void release  (WGPUBindGroupLayout& bind_group_layout) { if (bind_group_layout) wgpuBindGroupLayoutRelease(bind_group_layout); bind_group_layout = nullptr; }
 
     // Methods of Buffer
     inline void const *         get_const_mapped_range(WGPUBuffer buffer, size_t offset, size_t size);
@@ -44,7 +45,7 @@ namespace wgpu_ex {
     // Methods of CommandBuffer
     inline void set_label(WGPUCommandBuffer command_buffer, char const * label);
     inline void reference(WGPUCommandBuffer command_buffer);
-    inline void release  (WGPUCommandBuffer command_buffer) { wgpuCommandBufferRelease(command_buffer); }
+    inline void release  (WGPUCommandBuffer& command_buffer) { if (command_buffer) wgpuCommandBufferRelease(command_buffer); command_buffer = nullptr; }
 
     // Methods of CommandEncoder
     inline WGPUComputePassEncoder begin_compute_pass(WGPUCommandEncoder command_encoder, WGPU_NULLABLE const WGPUComputePassDescriptor& descriptor);
@@ -62,7 +63,7 @@ namespace wgpu_ex {
     inline void set_label              (WGPUCommandEncoder command_encoder, char const * label);
     inline void write_timestamp        (WGPUCommandEncoder command_encoder, WGPUQuerySet query_set, uint32_t query_index);
     inline void reference              (WGPUCommandEncoder command_encoder);
-    inline void release                (WGPUCommandEncoder command_encoder) { wgpuCommandEncoderRelease(command_encoder); }
+    inline void release                (WGPUCommandEncoder& command_encoder) { if (command_encoder) wgpuCommandEncoderRelease(command_encoder); command_encoder = nullptr; }
 
     // Methods of ComputePassEncoder
     inline void begin_pipeline_statistics_query(WGPUComputePassEncoder compute_pass_encoder, WGPUQuerySet query_set, uint32_t query_index);
@@ -121,12 +122,12 @@ namespace wgpu_ex {
     inline void process_events (WGPUInstance instance);
     inline void request_adapter(WGPUInstance instance, WGPU_NULLABLE const WGPURequestAdapterOptions& options, WGPURequestAdapterCallback callback, void * userdata);
     inline void reference      (WGPUInstance instance);
-    inline void release        (WGPUInstance instance);
+    inline void release        (WGPUInstance& instance) { if (instance) wgpuInstanceRelease(instance); instance = nullptr; }
 
     // Methods of PipelineLayout
     inline void set_label(WGPUPipelineLayout pipeline_layout, char const * label);
     inline void reference(WGPUPipelineLayout pipeline_layout);
-    inline void release  (WGPUPipelineLayout pipeline_layout) { wgpuPipelineLayoutRelease(pipeline_layout); }
+    inline void release  (WGPUPipelineLayout& pipeline_layout) { if (pipeline_layout) wgpuPipelineLayoutRelease(pipeline_layout); pipeline_layout = nullptr; }
 
     // Methods of QuerySet
     inline uint32_t      get_count(WGPUQuerySet query_set);
@@ -171,7 +172,7 @@ namespace wgpu_ex {
     // Methods of RenderPassEncoder
     inline void begin_occlusion_query          (WGPURenderPassEncoder render_pass_encoder, uint32_t query_index);
     inline void begin_pipeline_statistics_query(WGPURenderPassEncoder render_pass_encoder, WGPUQuerySet query_set, uint32_t queryIndex);
-    inline void draw                           (WGPURenderPassEncoder render_pass_encoder, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance);
+    inline void draw                           (WGPURenderPassEncoder render_pass_encoder, uint32_t vertex_count, uint32_t instance_count = 1, uint32_t first_vertex = 0, uint32_t first_instance = 0) { wgpuRenderPassEncoderDraw(render_pass_encoder, vertex_count, instance_count, first_vertex, first_instance); }
     inline void draw_indexed                   (WGPURenderPassEncoder render_pass_encoder, uint32_t index_count, uint32_t instance_count, uint32_t first_index, int32_t base_vertex, uint32_t first_instance) { wgpuRenderPassEncoderDrawIndexed(render_pass_encoder, index_count, instance_count, first_index, base_vertex, first_instance); }
     inline void draw_indexed_indirect          (WGPURenderPassEncoder render_pass_encoder, WGPUBuffer indirect_buffer, uint64_t indirect_offset);
     inline void draw_indirect                  (WGPURenderPassEncoder render_pass_encoder, WGPUBuffer indirect_buffer, uint64_t indirect_offset);
@@ -182,7 +183,7 @@ namespace wgpu_ex {
     inline void insert_debug_marker            (WGPURenderPassEncoder render_pass_encoder, char const * marker_label);
     inline void pop_debug_group                (WGPURenderPassEncoder render_pass_encoder);
     inline void push_debug_group               (WGPURenderPassEncoder render_pass_encoder, char const * group_label);
-    inline void set_bind_group                 (WGPURenderPassEncoder render_pass_encoder, uint32_t group_index, WGPU_NULLABLE WGPUBindGroup group, size_t dynamic_offset_count, uint32_t const * dynamic_offsets) { wgpuRenderPassEncoderSetBindGroup(render_pass_encoder, group_index, group, dynamic_offset_count, dynamic_offsets); }
+    inline void set_bind_group                 (WGPURenderPassEncoder render_pass_encoder, uint32_t group_index, WGPU_NULLABLE WGPUBindGroup group, size_t dynamic_offset_count = 0, uint32_t const * dynamic_offsets = nullptr) { wgpuRenderPassEncoderSetBindGroup(render_pass_encoder, group_index, group, dynamic_offset_count, dynamic_offsets); }
     inline void set_blend_constant             (WGPURenderPassEncoder render_pass_encoder, WGPUColor const * color);
     inline void set_index_buffer               (WGPURenderPassEncoder render_pass_encoder, WGPUBuffer buffer, WGPUIndexFormat format, uint64_t offset, uint64_t size) { wgpuRenderPassEncoderSetIndexBuffer(render_pass_encoder, buffer, format, offset, size); }
     inline void set_label                      (WGPURenderPassEncoder render_pass_encoder, char const * label);
@@ -193,10 +194,10 @@ namespace wgpu_ex {
     inline void set_viewport                   (WGPURenderPassEncoder render_pass_encoder, float x, float y, float width, float height, float min_depth, float max_depth);
     inline void write_timestamp                (WGPURenderPassEncoder render_pass_encoder, WGPUQuerySet query_set, uint32_t query_index);
     inline void reference                      (WGPURenderPassEncoder render_pass_encoder);
-    inline void release                        (WGPURenderPassEncoder render_pass_encoder) { wgpuRenderPassEncoderRelease(render_pass_encoder); }
+    inline void release                        (WGPURenderPassEncoder& render_pass_encoder) { if (render_pass_encoder) wgpuRenderPassEncoderRelease(render_pass_encoder); render_pass_encoder = nullptr; }
 
     // Methods of RenderPipeline
-    inline WGPUBindGroupLayout get_bind_group_layout(WGPURenderPipeline render_pipeline, uint32_t group_index);
+    inline WGPUBindGroupLayout get_bind_group_layout(WGPURenderPipeline render_pipeline, uint32_t group_index) { return wgpuRenderPipelineGetBindGroupLayout(render_pipeline, group_index); }
     inline void set_label(WGPURenderPipeline render_pipeline, char const * label);
     inline void reference(WGPURenderPipeline render_pipeline);
     inline void release  (WGPURenderPipeline render_pipeline);
@@ -210,18 +211,18 @@ namespace wgpu_ex {
     inline void get_compilation_info(WGPUShaderModule shader_module, WGPUCompilationInfoCallback callback, void * userdata);
     inline void set_label           (WGPUShaderModule shader_module, char const * label);
     inline void reference           (WGPUShaderModule shader_module);
-    inline void release             (WGPUShaderModule shader_module) { wgpuShaderModuleRelease(shader_module); }
+    inline void release             (WGPUShaderModule& shader_module) { if (shader_module) wgpuShaderModuleRelease(shader_module); shader_module = nullptr; }
 
     // Methods of Surface
     inline WGPUTextureFormat get_preferred_format(WGPUSurface surface, WGPUAdapter adapter);
     inline void reference(WGPUSurface surface);
-    inline void release  (WGPUSurface surface);
+    inline void release  (WGPUSurface& surface) { if (surface) wgpuSurfaceRelease(surface); surface = nullptr; }
 
     // Methods of SwapChain
     inline WGPUTextureView get_current_texture_view(WGPUSwapChain swap_chain) { return wgpuSwapChainGetCurrentTextureView(swap_chain); }
     inline void present  (WGPUSwapChain swap_chain) { wgpuSwapChainPresent(swap_chain); }
     inline void reference(WGPUSwapChain swap_chain);
-    inline void release  (WGPUSwapChain swap_chain);
+    inline void release  (WGPUSwapChain& swap_chain) { if (swap_chain) wgpuSwapChainRelease(swap_chain); swap_chain = nullptr; }
 
     // Methods of Texture
     inline WGPUTextureView       make_view    (WGPUTexture texture, WGPU_NULLABLE const WGPUTextureViewDescriptor& descriptor);
@@ -241,10 +242,10 @@ namespace wgpu_ex {
     // Methods of TextureView
     inline void set_label(WGPUTextureView texture_view, char const * label);
     inline void reference(WGPUTextureView texture_view);
-    inline void release  (WGPUTextureView texture_view) { wgpuTextureViewRelease(texture_view); }
+    inline void release  (WGPUTextureView& texture_view) { if (texture_view) wgpuTextureViewRelease(texture_view); texture_view = nullptr; }
 
     // extras
-    inline WGPUBindGroup make_bind_group(WGPUDevice device, WGPUBindGroupLayout layout, const WGPUBindGroupEntry& descriptor) {
+    inline WGPUBindGroup make_single_entry_bind_group(WGPUDevice device, WGPUBindGroupLayout layout, const WGPUBindGroupEntry& descriptor) {
         return make_bind_group(device, {
             .layout = layout,
             .entryCount = 1,
@@ -272,7 +273,7 @@ namespace wgpu_ex {
         });
     }
 
-    inline WGPURenderPassEncoder  begin_pass(WGPUCommandEncoder command_encoder, const WGPURenderPassColorAttachment& attachment) {
+    inline WGPURenderPassEncoder begin_pass(WGPUCommandEncoder command_encoder, const WGPURenderPassColorAttachment& attachment) {
         return begin_render_pass(command_encoder, {
             .colorAttachmentCount = 1,
             .colorAttachments = &attachment,
@@ -290,7 +291,21 @@ namespace wgpu_ex {
         });
     }
 
-    inline WGPUBuffer make_buffer(WGPUDevice device, WGPUQueue queue, const void* data, size_t size, WGPUBufferUsage usage) {
+    inline WGPUBuffer make_buffer(WGPUDevice device, WGPUBufferUsage usage, size_t size) {
+        return make_buffer(device, {
+            .usage = usage,
+            .size  = size,
+        });
+    }
+
+    tt WGPUBuffer make_buffer(WGPUDevice device, WGPUBufferUsage usage) {
+        return make_buffer(device, {
+            .usage = usage,
+            .size  = sizeof(t),
+        });
+    }
+
+    inline WGPUBuffer make_buffer(WGPUDevice device, WGPUQueue queue, WGPUBufferUsage usage, const void* data, size_t size) {
         let buffer = make_buffer(device, {
             .usage = (WGPUBufferUsageFlags) WGPUBufferUsage_CopyDst | usage,
             .size  = size,
@@ -299,18 +314,49 @@ namespace wgpu_ex {
         return buffer;
     }
 
-    inline void set_clear_color(WGPURenderPassColorAttachment& color_desc, WGPUColor color) {
-    #ifdef __EMSCRIPTEN__
-        // Dawn has both clearValue/clearColor but only Color works; Emscripten only has Value
-        color_desc.clearValue = color;
-    #else
-        color_desc.clearColor = color;
-    #endif
+    tt WGPUBuffer make_buffer(WGPUDevice device, WGPUQueue queue, WGPUBufferUsage usage, const t& data) {
+        return make_buffer(device, queue, usage, &data, sizeof(t));
+    }
+
+    tt void write_buffer(WGPUQueue queue, WGPUBuffer buffer, uint64_t buffer_offset, const t& data) {
+        return write_buffer(queue, buffer, buffer_offset, &data, sizeof(t));
     }
 
     inline void submit(WGPUQueue queue, WGPUCommandEncoder command_encoder) {
         tmp(commands, finish(command_encoder));
         submit(queue, commands);
+    }
+
+    struct WGPUEXSinglePassCommandEncoderImpl {
+        WGPUCommandEncoder    encoder;
+        WGPURenderPassEncoder pass;
+        WGPUTextureView       view;
+
+        WGPUQueue queue;
+    };
+
+    inline WGPUEXSinglePassCommandEncoderImpl run_single_pass_encoder(WGPUDevice device, WGPUSwapChain swap_chain, WGPUQueue queue, const WGPURenderPassColorAttachment& attachment, const WGPUCommandEncoderDescriptor& desc = {}) {
+        let back_buf_view = get_current_texture_view(swap_chain);
+
+        var att_copy = attachment;
+        att_copy.view = back_buf_view;
+        if (!att_copy. loadOp) att_copy. loadOp = WGPULoadOp_Clear;
+        if (!att_copy.storeOp) att_copy.storeOp = WGPUStoreOp_Store;
+
+        let encoder = make_command_encoder(device, desc);
+        let pass    = begin_pass(encoder, att_copy);
+
+        return {encoder, pass, back_buf_view, queue};
+    }
+
+
+    inline void release(WGPUEXSinglePassCommandEncoderImpl& encoder) {
+        end   (encoder.pass);
+        submit(encoder.queue, encoder.encoder);
+
+        release(encoder.pass   );
+        release(encoder.encoder);
+        release(encoder.view   );
     }
 }
 
