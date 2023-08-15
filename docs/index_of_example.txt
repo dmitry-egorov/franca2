@@ -13,8 +13,13 @@ alternative:
 
 find index of 'item in 'array
  <- loop over array
-		element == item ? index
+		element == item ? <- index
 	: not found
+
+find index of 'item in 'array
+    loop over array
+		element == item ? <- index
+ <- not found
 
 
 - it's not a plain text

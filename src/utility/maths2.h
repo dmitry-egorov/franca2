@@ -10,6 +10,7 @@
 
 struct float2 { float x, y; };
 
+constexpr float2 zero2f = { 0, 0 };
 inline float2 saturate(const float2& v) { return { saturate(v.x), saturate(v.y) }; }
 
 inline float2 flip_y(const float2& v) { return {v.x, -v.y}; }
@@ -86,8 +87,8 @@ struct fsize2 {
         };
         float2 v;
     };
-
 };
+
 
 struct uint2 { uint x, y; };
 
@@ -100,6 +101,19 @@ struct usize2 {
         uint2 v;
     };
 };
+
+
+inline fsize2 operator*(const usize2& v, const float& s) {
+    return {.x = (float)v.w * s, .y = (float)v.h * s };
+}
+
+inline usize2 to_usize2(const fsize2 s) {
+    return {.w = (uint)s.w, .h = (uint)s.h };
+}
+
+inline float2 operator/(const fsize2& vf, const usize2& vu) {
+    return {.x = vf.x / (float)vu.w, .y = vf.y / (float)vu.y };
+}
 
 inline float aspect_ratio_of(const usize2 s) {
     return (float)s.w / (float)s.h;

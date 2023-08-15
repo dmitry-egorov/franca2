@@ -9,9 +9,16 @@
 
 struct float3 {
     union {
-        struct { float x, y, z; };
-        struct { float2 xy; float _; };
-        struct { float __; float2 yz; };
+        struct { float  x, y, z; };
+        struct { float2 xy; float  _z; };
+        struct { float  _x; float2 yz; };
+    };
+};
+struct uint3 {
+    union {
+        struct { uint  x, y, z; };
+        struct { uint2 xy; uint  _z; };
+        struct { uint  _x; uint2 yz; };
     };
 };
 

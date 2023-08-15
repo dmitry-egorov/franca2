@@ -96,8 +96,11 @@ namespace transforms {
 
     // Note: uniform uv is a space [-ar, ar] x [0, 1] where ar is aspect ratio
 
-    [[nodiscard]] inline transform2 uniform_uv_to_uv(const float aspect_ratio) { return scaling({ 1 / aspect_ratio, 1}, 0.5f); }
-    [[nodiscard]] inline transform2 uv_to_uniform_uv(const float aspect_ratio) { return scaling({     aspect_ratio, 1}, 0.5f); }
+    [[nodiscard]] inline transform2 uniform_uv_to_uv(const float aspect_ratio, float2 center) { return scaling({ 1 / aspect_ratio, 1}, center); }
+    [[nodiscard]] inline transform2 uv_to_uniform_uv(const float aspect_ratio, float2 center) { return scaling({     aspect_ratio, 1}, center); }
+
+    [[nodiscard]] inline transform2 uniform_uv_to_uv(const usize2& size, float2 center) { return scaling({ (float)size.h / (float)size.w, 1 }, center); }
+    [[nodiscard]] inline transform2 uv_to_uniform_uv(const usize2& size, float2 center) { return scaling({ (float)size.w / (float)size.h, 1 }, center); }
 
     [[nodiscard]] inline transform2 uniform_clip_to_clip(const float aspect_ratio) { return scaling({ 1 / aspect_ratio, 1}); }
     [[nodiscard]] inline transform2 clip_to_uniform_clip(const float aspect_ratio) { return scaling({     aspect_ratio, 1}); }
@@ -105,14 +108,14 @@ namespace transforms {
     [[nodiscard]] inline transform2 uniform_clip_to_clip(const usize2& size) { return scaling({ (float)size.h / (float)size.w, 1}); }
     [[nodiscard]] inline transform2 clip_to_uniform_clip(const usize2& size) { return scaling({ (float)size.w / (float)size.h, 1}); }
 
-    [[nodiscard]] inline transform2 uniform_uv_to_clip(const float aspect_ratio) { return uniform_uv_to_uv(aspect_ratio) >> uv_to_clip(); }
-    [[nodiscard]] inline transform2 clip_to_uniform_uv(const float aspect_ratio) { return clip_to_uv() >> uv_to_uniform_uv(aspect_ratio); }
+    [[nodiscard]] inline transform2 uniform_uv_to_clip(const float aspect_ratio, float2 center) { return uniform_uv_to_uv(aspect_ratio, center) >> uv_to_clip(); }
+    [[nodiscard]] inline transform2 clip_to_uniform_uv(const float aspect_ratio, float2 center) { return clip_to_uv() >> uv_to_uniform_uv(aspect_ratio, center); }
 
     [[nodiscard]] inline transform2 rect_to_uv(const fsize2& size) { return scaling(1 / size.v); }
     [[nodiscard]] inline transform2 uv_to_rect(const fsize2& size) { return scaling(    size.v); }
 
-    [[nodiscard]] inline transform2 rect_to_uniform_uv(const fsize2& size) { return rect_to_uv(size) >> uv_to_uniform_uv(size.w / size.h); }
-    [[nodiscard]] inline transform2 uniform_uv_to_rect(const fsize2& size) { return uniform_uv_to_uv(size.w / size.h) >> uv_to_rect(size); }
+    [[nodiscard]] inline transform2 rect_to_uniform_uv(const fsize2& size, float2 center) { return rect_to_uv(size) >> uv_to_uniform_uv(size.w / size.h, center); }
+    [[nodiscard]] inline transform2 uniform_uv_to_rect(const fsize2& size, float2 center) { return uniform_uv_to_uv(size.w / size.h, center) >> uv_to_rect(size); }
 
     [[nodiscard]] inline float2 apply(const transform2& t, const float3& v) { return {
         t._00 * v.x + t._01 * v.y + t._02 * v.z,

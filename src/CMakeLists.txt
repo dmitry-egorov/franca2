@@ -2,13 +2,11 @@ cmake_minimum_required(VERSION 2.9)
 
 project(franca2_web)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wno-nonportable-include-path -Wno-address-of-temporary -fno-exceptions -fno-rtti")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20 -Wall -Wextra -Werror -Wno-nonportable-include-path -Wno-address-of-temporary -fno-exceptions -fno-rtti")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g3 -D_DEBUG=1 -Wno-unused -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g0 -DNDEBUG=1 -flto -O3")
 
 file(GLOB sources *.cpp)
-file(GLOB_RECURSE headers *.h)
-file(GLOB_RECURSE headers utility/*.h)
 
 if (EMSCRIPTEN)
 	set(CMAKE_EXECUTABLE_SUFFIX ".html")
@@ -27,5 +25,3 @@ if (EMSCRIPTEN)
 endif()
 
 add_executable(franca2_web ${sources} ${platform_sources} ${headers})
-
-target_include_directories(franca2_web PRIVATE "${CMAKE_CURRENT_LIST_DIR}/inc")

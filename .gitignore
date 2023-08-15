@@ -3,8 +3,11 @@
 _ReSharper.Caches/
 obj/
 bin/
+cmake-build-debug/
+cmake-build-release/
 cmake-build-debug-emscripten/
 cmake-build-release-emscripten/
 out/
+embedded/
 
 franca2.10x

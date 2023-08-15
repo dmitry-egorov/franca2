@@ -1,0 +1,21 @@
+- [ ] display node tree
+- [ ] navigate with cursor
+- [ ] edit
+- [ ] execute
+
+done
+- [+] draw line numbers
+- [+] align arena allocations
+- [+] measure performance
+    - [+] write timestamp queries
+    - [+] debug panel
+    - [+] display gpu time in the debug window
+    - [+] timing string in a compute shader
+- [+] round inlays
+- [+] wgsl files
+- [+] display nesting inlays
+- [+] display text colors
+- [+] display text view
+    - [+] text represented as a set of glyph ids
+- [+] dpi aware resolution
+- [+] alpha blend

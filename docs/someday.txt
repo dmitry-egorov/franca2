@@ -1,0 +1,1 @@
+- [ ] compare performance of generating diag text on cpu and gpu

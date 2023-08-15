@@ -1,0 +1,17 @@
+print [{6Hello, world!}]
+
+[{num 0}] = [{71.5}]
+[{num 1}] = [{73.3}]
+[{num 2}] = [{72.8}]
+[{sum}]   = [[([{num 0}] + [{num 1}])] * [{num 2}]]
+print [{6The sum of} [{num 0}] {6and} [{num 1}] {6is} [{sum}]]
+
+{4def} [index of [{item}] in [{array}]]
+    loop over [{array}]
+        if [[{5element}] is [{item}]] then [{3return} [{5index}]]
+    {3return} [{7not found}]
+
+{4def} [index of [{item}] in [{array}]]
+    loop over [{array}]
+        [[{5element}] == [{item}]] ? [{3<-} [{5index}]]
+ {3<-} [{7not found}]

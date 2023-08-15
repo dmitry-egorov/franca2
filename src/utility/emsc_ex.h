@@ -33,21 +33,23 @@ namespace emsc_ex {
         return emscripten_webgpu_get_device();
     }
 
-    inline void remake_swap_chain_from_html_canvas(WGPUInstance instance, WGPUDevice device, const char *selector, WGPUSwapChain& swap_chain, usize2& size) {
+    inline void remake_swap_chain_from_html_canvas(WGPUInstance instance, WGPUDevice device, const char *selector, WGPUSwapChain& swap_chain, usize2& px_size) {
         using namespace wgpu_ex;
 
         release(swap_chain);
 
-        size = get_element_css_usize2(selector);
-        set_canvas_element_size(selector, size);
+        let dips_size = get_element_css_usize2(selector);
+        set_canvas_element_size(selector, dips_size);
 
         tmp(surface, make_surface_from_html_canvas(instance, selector));
 
+        let dpi_ratio = emscripten_get_device_pixel_ratio();
+        px_size    = to_usize2(dips_size * (float)dpi_ratio);
         swap_chain = make_swap_chain(device, surface, {
             .usage  = WGPUTextureUsage_RenderAttachment,
             .format = WGPUTextureFormat_BGRA8Unorm,
-            .width  = size.w,
-            .height = size.h,
+            .width  = px_size.w,
+            .height = px_size.h,
             .presentMode = WGPUPresentMode_Fifo,
         });
     }

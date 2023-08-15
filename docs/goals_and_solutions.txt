@@ -3,6 +3,7 @@ overall goal:
 
 solution ideas:
 - separate displaying from editing
+    - parseless code
 	- bind names explicitly
 	- no ambiguity in identifiers
 	- can display anything that makes sense without worrying about parsing ambiguity

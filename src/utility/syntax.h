@@ -2,6 +2,9 @@
 #pragma once
 
 #define tt template<typename t>
+#define tt1 template<typename t0>
+#define tt2 template<typename t0, typename t1>
+#define tt3 template<typename t0, typename t1, typename t2>
 // 'defer'
 
 template<typename T>
@@ -25,6 +28,7 @@ public:
 
 // release and reset a variable at the end of the current scope
 #define defer_release(name) defer { release(name); }
+#define defer_release2(name0, name1) defer { release(name1); release(name0); }
 
 #define chk(condition) if (condition);
 
