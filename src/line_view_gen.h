@@ -1,5 +1,5 @@
-#ifndef FRANCA2_WEB_LINE_NUM_VIEW_GENERATOR_H
-#define FRANCA2_WEB_LINE_NUM_VIEW_GENERATOR_H
+#ifndef FRANCA2_LINE_NUM_VIEW_GENERATOR_H
+#define FRANCA2_LINE_NUM_VIEW_GENERATOR_H
 
 #include <algorithm>
 
@@ -11,7 +11,7 @@
 #include "utility/iterators.h"
 
 
-namespace line_view_generation {
+namespace line_view_gen {
     namespace {
         using namespace arrays;
         using namespace iterators;
@@ -24,7 +24,7 @@ namespace line_view_generation {
 
     static ret1<line_view> generate_line_view(uint line_count, usize2 view_size, arena &arena = arenas::gta) {
         let max_width = view_size.w - 2;
-        var height    = min(line_count, view_size.h);
+        var height    = std::min(line_count, view_size.h);
 
         var width     = 1u;
         var max_order = 1u;
@@ -37,10 +37,14 @@ namespace line_view_generation {
         var glyphs = alloc<uint8_t>(arena, view_size.w * view_size.h);
 
         for (var y = 0u; y < height; y++) {
+            var trailing = true;
             var order = max_order;
             for (var x = 0u; x < width ; x++, order /= 10) {
                 let digit = ((y + 1) / order) % 10;
-                glyphs[y * view_size.w + x + 1] = '0' + digit - ' ';
+                if (!trailing || digit != 0) {
+                    trailing = false;
+                    glyphs[y * view_size.w + x + 1] = '0' + digit - ' ';
+                }
             }
         }
 
@@ -49,4 +53,4 @@ namespace line_view_generation {
     }
 }
 
-#endif //FRANCA2_WEB_LINE_NUM_VIEW_GENERATOR_H
+#endif //FRANCA2_LINE_NUM_VIEW_GENERATOR_H

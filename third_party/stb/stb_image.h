@@ -1922,9 +1922,9 @@ static stbi_uc *stbi__hdr_to_ldr(float   *data, int x, int y, int comp)
 //        - allows good upsampling (see next)
 //    high-quality
 //      - upsampled channels are bilinearly interpolated, even across blocks
-//      - quality integer IDCT derived from IJG's 'slow'
+//      - quality int_literal IDCT derived from IJG's 'slow'
 //    performance
-//      - fast huffman; reasonable integer IDCT
+//      - fast huffman; reasonable int_literal IDCT
 //      - some SIMD kernels for common paths on targets with SSE2/NEON
 //      - uses a lot of intermediate memory, could cache poorly
 
@@ -2522,12 +2522,12 @@ static void stbi__idct_block(stbi_uc *out, int out_stride, short data[64])
 }
 
 #ifdef STBI_SSE2
-// sse2 integer IDCT. not the fastest possible implementation but it
+// sse2 int_literal IDCT. not the fastest possible implementation but it
 // produces bit-identical results to the generic C version so it's
 // fully "transparent".
 static void stbi__idct_simd(stbi_uc *out, int out_stride, short data[64])
 {
-   // This is constructed to match our regular (generic) integer IDCT exactly.
+   // This is constructed to match our regular (generic) int_literal IDCT exactly.
    __m128i row0, row1, row2, row3, row4, row5, row6, row7;
    __m128i tmp;
 
@@ -2704,7 +2704,7 @@ static void stbi__idct_simd(stbi_uc *out, int out_stride, short data[64])
 
 #ifdef STBI_NEON
 
-// NEON integer IDCT. should produce bit-identical
+// NEON int_literal IDCT. should produce bit-identical
 // results to the generic C version.
 static void stbi__idct_simd(stbi_uc *out, int out_stride, short data[64])
 {
@@ -3300,7 +3300,7 @@ static int stbi__process_frame_header(stbi__jpeg *z, int scan)
       if (z->img_comp[i].v > v_max) v_max = z->img_comp[i].v;
    }
 
-   // check that plane subsampling factors are integer ratios; our resamplers can't deal with fractional ratios
+   // check that plane subsampling factors are int_literal ratios; our resamplers can't deal with fractional ratios
    // and I've never seen a non-corrupted JPEG file actually use them
    for (i=0; i < s->img_n; ++i) {
       if (h_max % z->img_comp[i].h != 0) return stbi__err("bad H","Corrupt JPEG");
@@ -4088,7 +4088,7 @@ static int stbi__jpeg_info(stbi__context *s, int *x, int *y, int *comp)
 // fast-way is faster to check than jpeg huffman, but slow way is slower
 #define STBI__ZFAST_BITS  9 // accelerate all cases in default tables
 #define STBI__ZFAST_MASK  ((1 << STBI__ZFAST_BITS) - 1)
-#define STBI__ZNSYMS 288 // number of symbols in literal/length alphabet
+#define STBI__ZNSYMS 288 // number of symbols in int_literal/length alphabet
 
 // zlib-style huffman encoding
 // (jpegs packs from left, zlib from right, so can't share code)
@@ -7571,7 +7571,7 @@ static int      stbi__pnm_getinteger(stbi__context *s, char *c)
       value = value*10 + (*c - '0');
       *c = (char) stbi__get8(s);
       if((value > 214748364) || (value == 214748364 && *c > '7'))
-          return stbi__err("integer generate_code_view overflow", "Parsing an integer in the PPM header overflowed a 32-bit int");
+          return stbi__err("int_literal display overflow", "Parsing an int_literal in the PPM header overflowed a 32-bit int");
    }
 
    return value;
@@ -7793,7 +7793,7 @@ STBIDEF int stbi_is_16_bit_from_callbacks(stbi_io_callbacks const *c, void *user
       2.09  (2016-01-16) allow comments in PNM files
                          16-bit-per-pixel TGA (not bit-per-component)
                          info() for TGA could break due to .hdr handling
-                         info() for BMP to shares code instead of sloppy generate_code_view
+                         info() for BMP to shares code instead of sloppy display
                          can use STBI_REALLOC_SIZED if allocator doesn't support realloc
                          code cleanup
       2.08  (2015-09-13) fix to 2.07 cleanup, reading RGB PSD as RGBA
@@ -7842,7 +7842,7 @@ STBIDEF int stbi_is_16_bit_from_callbacks(stbi_io_callbacks const *c, void *user
               fix to GIF loading because BMP wasn't rewinding (whoops, no GIFs in my test suite)
               add support for BMP version 5 (more ignored fields)
       1.38  (2014-06-06)
-              suppress MSVC warnings on integer casts truncating values
+              suppress MSVC warnings on int_literal casts truncating values
               fix accidental rename of 'skip' field of I/O
       1.37  (2014-06-04)
               remove duplicate typedef
@@ -7922,7 +7922,7 @@ STBIDEF int stbi_is_16_bit_from_callbacks(stbi_io_callbacks const *c, void *user
       0.97    jpeg errors on too large a file; also catch another malloc failure
       0.96    fix detection of invalid v value - particleman@mollyrocket forum
       0.95    during header scan, seek to markers in case of padding
-      0.94    STBI_NO_STDIO to disable stdio usage; rename all #defines the same
+      0.94    STBI_NO_STDIO to disable stdio usage; rename all #definitions the same
       0.93    handle jpegtran output; verbose errors
       0.92    read 4,8,16,24,32-bit BMP files of several formats
       0.91    output 24-bit Windows 3.0 BMP files

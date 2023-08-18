@@ -2,8 +2,8 @@
 // Created by degor on 11.08.2023.
 //
 
-#ifndef FRANCA2_WEB_MATHS2_H
-#define FRANCA2_WEB_MATHS2_H
+#ifndef FRANCA2_MATHS2_H
+#define FRANCA2_MATHS2_H
 #include "maths.h"
 #include "syntax.h"
 #include "primitives.h"
@@ -119,4 +119,4 @@ inline float aspect_ratio_of(const usize2 s) {
     return (float)s.w / (float)s.h;
 }
 
-#endif //FRANCA2_WEB_MATHS2_H
+#endif //FRANCA2_MATHS2_H

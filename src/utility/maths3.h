@@ -2,8 +2,8 @@
 // Created by degor on 11.08.2023.
 //
 
-#ifndef FRANCA2_WEB_MATHS3_H
-#define FRANCA2_WEB_MATHS3_H
+#ifndef FRANCA2_MATHS3_H
+#define FRANCA2_MATHS3_H
 
 #include "maths2.h"
 

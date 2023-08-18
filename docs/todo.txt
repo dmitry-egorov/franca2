@@ -1,9 +1,24 @@
-- [ ] display node tree
-- [ ] navigate with cursor
+- [ ] immediate execution (not lazy)
+- [ ] navigate node tree
+- [ ] compile natively with dawn
+- [ ] cursor
+    - [ ] display blinking cursor
+    - [ ] only redraw when state changes
+    - [ ] move cursor
+    - [ ] scroll view
 - [ ] edit
-- [ ] execute
 
 done
+- [+] store pattern as list, use string literals
+- [+] rework ast, so that it's executable
+- [+] display ast
+- [+] execute
+- [+] definitions pass
+- [+] support both brackets on the same symbol
+- [+] display node tree
+    - [+] specify    node tree
+    - [+] parse into node tree
+    - [+] rasterize  node tree
 - [+] draw line numbers
 - [+] align arena allocations
 - [+] measure performance

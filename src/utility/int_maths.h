@@ -1,6 +1,7 @@
-#ifndef FRANCA2_WEB_INT_MATHS_H
-#define FRANCA2_WEB_INT_MATHS_H
+#ifndef FRANCA2_INT_MATHS_H
+#define FRANCA2_INT_MATHS_H
 
+#include "syntax.h"
 #include "primitives.h"
 
 inline uint pow(uint value, uint exponent) {
@@ -9,4 +10,4 @@ inline uint pow(uint value, uint exponent) {
     return result;
 }
 
-#endif //FRANCA2_WEB_INT_MATHS_H
+#endif //FRANCA2_INT_MATHS_H

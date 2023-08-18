@@ -12,13 +12,17 @@ if "%~1"=="/d" (
   set DEBUG=false
 )
 
-set CPP_FLAGS=-std=c++20 -Wall -Wextra -Wno-nonportable-include-path -Wno-address-of-temporary -Wno-unused-function -fno-exceptions -fno-rtti
-set EMS_FLAGS=--output_eol linux -s ALLOW_MEMORY_GROWTH=0 -s INITIAL_MEMORY=64MB -s ENVIRONMENT=web -s NO_EXIT_RUNTIME=1 -s STRICT=1 -s TEXTDECODER=2 -s USE_WEBGPU=1 -s WASM=1 --shell-file shell.html --embed-file embedded
+set CPP_FLAGS=-std=c++20 -Wall -Wextra -fno-exceptions -fno-rtti
+set EMS_FLAGS=--output_eol linux -s ALLOW_MEMORY_GROWTH=0 -s INITIAL_MEMORY=16MB -s ENVIRONMENT=web -s NO_EXIT_RUNTIME=1 -s STRICT=1 -s TEXTDECODER=2 -s USE_WEBGPU=1 -s WASM=1 -msse2 -msimd128 --shell-file shell.html --embed-file embedded
 set OPT_FLAGS=
 
 if %DEBUG%==true (
-  set CPP_FLAGS=%CPP_FLAGS% -g3 -D_DEBUG=1 -Wno-unused
-  set EMS_FLAGS=%EMS_FLAGS% -s ASSERTIONS=1 -s DEMANGLE_SUPPORT=1 -s SAFE_HEAP=1 -s STACK_OVERFLOW_CHECK=2
+  xcopy *.cpp out\. /Y /q
+  xcopy *.h out\. /Y /q
+  xcopy utility\*.h out\utility\. /Y /q
+
+  set CPP_FLAGS=%CPP_FLAGS% -g3 -D_DEBUG=1 -Wno-unused -Wno-limited-postlink-optimizations
+  set EMS_FLAGS=%EMS_FLAGS% -s ASSERTIONS=1 -s DEMANGLE_SUPPORT=1 -s SAFE_HEAP=1 -s STACK_OVERFLOW_CHECK=2 -gsource-map
   set OPT_FLAGS=%OPT_FLAGS% -O0
 ) else (
   set CPP_FLAGS=%CPP_FLAGS% -g0 -DNDEBUG=1 -flto -Werror

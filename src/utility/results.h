@@ -1,5 +1,5 @@
-#ifndef FRANCA2_WEB_RESULTS_H
-#define FRANCA2_WEB_RESULTS_H
+#ifndef FRANCA2_RESULTS_H
+#define FRANCA2_RESULTS_H
 
 #include "syntax.h"
 
@@ -29,12 +29,14 @@ tt3 struct ret3 {
 #define ret2_fail {{}, {}, false}
 #define ret3_fail {{}, {}, {}, false}
 
-#define chk_1(name0, initializer) var [name0, stx_concat(ok, __LINE__)] = (initializer); if (stx_concat(ok, __LINE__));
-#define try_ret1(name0, initializer) var [name0, stx_concat(ok, __LINE__)] = (initializer); if (stx_concat(ok, __LINE__));
-#define try_ret2(name0, name1, initializer) var [name0, name1, stx_concat(ok, __LINE__)] = (initializer); if (stx_concat(ok, __LINE__));
-#define try_ret3(name0, name1, name2, initializer) var [name0, name1, name2, stx_concat(ok, __LINE__)] = (initializer); if (stx_concat(ok, __LINE__));
-#define try_tmp1(name0, initializer) var [name0, stx_concat(ok, __LINE__)] = (initializer); defer_release(name0); if (stx_concat(ok, __LINE__));
-#define try_tmp2(name0, name1, initializer) var [name0, name1, stx_concat(ok, __LINE__)] = (initializer); defer_release2(name0, name1); if (stx_concat(ok, __LINE__));
-#define try_tmp3(name0, name1, name2, initializer) var [name0, name1, name2, stx_concat(ok, __LINE__)] = (initializer); defer_release2(name0, name1, name2); if (stx_concat(ok, __LINE__));
+#define chk_var1(name0, initializer) var [name0, stx_concat(ok, __LINE__)] = (initializer); if (stx_concat(ok, __LINE__));
+#define chk_var2(name0, name1, initializer) var [name0, name1, stx_concat(ok, __LINE__)] = (initializer); if (stx_concat(ok, __LINE__));
+#define chk_set1(name0, initializer) var [stx_concat(res, __LINE__), stx_concat(ok, __LINE__)] = (initializer); if (stx_concat(ok, __LINE__)) { name0 = stx_concat(res, __LINE__); }
 
-#endif //FRANCA2_WEB_RESULTS_H
+#define chk_tmp1(name0, initializer) var [name0, stx_concat(ok, __LINE__)] = (initializer); defer_release(name0); if (stx_concat(ok, __LINE__));
+#define chk_tmp2(name0, name1, initializer) var [name0, name1, stx_concat(ok, __LINE__)] = (initializer); defer_release2(name0, name1); if (stx_concat(ok, __LINE__));
+#define chk_tmp3(name0, name1, name2, initializer) var [name0, name1, name2, stx_concat(ok, __LINE__)] = (initializer); defer_release2(name0, name1, name2); if (stx_concat(ok, __LINE__));
+
+#define asr_1(name0, initializer) var [name0, stx_concat(ok, __LINE__)] = (initializer); assert(stx_concat(ok, __LINE__))
+
+#endif //FRANCA2_RESULTS_H

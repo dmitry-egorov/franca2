@@ -1,36 +1,50 @@
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
+#pragma clang diagnostic ignored "-Wunknown-attributes"
+
 #include <emscripten/em_js.h>
-#include <emscripten/emscripten.h>
-#include <emscripten/html5.h>
 #include <emscripten/html5_webgpu.h>
-#include <cstdio>
 #include <array>
 
-#include "utility/primitives.h"
 #include "utility/maths2.h"
 #include "utility/syntax.h"
 #include "utility/transforms.h"
+#define FRANCA2_ARRAYS_IMPL
+#include "utility/arrays.h"
+#define FRANCA2_ARENAS_IMPL
 #include "utility/arenas.h"
-#include "utility/strings.h"
 
 #include "utility/wgpu_ex.h"
 #include "utility/wgpu_png.h"
 #include "utility/emsc_ex.h"
-#include "utility/wgsl_ex.h"
 
 #define STBI_ONLY_PNG
 #define STB_IMAGE_IMPLEMENTATION
 #include "../third_party/stb/stb_image.h"
 
-#include "code_view_generation.h"
-#include "line_view_generation.h"
+#include "color_scheme.h"
+
+#include "code_views.h"
+
+#include "visual_asts.h"
+#include "visual_parser.h"
+#include "visual_view_gen.h"
+#include "line_view_gen.h"
+
+#include "compute_asts.h"
+#include "compute_parsing.h"
+#include "compute_printing.h"
+#include "compute_definitions.h"
+#include "compute_execution.h"
+#include "compute_display.h"
 
 using namespace arenas;
 using namespace wgpu_ex;
 using namespace wgpu_ex::png;
-using namespace wgsl_ex;
 using namespace emsc_ex;
-using namespace code_view_generation;
-using namespace line_view_generation;
+using namespace visual_asts::view_gen;
+using namespace line_view_gen;
+using namespace visual_asts::parser;
 
 //const char *ascii_chars = R"end( !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)end";
 
@@ -38,17 +52,7 @@ let canvas_name = "canvas";
 
 let clear_color = WGPUColor {.r = 0.1f, .g = 0.1f, .b = 0.15f, .a = 1.0f};
 
-let palette = array<uint, 256> {
-    0xa7a7ebff, // 0 regular
-    0xffffffff, // 1 identifier
-    0x416ecaff, // 2 break statement
-    0x3393ffff, // 3 return statements
-    0xae76c0ff, // 4 def
-    0xbbbbbbff, // 5 implicitly declared vars
-    0xa1c289ff, // 6 strings
-    0xc6b88cff, // 7 constants
-    0xdddddd44, // 8 inlays
-};
+static var palette = std::array<uint, 256>();
 
 struct state_t {
     struct wgpu_state {
@@ -66,9 +70,14 @@ struct state_t {
         BoundComputePipeline bound_timings_text_pipeline;
         WGPUQuerySet  perf_query_set;
     } res;
+
+    struct view_state {
+        bool dirty;
+    } view;
+
 };
 
-#define using_state ref[wgpu, res] = state
+#define using_state ref[wgpu, res, view] = state
 #define using_wgpu_state ref [instance, device, queue, swapchain, px_size] = state.wgpu
 
 static let code_view_size = usize2 {.w = 120, .h = 40};
@@ -91,11 +100,24 @@ struct gpu_uniforms {
     uint3  _pad0;
     uint   inlay_color;
 
-    array<uint, 256> palette;
+    std::array<uint, 256> palette;
 };
 
 static bool init() {
     gta_init(8 * 1024 * 1024); // 8 MB of global temp storage
+
+    {
+        using enum color_scheme;
+        palette[(size_t)regulars         ] = 0xa7a7ebff;
+        palette[(size_t)identifiers      ] = 0xffffffff;
+        palette[(size_t)break_statements ] = 0x416ecaff;
+        palette[(size_t)return_statements] = 0x3393ffff;
+        palette[(size_t)definitions      ] = 0xae76c0ff;
+        palette[(size_t)implicit_vars    ] = 0xbbbbbbff;
+        palette[(size_t)strings          ] = 0x6aab73ff;
+        palette[(size_t)constants        ] = 0xc6b88cff;
+        palette[(size_t)inlays           ] = 0xdddddd44;
+    }
 
     using_state;
     using_wgpu_state;
@@ -109,16 +131,30 @@ static bool init() {
 
     tmp(wrap_sampler, make_wrap_sampler(device));
 
-    try_tmp2(font_texture, font_tv, load_8bit_texture_from_png_file(device, "embedded/jb.png")) else return(false);
+    chk_tmp2(font_texture, font_tv, load_8bit_texture_from_png_file(device, "embedded/jb.png")) else return(false);
 
-    try_ret1(code_view, parse_file("embedded/test_program.fr", code_view_size)) else return false;
-	
-	try_ret1(line_view, generate_line_view(code_view.line_count, line_view_size)) else return false;
+    var code_view = make_code_vew(code_view_size);
+    var cv_it = iterate(code_view);
 
-    try_tmp2(_0, line_glyph_tv, make_texture_2d(device, line_view_size, WGPUTextureFormat_R8Uint, line_view.glyphs.data)) else return false;
-    try_tmp2(_1, code_glyph_tv, make_texture_2d(device, code_view_size, WGPUTextureFormat_R8Uint, code_view.glyphs.data)) else return false;
-    try_tmp2(_2, code_color_tv, make_texture_2d(device, code_view_size, WGPUTextureFormat_R8Uint, code_view.colors.data)) else return false;
-    try_tmp2(_3, code_inlay_tv, make_texture_2d(device, code_view_size, WGPUTextureFormat_R8Uint, code_view.inlays.data)) else return false;
+    chk_var1(ast, parse_file("embedded/test_program.frv")) else return false;
+    print_ast(&ast);
+    display(ast, cv_it);
+
+    chk_var1(compute_ast, compute_asts::parse_file("embedded/hello_world.fr")) else return false;
+    compute_asts::print_ast(&compute_ast);
+    var defs = compute_asts::gather_definitions(&compute_ast);
+    printf("Definitions: %zu\n", defs.count);
+    compute_asts::execute(compute_ast, defs , gta );
+    compute_asts::display(compute_ast, cv_it, defs);
+
+    code_view.line_count = cv_it.cell_idx.y + 1;
+
+    chk_var1(line_view, generate_line_view(code_view.line_count, line_view_size)) else return false;
+
+    chk_tmp2(_0, line_glyph_tv, make_texture_2d(device, line_view_size, WGPUTextureFormat_R8Uint, line_view.glyphs.data)) else return false;
+    chk_tmp2(_1, code_glyph_tv, make_texture_2d(device, code_view_size, WGPUTextureFormat_R8Uint, code_view.glyphs.data)) else return false;
+    chk_tmp2(_2, code_color_tv, make_texture_2d(device, code_view_size, WGPUTextureFormat_R8Uint, code_view.colors.data)) else return false;
+    chk_tmp2(_3, code_inlay_tv, make_texture_2d(device, code_view_size, WGPUTextureFormat_R8Uint, code_view.inlays.data)) else return false;
 
     tmp(shader_module, make_wgsl_shader_module_from_file(device, "embedded/main.wgsl"));
 
@@ -181,12 +217,16 @@ static int resize() {
         .palette     = palette
     });
 
+    view.dirty = true;
+
     return 1;
 }
 
 static int draw(double /*time*/) {
     using_state;
     using_wgpu_state;
+
+    chk(view.dirty) else return true; defer { view.dirty = false; };
 
     {
         tmp(encoder, make_command_encoder(device));
@@ -213,7 +253,7 @@ static int draw(double /*time*/) {
 }
 
 extern "C" __attribute__((used, visibility("default"))) void entry_point() {
-    if (init()); else return;
+    if (init()); else { printf("Failed to initialize\n"); return;}
     emsc_ex::loop(draw);
 }
 
@@ -245,3 +285,5 @@ int main(int /*argc*/, char* /*argv*/[]) {
     impl::glue_preint();
     return 0;
 }
+
+#pragma clang diagnostic pop

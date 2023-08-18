@@ -2,8 +2,8 @@
 // Created by degor on 11.08.2023.
 //
 
-#ifndef FRANCA2_WEB_TRIGS_H
-#define FRANCA2_WEB_TRIGS_H
+#ifndef FRANCA2_TRIGS_H
+#define FRANCA2_TRIGS_H
 
 struct turns {
     union { float value, v; };

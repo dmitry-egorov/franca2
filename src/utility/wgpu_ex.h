@@ -9,6 +9,8 @@
 #include "files.h"
 
 namespace wgpu_ex {
+    using namespace arenas;
+
     inline WGPUInstance make_instance(const WGPUInstanceDescriptor& descriptor) { return wgpuCreateInstance(&descriptor); }
     inline WGPUProc     get_proc_address(WGPUDevice device, char const * proc_name);
 
@@ -254,16 +256,16 @@ namespace wgpu_ex {
 
     // extras
 
-    inline WGPUSurface make_surface_from_html_canvas(WGPUInstance instance, const char *selector) {
+    inline WGPUSurface make_surface_from_html_canvas(WGPUInstance instance, const char *selector, arena& arena = gta) {
         return make_surface(instance, {
-            .nextInChain = (WGPUChainedStruct*)&WGPUSurfaceDescriptorFromCanvasHTMLSelector {
+            .nextInChain = &alloc_one(arena, WGPUSurfaceDescriptorFromCanvasHTMLSelector {
                 .chain    = {.sType = WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector},
                 .selector = selector
-            }
+            })->chain
         });
     }
 
-    inline WGPUColorTargetState make_target(const WGPUBlendState& blend, arenas::arena& arena = arenas::gta) { return {
+    inline WGPUColorTargetState make_target(const WGPUBlendState& blend, arena& arena = gta) { return {
         .format    = WGPUTextureFormat_BGRA8Unorm,
         .blend     = alloc_one(arena, blend),
         .writeMask = WGPUColorWriteMask_All,
@@ -279,7 +281,7 @@ namespace wgpu_ex {
         .entryPoint = entry_point
     };}
 
-    inline WGPUFragmentState make_fragment_state(WGPUShaderModule shader_module, const char* entry_point, const WGPUBlendState& blend, arenas::arena& arena = arenas::gta) { return {
+    inline WGPUFragmentState make_fragment_state(WGPUShaderModule shader_module, const char* entry_point, const WGPUBlendState& blend, arena& arena = gta) { return {
         .module      = shader_module, .entryPoint  = entry_point,
         .targetCount = 1,
         .targets     = alloc_one(arena, make_target(blend, arena)),
@@ -397,7 +399,7 @@ namespace wgpu_ex {
         });
     }
 
-    inline WGPUShaderModule make_wgsl_shader_module_from_file(WGPUDevice device, const char* const path, const char* label = nullptr, arenas::arena& arena = arenas::gta) {
+    inline WGPUShaderModule make_wgsl_shader_module_from_file(WGPUDevice device, const char* const path, const char* label = nullptr, arena& arena = gta) {
         let code = read_file_as_string(path, arena);
         let wgsl = WGPUShaderModuleWGSLDescriptor {
             .chain = { .sType = WGPUSType_ShaderModuleWGSLDescriptor },

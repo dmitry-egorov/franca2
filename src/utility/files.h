@@ -1,5 +1,5 @@
-#ifndef FRANCA2_WEB_FILES_H
-#define FRANCA2_WEB_FILES_H
+#ifndef FRANCA2_FILES_H
+#define FRANCA2_FILES_H
 #include <cstdio>
 #include "syntax.h"
 #include "arenas.h"
@@ -25,4 +25,4 @@ inline arrays::array_view<char> read_file_as_string(const char* path, arenas::ar
     return buffer;
 }
 
-#endif //FRANCA2_WEB_FILES_H
+#endif //FRANCA2_FILES_H

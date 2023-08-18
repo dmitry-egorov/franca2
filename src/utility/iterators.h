@@ -1,60 +1,123 @@
-//
-// Created by degor on 16.08.2023.
-//
-
-#ifndef FRANCA2_WEB_ITERATORS_H
-#define FRANCA2_WEB_ITERATORS_H
+#ifndef FRANCA2_ITERATORS_H
+#define FRANCA2_ITERATORS_H
 
 #include "syntax.h"
 #include "results.h"
 #include "arrays.h"
 #include "arenas.h"
+#include "strings.h"
 
 namespace iterators {
     using namespace arenas;
     using namespace arrays;
 
-    tt struct iterator {
-        array_view<t> view;
-    };
+    tt bool is_empty(const array_view<t>& it) { return it.count == 0; }
 
-    tt iterator<t> iterate(const array_view<t>& v) { return {.view = v}; }
-
-    tt bool finished(const iterator<t>& it) { return it.view.count == 0; }
-
-    tt ret1<t> peek(iterator<t>& it) {
-        chk (it.view.count != 0) else return ret1_fail;
-        return ret1_ok(it.view[0]);
+    tt ret1<t> peek(array_view<t>& it) {
+        chk (it.count != 0) else return ret1_fail;
+        return ret1_ok(it[0]);
     }
 
-    tt ret1<t> take(iterator<t>& it) {
-        chk(it.view.count != 0) else return ret1_fail;
+    tt bool peek(array_view<t>& it, const t& value) {
+        chk (it.count != 0) else return false;
+        return it[0] == value;
+    }
 
-        let result = it.view[0];
+    tt ret1<t> take(array_view<t>& it) {
+        chk(it.count != 0) else return ret1_fail;
 
-        advance(it.view);
-
+        let result = it[0];
+        advance(it);
         return ret1_ok(result);
     }
 
-    tt bool take_until(iterator<t>& it, t target) {
+    tt bool take(array_view<t>& it, const t& value) {
+        chk_var1(c, peek(it)) else return false;
+        chk  (c == value ) else return false;
+        take(it);
+        return true;
+    }
+
+    tt bool take(array_view<t>& it, const array_view<t>& sequence) {
+        chk(it.count >= sequence.count) else return false;
+
+        var it_copy    = it;
+        var targets_it = sequence;
+
+        while (!is_empty(targets_it)) {
+            chk(it_copy[0] == targets_it[0]) else return false;
+            advance(it_copy);
+            advance(targets_it);
+        }
+
+        it = it_copy;
+        return true;
+    }
+
+    tt array_view<t> take_until(array_view<t>& it, const t& target) {
+        var result = it;
+        result.count = 0;
+
         while (true) {
-            chk_1(c, peek(it)) else return false;
+            chk_var1(c, peek(it)) else return result;
+            chk     (c != target) else return result;
+            take(it);
+            enlarge(result);
+        }
+    }
+
+    tt array_view<t> take_until_any(array_view<t>& it, const array_view<t>& targets) {
+        var result = array_view<t> { it.data, 0 };
+        while (true) {
+            chk_var1(c, peek(it))           else return result;
+            chk     (!contains(targets, c)) else return result;
+
+            take(it);
+            enlarge(result);
+        }
+    }
+
+    tt array_view<t> take_while_any(array_view<t>& it, const array_view<t>& targets) {
+        var result = array_view<t> { it.data, 0 };
+        while (true) {
+            chk_var1(c, peek(it))          else return result;
+            chk     (contains(targets, c)) else return result;
+
+            advance(it);
+            enlarge(result);
+        }
+    }
+
+    tt bool skip_until(array_view<t>& it, const t& target) {
+        while (true) {
+            chk_var1(c, peek(it)) else return false;
             if (c == target) return true;
             take(it);
         }
     }
 
-    ret1<uint8_t> take_digit(iterator<char>& it) {
-        chk_1(c, peek(it)) else return ret1_fail;
+    tt bool skip_past(array_view<t>& it, const t& target) {
+        while (true) {
+            chk_var1(c, take(it)) else return false;
+            if (c == target) return true;
+        }
+    }
 
-        var digit = c - '0';
-        chk(digit >= 0 && digit <= 9) else return ret1_fail;
+    tt void skip_while(array_view<t>& it, const t& target) {
+        while (true) {
+            chk_var1(c, peek(it)) else return;
+            if (c != target) return;
+            take(it);
+        }
+    }
 
-        take(it);
-
-        return ret1_ok((uint8_t)digit);
+    tt void skip_while_any(array_view<t>& it, const array_view<t>& targets) {
+        while (true) {
+            chk_var1(c, peek(it))          else return;
+            chk     (contains(targets, c)) else return;
+            advance(it);
+        }
     }
 }
 
-#endif //FRANCA2_WEB_ITERATORS_H
+#endif //FRANCA2_ITERATORS_H
