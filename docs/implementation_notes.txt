@@ -1,0 +1,10 @@
+- variable declaration
+    - id
+    - display string
+    - mutability
+    - initial value
+    - type?
+    - lazyness?
+
+- ? 'let a' returns a pointer to 'a'
+    - how to infer type then?

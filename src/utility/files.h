@@ -11,7 +11,7 @@ void release(FILE*& f) {
 
 inline arrays::array_view<char> read_file_as_string(const char* path, arenas::arena& arena = arenas::gta) {
     tmp(f, fopen (path, "rb"));
-    chk(f) else return {};
+    if (f); else return {};
 
     fseek (f, 0, SEEK_END);
     let length = ftell(f);

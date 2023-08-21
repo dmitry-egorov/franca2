@@ -14,17 +14,17 @@ namespace iterators {
     tt bool is_empty(const array_view<t>& it) { return it.count == 0; }
 
     tt ret1<t> peek(array_view<t>& it) {
-        chk (it.count != 0) else return ret1_fail;
+        if (it.count != 0); else return ret1_fail;
         return ret1_ok(it[0]);
     }
 
     tt bool peek(array_view<t>& it, const t& value) {
-        chk (it.count != 0) else return false;
+        if (it.count != 0); else return false;
         return it[0] == value;
     }
 
     tt ret1<t> take(array_view<t>& it) {
-        chk(it.count != 0) else return ret1_fail;
+        if (it.count != 0); else return ret1_fail;
 
         let result = it[0];
         advance(it);
@@ -32,20 +32,20 @@ namespace iterators {
     }
 
     tt bool take(array_view<t>& it, const t& value) {
-        chk_var1(c, peek(it)) else return false;
-        chk  (c == value ) else return false;
+        if_var1 (c, peek(it)); else return false;
+             if (c == value ); else return false;
         take(it);
         return true;
     }
 
     tt bool take(array_view<t>& it, const array_view<t>& sequence) {
-        chk(it.count >= sequence.count) else return false;
+        if (it.count >= sequence.count); else return false;
 
         var it_copy    = it;
         var targets_it = sequence;
 
         while (!is_empty(targets_it)) {
-            chk(it_copy[0] == targets_it[0]) else return false;
+            if(it_copy[0] == targets_it[0]); else return false;
             advance(it_copy);
             advance(targets_it);
         }
@@ -59,8 +59,8 @@ namespace iterators {
         result.count = 0;
 
         while (true) {
-            chk_var1(c, peek(it)) else return result;
-            chk     (c != target) else return result;
+            if_var1(c, peek(it)); else return result;
+                 if(c != target); else return result;
             take(it);
             enlarge(result);
         }
@@ -69,8 +69,8 @@ namespace iterators {
     tt array_view<t> take_until_any(array_view<t>& it, const array_view<t>& targets) {
         var result = array_view<t> { it.data, 0 };
         while (true) {
-            chk_var1(c, peek(it))           else return result;
-            chk     (!contains(targets, c)) else return result;
+            if_var1 (c, peek(it)          ); else return result;
+                 if (!contains(targets, c)); else return result;
 
             take(it);
             enlarge(result);
@@ -80,8 +80,8 @@ namespace iterators {
     tt array_view<t> take_while_any(array_view<t>& it, const array_view<t>& targets) {
         var result = array_view<t> { it.data, 0 };
         while (true) {
-            chk_var1(c, peek(it))          else return result;
-            chk     (contains(targets, c)) else return result;
+            if_var1 (c, peek(it)         ); else return result;
+                 if (contains(targets, c)); else return result;
 
             advance(it);
             enlarge(result);
@@ -90,7 +90,7 @@ namespace iterators {
 
     tt bool skip_until(array_view<t>& it, const t& target) {
         while (true) {
-            chk_var1(c, peek(it)) else return false;
+            if_var1(c, peek(it)); else return false;
             if (c == target) return true;
             take(it);
         }
@@ -98,14 +98,14 @@ namespace iterators {
 
     tt bool skip_past(array_view<t>& it, const t& target) {
         while (true) {
-            chk_var1(c, take(it)) else return false;
+            if_var1 (c, take(it)); else return false;
             if (c == target) return true;
         }
     }
 
     tt void skip_while(array_view<t>& it, const t& target) {
         while (true) {
-            chk_var1(c, peek(it)) else return;
+            if_var1 (c, peek(it)); else return;
             if (c != target) return;
             take(it);
         }
@@ -113,8 +113,8 @@ namespace iterators {
 
     tt void skip_while_any(array_view<t>& it, const array_view<t>& targets) {
         while (true) {
-            chk_var1(c, peek(it))          else return;
-            chk     (contains(targets, c)) else return;
+            if_var1 (c, peek(it));          else return;
+                 if (contains(targets, c)); else return;
             advance(it);
         }
     }

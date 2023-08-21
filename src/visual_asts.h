@@ -31,7 +31,7 @@ namespace visual_asts {
     };
 
     struct node {
-        color_scheme color_id;
+        palette_color color_id;
 
         array_view<char> prefix_text;
 
@@ -66,7 +66,7 @@ namespace visual_asts {
             var child = node->first_child;
             if (child) {
                 printf("[");
-                if (child->color_id != color_scheme::regulars)
+                if (child->color_id != palette_color::regulars)
                     printf("%u", (uint8_t)child->color_id);
                 print_ast_for(child);
                 printf("]");

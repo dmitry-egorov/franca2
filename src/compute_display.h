@@ -13,190 +13,269 @@
 #include "utility/arenas.h"
 #include "utility/iterators.h"
 #include "utility/strings.h"
-#include "color_scheme.h"
+#include "color_palette.h"
 #include "code_views.h"
 #include "compute_asts.h"
-#include "compute_definitions.h"
+#include "compute_storage.h"
 
 namespace compute_asts {
-    static void display(ast &ast, code_views::code_view_iterator &it, const arenas::array_view<definition> &definitions);
+
+    inline void display(ast &ast, const arrays::array_view<variable> &storage, code_views::code_view_iterator &it);
 
     namespace displaying {
         using namespace iterators;
         using namespace compute_asts;
         using namespace code_views;
         using namespace strings;
+        using enum palette_color;
+        using enum node::type_t;
+        using enum poly_value::type_t;
+        using enum inlay_type;
+        using enum builtin_func_id;
 
         struct context {
             code_view_iterator& iterator;
-            const array_view<definition>& definitions;
+            array_view<variable> storage;
             bool show_top_level_inlays_for_strings;
+            uint inactive_level;
         };
-#define using_display_ctx ref [it, defs, str_inlays] = ctx
+#define using_display_ctx ref [____, defs, str_inlays, inactive_level] = ctx
 
-        void display_nodes(const node*, context&);
-        void display_node (const node*, context&);
-
-        bool display_func(uint fn_id, const node *args, context&);
-        void display_show_as(const node*, context&);
-        void display_let    (const node*, context&);
-        void display_param  (const node*, context&);
-        void display_ref    (const node*, context&);
-        void display_istring(const node*, context&);
-        void display_plus   (const node*, context&);
-        void display_print  (const node*, context&);
+        void display_list(const node&, context&);
+        void display_list(const node*, context&);
     }
 
-
-    static void display(ast &ast, code_views::code_view_iterator &it, const arrays::array_view<definition> &definitions) {
-        var ctx = displaying::context { it, definitions, true };
-        display_nodes(ast.root, ctx);
+    inline void display(ast& ast, const arrays::array_view<variable>& storage, code_views::code_view_iterator& it) {
+        var ctx = displaying::context {it, storage, true, 0 };
+        display_list(ast.root, ctx);
     }
 
     namespace displaying {
-        using enum node_type;
+        void display_node (const node&, context&);
+        void display_node (const node*, context&);
+
+        bool display_func(const node& node, context&);
+        void display_inactive     (const node*, context&);
+        void display_macro_show_as(const node*, context&);
+        void display_decl_var     (const node*, context&);
+        void display_decl_param   (const node*, context&);
+        void display_var_ref      (const node*, context&);
+        void display_istring      (const node*, context&);
+        void display_op_assign    (const node*, context&);
+        void display_op_plus      (const node*, context&);
+        void display_fn_print     (const node*, context&);
+
+        void  open_brackets(context&);
+        void close_brackets(context&);
+        void put_value(context&, palette_color color, poly_value value);
+        void put_uint(palette_color color, uint value, context&);
+        void put_text(palette_color color, const array_view<char>& text, context&);
+        void put_text_in_brackets(palette_color color, const array_view<char>& text, context&);
+
+
+        palette_color color_of(poly_value value);
 
         void display_node(const node *node, context& ctx) {
-            chk(node) else return;
+            if_ref(n, node); else return;
+            display_node(n, ctx);
+        }
 
+        void display_node(const node& node, context& ctx) {
             using_display_ctx;
 
-            if (node->type != str_literal || str_inlays) set_inlay(ctx.iterator, 1);
-            switch (node->type) {
-                case int_literal: { put_uint(it, color_scheme::constants, node->int_value); break; }
-                case str_literal: { put_text(it, color_scheme::strings  , node->str_value); break; }
+            if (is_str_literal(node) && str_inlays); else open_brackets(ctx);
+            switch (node.type) {
+                case literal: { put_value(ctx, color_of(node.value), node.value); break; }
                 case list: {
-                    let child = node->first_child;
-                    chk(child) else { put_text(it, color_scheme::inlays, view_of(" ")); break; }
+                    if_ref(first_child, node.first_child); else { put_text(inlays, view_of(" "), ctx); break; }
+                    if_ref( last_child, node. last_child); else { dbg_fail_break; }
 
-                    if (child->type == int_literal)
-                        if (display_func(child->int_value, child->next_sibling, ctx))
-                            break;
+                    put_text(inlays, first_child.prefix, ctx);
 
-                    put_text(it, color_scheme::inlays, child->prefix);
-                    str_inlays = true;
-                    display_nodes(child, ctx);
+                    if(!display_func(first_child, ctx)) {
+                        str_inlays = true;
+                        display_list(first_child, ctx);
+                        break;
+                    }
+
+                    put_text(inlays, last_child.suffix, ctx);
+
                     break;
                 }
             }
 
-            if (node->type != str_literal || str_inlays) set_inlay_prev(it, 2);
+            if (is_str_literal(node) && str_inlays); else close_brackets(ctx);
         }
 
-        void display_nodes(const node *node, context& ctx) {
-            chk(node) else return;
-
-            using_display_ctx;
-
+        void display_list(const node& node, context& ctx) {
             display_node(node, ctx);
 
-            if (node->suffix.count > 0)
-                put_text(it, color_scheme::inlays, node->suffix);
-
-            if (node->next_sibling)
-                display_nodes(node->next_sibling, ctx);
+            if (node.next) {
+                put_text(inlays, node.suffix, ctx);
+                display_list(node.next, ctx);
+            }
         }
 
-        bool display_func(uint fn_id, const node *args, context& ctx) {
+        void display_list(const node* node_list, context& ctx) {
             using_display_ctx;
 
-            if (fn_id ==   0) { display_show_as(args, ctx); return true; }
-            if (fn_id ==   1) { display_let    (args, ctx); return true; }
-            if (fn_id ==   2) { display_param  (args, ctx); return true; }
-            if (fn_id ==   3) { display_ref    (args, ctx); return true; }
-            if (fn_id ==   4) { display_istring(args, ctx); return true; }
-            if (fn_id == 100) { display_plus   (args, ctx); return true; }
-            if (fn_id == 200) { display_print  (args, ctx); return true; }
+            if_ref(node, node_list); else return;
+            display_list(node, ctx);
+        }
 
+        bool display_func(const node& node, context& ctx) {
+            using_display_ctx;
+            if_var1(fn_id, get_int(node)); else return false;
+            let args = node.next;
+
+            if (fn_id == (uint)inactive     ) { display_inactive     (args, ctx); return true; }
+            if (fn_id == (uint)macro_show_as) { display_macro_show_as(args, ctx); return true; }
+            if (fn_id == (uint)decl_var     ) { display_decl_var     (args, ctx); return true; }
+            if (fn_id == (uint)decl_param   ) { display_decl_param   (args, ctx); return true; }
+            if (fn_id == (uint)var_ref      ) { display_var_ref      (args, ctx); return true; }
+            if (fn_id == (uint)istring      ) { display_istring      (args, ctx); return true; }
+            if (fn_id == (uint)op_assign    ) { display_op_assign    (args, ctx); return true; }
+            if (fn_id == (uint)op_plus      ) { display_op_plus      (args, ctx); return true; }
+            if (fn_id == (uint)fn_print     ) { display_fn_print     (args, ctx); return true; }
             return false;
         }
 
-        void display_show_as(const node *args, context& ctx) {
-            let id_node = args;
-            assert(id_node->type == int_literal);
+        void display_inactive(const node* args, context& ctx) {
+            if_ref(args_list, args); else return;
 
+            put_text(inlays, args_list.prefix, ctx);
+
+            ctx.inactive_level += 1;
+            display_list(args, ctx);
+            ctx.inactive_level -= 1;
+        }
+
+        void display_macro_show_as(const node* args, context& ctx) {
             using_display_ctx;
 
-            let id = id_node->int_value;
+            if_ref (id_node, args       ); else { dbg_fail_return; }
+            if_var1(id, get_int(id_node)); else { dbg_fail_return; }
 
-            put_text(it, color_scheme::definitions, view_of("show "));
-            put_uint(it, color_scheme::constants  , id);
-            put_text(it, color_scheme::definitions, view_of(" as "));
+            put_text(definitions, view_of("show"), ctx);
+            put_text(inlays, id_node.prefix, ctx);
+            put_uint(constants, id, ctx);
+            put_text(inlays, id_node.suffix, ctx);
+            put_text(definitions, view_of("as "), ctx);
 
-            let pattern_node = id_node->next_sibling;
+            let pattern_node = id_node.next;
 
             str_inlays = true;
             display_node(pattern_node, ctx);
         }
 
-        void display_let(const node *args, context& ctx) {
-            let id_node = args;
-            assert(id_node->type == int_literal);
-            let name_node = id_node->next_sibling;
-            assert(name_node->type == str_literal);
-            let value_node = name_node->next_sibling;
-
+        void display_decl_var(const node* args, context& ctx) {
             using_display_ctx;
 
-            let name = name_node->str_value;
+            if_var3(id_node, mut_node, name_node, deref_list3(args)); else { dbg_fail_return; }
+            if_var1(name, get_str(name_node)); else { dbg_fail_return; }
 
-            put_text (it, color_scheme::regulars, view_of("let "));
-            set_inlay(it, 1); put_text(it, color_scheme::identifiers, name); set_inlay_prev(it, 2);
-            put_text (it, color_scheme::regulars, view_of(" = "));
+            if_var1(mut, get_int(mut_node)); else { dbg_fail_return; }
+            put_text(regulars, view_of(mut ? "var" : "let"), ctx);
+            put_text(inlays, name_node.prefix, ctx);
+            put_text_in_brackets(identifiers, name, ctx);
+            put_text(inlays, name_node.suffix, ctx);
+
+            if_ref(init_node, name_node.next); else return;
+            put_text(regulars, view_of("= "), ctx);
+            str_inlays = true;
+            display_node(init_node, ctx);
+        }
+
+        void display_decl_param(const node* args, context& ctx) {
+            using_display_ctx;
+
+            if_var2(id_node, name_node, deref_list2(args)); else { dbg_fail_return; }
+            if_var1(name, get_str(name_node)); else { name = view_of(" "); assert(false);  }
+            put_text_in_brackets(identifiers, name, ctx);
+        }
+
+        void display_var_ref(const node* args, context& ctx) {
+            using_display_ctx;
+
+            if_ref (id_node, args            ); else { dbg_fail_return; }
+            if_var1(id, get_int(id_node)     ); else { dbg_fail_return; }
+            if_var1(name, find_name(defs, id)); else { put_text(inlays, view_of(" "), ctx); dbg_fail_return; }
+
+            put_text_in_brackets(identifiers, name, ctx);
+        }
+
+        void display_istring(const node* args, context& ctx) {
+            ctx.show_top_level_inlays_for_strings = false;
+            display_list(args, ctx);
+        }
+
+        void display_op_assign(const node* args, context& ctx) {
+            using_display_ctx;
+
+            if_var2(id_node, value_node, deref_list2(args)); else { dbg_fail_return; }
+
+            if_var1(id  , get_int (id_node )); else { dbg_fail_return; }
+            if_var1(name, find_name(defs, id)); else { put_text(inlays, view_of(" "), ctx); dbg_fail_return; }
 
             str_inlays = true;
-            display_node(value_node, ctx);
+            put_text(identifiers, name, ctx);
+            put_text(regulars, view_of(" = "), ctx);
+            display_node(&value_node, ctx);
         }
 
-        void display_param(const node *arguments, context& ctx) {
-            let id_node = arguments;
-            assert(id_node->type == int_literal);
-            let name_node = id_node->next_sibling;
-            assert(name_node->type == str_literal);
-
+        void display_op_plus(const node* args, context& ctx) {
             using_display_ctx;
 
-            let name = name_node->str_value;
-            set_inlay(it, 1); put_text(it, color_scheme::identifiers, name); set_inlay_prev(it, 2);
-        }
-
-
-        void display_ref(const node *arguments, context& ctx) {
-            let id_node = arguments;
-            assert(id_node->type == int_literal);
-
-            using_display_ctx;
-
-            let id = id_node->int_value;
-            chk_var1(name, find_name(defs, id)) else { put_text(it, color_scheme::inlays, view_of(" ")); return; }
-
-            set_inlay(it, 1); put_text(it, color_scheme::identifiers, name); set_inlay_prev(it, 2);
-        }
-
-        void display_istring(const node *arguments, context& ctx) {
-            ctx.show_top_level_inlays_for_strings = false;
-            display_nodes(arguments, ctx);
-        }
-
-        void display_plus(const node *arguments, context& ctx) {
-            let a_node = arguments;
-            let b_node = a_node->next_sibling;
-
-            using_display_ctx;
-
+            if_var2(a_node, b_node, deref_list2(args)); else { dbg_fail_return; }
             str_inlays = true;
             display_node(a_node, ctx);
-            put_text(it, color_scheme::regulars, view_of(" + "));
+            put_text(regulars, view_of(" + "), ctx);
             display_node(b_node, ctx);
         }
 
-        void display_print(const node *arguments, context& ctx) {
-            var text_node = arguments;
+        void display_fn_print(const node* args, context& ctx) {
+            if_ref(text_node, args); else return;
 
             using_display_ctx;
-            put_text(it, color_scheme::regulars, view_of("print "));
+            put_text(regulars, view_of("print "), ctx);
             str_inlays = true;
             display_node(text_node, ctx);
+        }
+
+        void open_brackets(context& ctx) {
+            set_inlay(ctx.iterator, open);
+        }
+
+        void close_brackets(context& ctx) {
+            set_inlay_prev(ctx.iterator, close);
+        }
+
+        void put_value(context& ctx, palette_color color, poly_value value) {
+            switch (value.type) {
+                case integer: { put_uint(color, value.integer, ctx); break; }
+                case string : { put_text(color, value.string , ctx); break; }
+                default: { dbg_fail_return; }
+            }
+        }
+
+        void put_uint(palette_color color, uint value, context& ctx) {
+            put_uint(ctx.iterator, ctx.inactive_level > 0 ? inlays : color, value);
+        }
+
+        void put_text(palette_color color, const array_view<char>& text, context& ctx) {
+            put_text(ctx.iterator, ctx.inactive_level > 0 ? inlays : color, text);
+        }
+
+        void put_text_in_brackets(palette_color color, const array_view<char>& text, context& ctx) {
+            put_text_in_brackets(ctx.iterator, ctx.inactive_level > 0 ? inlays : color, text);
+        }
+
+        palette_color color_of(poly_value value) {
+            switch (value.type) {
+                case integer: return constants;
+                case string : return strings;
+            }
+            dbg_fail_return regulars; // unreachable
         }
     }
 }

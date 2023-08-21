@@ -51,7 +51,7 @@ namespace arenas {
 
     tt t* gta_one(const t& item, uint align = sizeof(size_t));
 
-    tt array<t> alloc_array(arena& arena, const size_t capacity, uint align = sizeof(size_t));
+    tt array<t> alloc_array(arena& arena, size_t capacity, uint align = sizeof(size_t));
 }
 #endif //FRANCA2_ARENAS_H
 
@@ -117,7 +117,7 @@ namespace arenas {
 
     tt array_view<t> alloc(arena& arena, const std::initializer_list<t> list, const uint align) {
         let count = list.size();
-        chk(count > 0) else return { 0, 0 };
+        if(count > 0); else return { 0, 0 };
 
         var data = alloc_g<t>(arena, count, align);
 
@@ -135,7 +135,8 @@ namespace arenas {
     }
 
     tt array<t> alloc_array(arena& arena, const size_t capacity, const uint align) {
-        return { alloc<t>(arena, capacity, align), 0 };
+        var storage = alloc<t>(arena, capacity, align);
+        return {{storage.data, 0}, storage.count};
     }
 
     // gta_ -> global temp arena

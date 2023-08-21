@@ -20,13 +20,12 @@ namespace arrays {
 
     tt struct array {
         array_view<t> data;
-        size_t count;
+        size_t capacity;
     };
 
     tt void push(array<t>& s, const t& value);
     tt t    pop (array<t>& s);
     tt t    peek(const array<t>& s);
-    tt array_view<t> view_of(const array<t>& s);
 }
 #endif //FRANCA2_ARRAYS_H
 
@@ -55,22 +54,19 @@ namespace arrays {
     }
 
     tt void push(array<t>& s, const t& value) {
-        assert(s.count < s.data.count);
-        s.data[s.count++] = value;
+        assert(s.data.count < s.capacity);
+        s.data[s.data.count] = value;
+        enlarge(s.data);
     }
 
     tt t pop(array<t>& s) {
-        assert(s.count > 0);
-        return s.data[--s.count];
+        assert(s.data.count > 0);
+        return s.data[--s.data.count];
     }
 
     tt t peek(const array<t>& s) {
         assert(s.count > 0);
-        return s.data[s.count - 1];
-    }
-
-    tt array_view<t> view_of(const array<t>& s) {
-        return { s.data.data, s.count };
+        return s.data[s.data.count - 1];
     }
 }
 #endif

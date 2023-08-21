@@ -1,6 +1,12 @@
 overall goal:
 - make programming easier, faster and more enjoyable
 
+features:
+    - [ ] text format for storing
+    - [ ] running the program
+    - [ ] displaying the program
+    - [ ] editing the program
+
 solution ideas:
 - separate displaying from editing
     - parseless code

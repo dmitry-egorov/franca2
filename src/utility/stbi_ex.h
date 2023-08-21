@@ -12,7 +12,7 @@ namespace stbi_ex {
     };
 
     inline void release(image_data& sd) {
-        chk(sd.data != nullptr) else return;
+        if (sd.data != nullptr); else return;
         stbi_image_free(sd.data);
         sd.data = nullptr;
     }

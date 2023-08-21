@@ -204,7 +204,7 @@ namespace wgpu_ex {
     inline void set_viewport                   (WGPURenderPassEncoder render_pass_encoder, float x, float y, float width, float height, float min_depth, float max_depth);
     inline void write_timestamp                (WGPURenderPassEncoder render_pass_encoder, WGPUQuerySet query_set, uint32_t query_index) { wgpuRenderPassEncoderWriteTimestamp(render_pass_encoder, query_set, query_index); }
     inline void reference                      (WGPURenderPassEncoder render_pass_encoder);
-    inline void release                        (WGPURenderPassEncoder& render_pass_encoder) { chk(render_pass_encoder) else return; wgpuRenderPassEncoderEnd(render_pass_encoder); wgpuRenderPassEncoderRelease(render_pass_encoder); render_pass_encoder = nullptr; }
+    inline void release                        (WGPURenderPassEncoder& render_pass_encoder) { if (render_pass_encoder); else return; wgpuRenderPassEncoderEnd(render_pass_encoder); wgpuRenderPassEncoderRelease(render_pass_encoder); render_pass_encoder = nullptr; }
 
     // Methods of RenderPipeline
     inline WGPUBindGroupLayout get_bind_group_layout(WGPURenderPipeline render_pipeline, uint32_t group_index) { return wgpuRenderPipelineGetBindGroupLayout(render_pipeline, group_index); }

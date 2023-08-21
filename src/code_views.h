@@ -17,6 +17,13 @@ namespace code_views {
     using namespace iterators;
     using namespace strings;
 
+    enum class inlay_type {
+        none  = 0,
+        open  = 1,
+        close = 2,
+        both  = 3
+    };
+
     struct code_view {
         arena& scratch_arena;
         array_view<uint8_t> glyphs;
@@ -57,27 +64,33 @@ namespace code_views {
         return { need_next_line, !finished(it) };
     }
 
-    void put_uint      (code_view_iterator &it, color_scheme color, uint value);
-    template<typename... Args> void put_text(code_view_iterator &it, color_scheme color, const char* format, Args... args);
-    void put_text      (code_view_iterator &it, color_scheme color, const array_view<char>& text);
+    void put_uint      (code_view_iterator &it, palette_color color, uint value);
+    template<typename... Args> void put_text(code_view_iterator &it, palette_color color, const char* format, Args... args);
+    void put_text      (code_view_iterator &it, palette_color color, const array_view<char>& text);
     void set_glyph     (code_view_iterator &it, u8 glyph) { using_cv_iterator(it); glyphs[y * size.w + x] = glyph; }
-    void set_color     (code_view_iterator &it, color_scheme color) { using_cv_iterator(it); colors[y * size.w + x] = (uint8_t)color; }
-    void set_inlay     (code_view_iterator &it, u8 inlay) { using_cv_iterator(it); inlays[y * size.w + x] |= inlay; }
-    void set_inlay_prev(code_view_iterator &it, u8 inlay) { using_cv_iterator(it); inlays[y * size.w + x - 1] |= inlay; }
+    void set_color     (code_view_iterator &it, palette_color color) { using_cv_iterator(it); colors[y * size.w + x] = (uint8_t)color; }
+    void set_inlay     (code_view_iterator &it, inlay_type inlay) { using_cv_iterator(it); inlays[y * size.w + x    ] |= (u8)inlay; }
+    void set_inlay_prev(code_view_iterator &it, inlay_type inlay) { using_cv_iterator(it); inlays[y * size.w + x - 1] |= (u8)inlay; }
 
-
-    void put_uint(code_view_iterator &it, color_scheme color, uint value) {
+    void put_uint(code_view_iterator &it, palette_color color, uint value) {
         put_text(it, color, "%d", value);
     }
 
-    template<typename... Args> void put_text(code_view_iterator &it, color_scheme color, const char* format, Args... args) {
+    template<typename... Args> void put_text(code_view_iterator &it, palette_color color, const char* format, Args... args) {
         put_text(it, color, make_string(it.view.scratch_arena, format, args...));
     }
 
-    void put_text(code_view_iterator &it, color_scheme color, const array_view<char>& text) {
+    void put_text_in_brackets(code_view_iterator &it, palette_color color, const array_view<char>& text) {
+        using enum inlay_type;
+        set_inlay(it, open);
+        put_text(it, color, text);
+        set_inlay_prev(it, close);
+    }
+
+    void put_text(code_view_iterator &it, palette_color color, const array_view<char>& text) {
         var text_it = text;
         while(!is_empty(text_it) && !finished(it)) {
-            chk_var1(c, take(text_it)) else break;
+            if_var1 (c, take(text_it)); else break;
             if (c == '\n') {
                 next_line(it);
                 continue;
@@ -88,10 +101,10 @@ namespace code_views {
             set_glyph(it, c - ' ');
             set_color(it, color);
 
-            chk_var1(skipped_line, next_cell(it)) else break;
+            if_var1 (skipped_line, next_cell(it)); else break;
 
             if (skipped_line) {
-                chk(skip_past(text_it, '\n')) else break;
+                if(skip_past(text_it, '\n')); else break;
             }
         }
     }

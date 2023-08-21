@@ -1,4 +1,9 @@
-- [ ] immediate execution (not lazy)
+
+- [ ] local scopes
+    - [ ] block node
+- [ ] ?? gen wasm
+- [ ] function definitions
+- [ ] local variables
 - [ ] navigate node tree
 - [ ] compile natively with dawn
 - [ ] cursor
@@ -9,6 +14,9 @@
 - [ ] edit
 
 done
+- [+] disabled blocks
+- [+] global mutable variables
+- [+] immediate execution (not lazy)
 - [+] store pattern as list, use string literals
 - [+] rework ast, so that it's executable
 - [+] display ast

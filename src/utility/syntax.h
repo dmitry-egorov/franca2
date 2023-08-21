@@ -5,6 +5,7 @@
 #define tt1 template<typename t0>
 #define tt2 template<typename t0, typename t1>
 #define tt3 template<typename t0, typename t1, typename t2>
+#define tt4 template<typename t0, typename t1, typename t2, typename t3>
 // 'defer'
 
 template<typename T>
@@ -30,14 +31,17 @@ public:
 #define defer_release(name) defer { release(name); }
 #define defer_release2(name0, name1) defer { release(name1); release(name0); }
 
-#define chk(condition) if (condition);
-
 #define var auto
 #define let const auto
 #define def constexpr
 #define ref auto&
+#define if_ref(name, ptr) ref name = *(ptr); if (ptr)
 
 #define tmp(name, initializer) var name = (initializer); defer_release(name)
+
+#define dbg_fail_return assert(false); return
+#define dbg_fail_continue assert(false); continue
+#define dbg_fail_break assert(false); break
 
 #define CODE(...) #__VA_ARGS__
 

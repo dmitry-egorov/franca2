@@ -16,7 +16,7 @@
 #include "utility/strings.h"
 #include "code_views.h"
 #include "compute_asts.h"
-#include "compute_definitions.h"
+#include "compute_storage.h"
 
 namespace compute_asts {
 
@@ -25,79 +25,70 @@ namespace compute_asts {
         using namespace compute_asts;
         using namespace code_views;
         using namespace strings;
+        using enum builtin_func_id;
 
         struct context {
-            const array_view<definition>& definitions;
+            const array_view<variable>& storage;
             arena& arena;
         };
 #define using_exec_ctx ref [defs, arena] = ctx
 
-        struct poly_value {
-            enum class type_t {
-                integer,
-                string
-            } type;
-
-            union {
-                uint integer;
-                array_view<char> string;
-            };
-        };
-
         poly_value       execute_node   (const node*, context&);
         poly_value       execute_list   (const node*, context&);
-        poly_value       execute_nodes  (const node*, context&);
-        array_view<char> execute_istring(const node*, context&);
+        poly_value       execute_nodes_chain  (const node*, context&);
 
         ret1<poly_value> execute_func (uint fn_id, const node*, context&);
-        array_view<char> execute_print(const node*, context&);
-             poly_value  execute_ref  (const node*, context&);
-                   uint  execute_plus (const node*, context&);
 
-        uint             get_int_literal_value(const node*);
-        array_view<char> get_str_literal_value(const node*);
+             poly_value  execute_decl_var (const node*, context&);
+             poly_value  execute_var_ref  (const node*, context&);
+             poly_value  execute_op_assign(const node*, context&);
+                   uint  execute_op_plus  (const node*, context&);
+        array_view<char> execute_istring  (const node*, context&);
+        array_view<char> execute_fn_print (const node*, context&);
 
-        poly_value to_poly(uint value);
-        poly_value to_poly(const array_view<char>& value);
+        poly_value get_literal_value(const node*);
 
         void push_uint (arena_array<char>&, uint, arena&);
         void push_value(arena_array<char>&, const poly_value&, arena&);
     }
 
-    void execute(const ast& ast, const arrays::array_view<definition>& defs, arenas::arena& arena) {
-        var ctx = execution::context {.definitions = defs, .arena = arena};
-        execute_nodes(ast.root, ctx);
+    void execute(const ast& ast, const arrays::array_view<variable>& defs, arenas::arena& arena) {
+        var ctx = execution::context {.storage = defs, .arena = arena};
+        execute_nodes_chain(ast.root, ctx);
     }
 
     namespace execution {
-        using enum node_type;
+        using enum node::type_t;
         using enum poly_value::type_t;
 
         poly_value execute_node(const node* node, context& ctx) {
             switch (node->type) {
-                case int_literal: return to_poly(get_int_literal_value(node));
-                case str_literal: return to_poly(get_str_literal_value(node));
-                case list       : return execute_list(node, ctx);
-                default: { assert(false); return {}; } // unreachable
+                case literal: return get_literal_value(node);
+                case list   : return execute_list(node, ctx);
+                default: { dbg_fail_return {}; } // unreachable
             }
         }
 
         ret1<poly_value> execute_func(uint fn_id, const node* args, context& ctx) {
-            if (fn_id ==   3) return ret1_ok(execute_ref(args, ctx));
-            if (fn_id ==   4) return ret1_ok(to_poly(execute_istring(args, ctx)));
-            if (fn_id == 100) return ret1_ok(to_poly(execute_plus   (args, ctx)));
-            if (fn_id == 200) return ret1_ok(to_poly(execute_print  (args, ctx)));
+            if (fn_id == (uint)inactive ) return ret1_ok({});
+            if (fn_id == (uint)decl_var ) return ret1_ok(execute_decl_var(args, ctx));
+            if (fn_id == (uint)var_ref  ) return ret1_ok(execute_var_ref (args, ctx));
+            if (fn_id == (uint)istring  ) return ret1_ok(to_poly(execute_istring  (args, ctx)));
+            if (fn_id == (uint)op_assign) return ret1_ok(execute_op_assign(args, ctx));
+            if (fn_id == (uint)op_plus  ) return ret1_ok(to_poly(execute_op_plus  (args, ctx)));
+            if (fn_id == (uint)fn_print ) return ret1_ok(to_poly(execute_fn_print (args, ctx)));
             return ret1_fail;
         }
 
-        array_view<char> execute_print(const node* arguments, context& ctx) {
+        array_view<char> execute_fn_print(const node* arguments, context& ctx) {
             using_exec_ctx;
 
             let value  = execute_node(arguments, ctx);
-            var result =
-                value.type == integer ? make_string(arena, "%d", value.integer) :
-                value.type == string  ? value.string :
-                                        view_of("");
+
+            var result = array_view<char> {};
+            if_var1(i, get_int(value)) { result = make_string(arena, "%d", i); } else {
+            if_var1(s, get_str(value)) { result = s; }
+                else { assert(false); result = view_of(""); }}
 
             print(result);
             printf("\n");
@@ -105,55 +96,72 @@ namespace compute_asts {
             return result;
         }
 
-        poly_value execute_ref(const node* arguments, context& ctx) {
+        poly_value execute_decl_var(const node* args, context& ctx) {
             using_exec_ctx;
 
-            let id_node = arguments;
-            assert(id_node->type == int_literal);
+            if_var3(id_node, mut_node, name_node, deref_list3(args)); else { dbg_fail_return {}; }
+            if_var1(id, get_int(id_node)    ); else { dbg_fail_return {}; }
+            if_ref (variable, find(defs, id)); else { dbg_fail_return {}; }
 
-            let id = id_node->int_value;
-            chk_var1(define, find(defs, id)) else { return {}; }
-
-            return execute_node(define.value_node, ctx);
+            if_ref(value_node, name_node.next); else return {};
+            return variable.value = execute_node(&value_node, ctx);
         }
 
-        uint execute_plus(const node* arguments, context& ctx) {
-            let a_node = arguments;
-            let b_node = a_node->next_sibling;
+        poly_value execute_var_ref(const node* args, context& ctx) {
+            using_exec_ctx;
 
-            let a_value = execute_node(a_node, ctx);
-            let b_value = execute_node(b_node, ctx);
+            if_ref (id_node , args)            ; else { dbg_fail_return {}; }
+            if_var1(id      , get_int(id_node)); else { dbg_fail_return {}; }
+            if_ref (variable, find(defs, id))  ; else { dbg_fail_return {}; }
 
-            assert(a_value.type == integer && b_value.type == integer);
+            return variable.value;
+        }
+
+        poly_value  execute_op_assign(const node* args, context& ctx) {
+            using_exec_ctx;
+
+            if_ref(id_node, args); else { dbg_fail_return {}; }
+            if_ref(value_node, id_node.next); else { dbg_fail_return {}; }
+
+            if_ref(variable, find(defs, id_node.value.integer)); else { dbg_fail_return {}; }
+            if   (variable.is_mutable); else { dbg_fail_return {}; }
+
+            return variable.value = execute_node(&value_node, ctx);
+        }
+
+        uint execute_op_plus(const node* args, context& ctx) {
+            if_ref(a_node, args       ); else { dbg_fail_return {}; }
+            if_ref(b_node, a_node.next); else { dbg_fail_return {}; }
+
+            let a_value = execute_node(&a_node, ctx);
+            let b_value = execute_node(&b_node, ctx);
+
+            if(a_value.type == integer && b_value.type == integer); else { dbg_fail_return {}; }
 
             return a_value.integer + b_value.integer;
         }
 
         poly_value execute_list(const node* node, context& ctx) {
             assert(node->type == list);
-            let child = node->first_child;
-            if (child->type == int_literal) {
-                var [result, executed] = execute_func(child->int_value, child->next_sibling, ctx);
-                if (executed) return result;
+            if_ref(child, node->first_child) {
+                if_var1(fn_id, get_int(child)) {
+                    var [result, executed] = execute_func(fn_id, child.next, ctx);
+                    if (executed) return result;
+                }
             }
 
-            return execute_nodes(child, ctx);
+            return execute_nodes_chain(&child, ctx);
         }
 
-        poly_value execute_nodes(const node* start_node, context& ctx) {
+        poly_value execute_nodes_chain(const node* chain, context& ctx) {
             var result = poly_value {};
 
-            var node = start_node;
-            while(node) { defer {node = node->next_sibling; };
+            var node = chain;
+            while(node) { defer {node = node->next; };
                 result = execute_node(node, ctx);
             }
 
             return result;
-        }
-
-        uint get_int_literal_value(const node* node) {
-            assert(node->type == int_literal);
-            return node->int_value;
         }
 
         array_view<char> execute_istring(const node* nodes, context& ctx) {
@@ -164,12 +172,8 @@ namespace compute_asts {
 
             loop_over_sequence(node, nodes) {
                 switch (node->type) {
-                    case int_literal: {
-                        push_uint(result_storage, get_int_literal_value(node), arena);
-                        break;
-                    }
-                    case str_literal: {
-                        push(result_storage, get_str_literal_value(node), arena, 1);
+                    case literal: {
+                        push_value(result_storage, get_literal_value(node), arena);
                         break;
                     }
                     case list: {
@@ -181,12 +185,14 @@ namespace compute_asts {
                 }
             }
 
-            return view_of(result_storage);
+            return result_storage.data;
         }
 
-        array_view<char> get_str_literal_value(const node* node) {
-            assert(node->type == str_literal);
-            return node->str_value;
+        poly_value get_literal_value(const node* node) {
+            assert(node->type == literal);
+            if (is_int_literal(node)) return to_poly(node->value.integer);
+            if (is_str_literal(node)) return to_poly(node->value.string );
+            assert(false); // unreachable
         }
 
         void push_uint(arena_array<char>& storage, const uint value, arena& arena) {
@@ -205,13 +211,6 @@ namespace compute_asts {
                     break;
                 }
             }
-        }
-
-        poly_value to_poly(uint value) {
-            return poly_value { .type = integer, .integer = value };
-        }
-        poly_value to_poly(const array_view<char>& value) {
-            return poly_value { .type = string, .string = value };
         }
     }
 }

@@ -18,6 +18,7 @@ namespace visual_asts::view_gen {
     using namespace iterators;
     using namespace visual_asts;
     using namespace code_views;
+    using enum inlay_type;
 
     void display(const node& node, code_view_iterator& it);
 
@@ -30,12 +31,12 @@ namespace visual_asts::view_gen {
 
         var child = node.first_child;
         if (child) {
-            set_inlay(it, 1);
+            set_inlay(it, open);
             display(*child, it);
             if (child->prefix_text.count == 0 && child->first_child == nullptr)
-                set_inlay(it, 2);
+                set_inlay(it, close);
             else
-                set_inlay_prev(it, 2);
+                set_inlay_prev(it, close);
         }
 
         if (node.next_sibling)

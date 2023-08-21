@@ -15,7 +15,7 @@ namespace wgpu_ex::png {
         tmp(sd, stbi_ex::load(path, STBI_grey));
 
         //TODO: support multiple formats
-        chk(sd.data && sd.channels == 1) else return ret2_fail;
+        if(sd.data && sd.channels == 1); else return ret2_fail;
 
         return make_texture_2d(device, sd.size, WGPUTextureFormat_R8Unorm, sd.data);
     }

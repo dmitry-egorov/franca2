@@ -24,7 +24,7 @@ namespace visual_asts::parser {
     using namespace arenas;
 
     namespace {
-        node* parse_expression(array_view<char>& it, color_scheme color, ast_storage& storage);
+        node* parse_expression(array_view<char>& it, palette_color color, ast_storage& storage);
         void  parse_prefix    (array_view<char>& it, node& node);
         bool  parse_child     (array_view<char>& it, node& node, ast_storage& storage);
         void  parse_sibling   (array_view<char>& it, node& node, ast_storage& storage);
@@ -32,7 +32,7 @@ namespace visual_asts::parser {
 
     static ret1<ast> parse_text(const array_view<char>& text, ast_storage& storage) {
         var iterator = text;
-        var root = parse_expression(iterator, color_scheme::regulars, storage);
+        var root = parse_expression(iterator, palette_color::regulars, storage);
 
         let a = visual_asts::ast {root, storage };
         return ret1_ok(a);
@@ -44,17 +44,17 @@ namespace visual_asts::parser {
             arenas::make(1024 * 1024 * sizeof(char))
         };
 
-        chk_var1(ast, parse_text(read_file_as_string(path, storage.text_arena), storage)) else { release(storage); return ret1_fail; }
+        if_var1(ast, parse_text(read_file_as_string(path, storage.text_arena), storage)); else { release(storage); return ret1_fail; }
         return ret1_ok(ast);
     }
 
     namespace {
-        node* parse_expression(array_view<char>& it, color_scheme color, ast_storage& storage) {
+        node* parse_expression(array_view<char>& it, palette_color color, ast_storage& storage) {
             ref node = *make_node(storage, {});
             node.color_id = color;
 
                 parse_prefix (it, node);
-            chk(parse_child  (it, node, storage)) else return &node;
+            if (parse_child  (it, node, storage)); else return &node;
                 parse_sibling(it, node, storage);
 
             return &node;
@@ -66,12 +66,12 @@ namespace visual_asts::parser {
         }
 
         bool parse_child(array_view<char>& it, node& node, ast_storage& storage) {
-            chk(take(it, '[')) else return false;
+            if (take(it, '[')); else return false;
             let [d, d_ok]     = take_integer(it);
             if (d_ok) skip_whitespaces(it);
-            node.first_child = parse_expression(it, d_ok ? (color_scheme)d : color_scheme::regulars, storage);
+            node.first_child = parse_expression(it, d_ok ? (palette_color)d : palette_color::regulars, storage);
             node.first_child->parent = &node;
-            chk(take(it, ']')) else return false;
+            if (take(it, ']')); else return false;
             return true;
         }
 

@@ -21,22 +21,38 @@ tt3 struct ret3 {
     bool ok;
 };
 
+tt4 struct ret4 {
+    t0   v0;
+    t1   v1;
+    t2   v2;
+    t3   v3;
+    bool ok;
+};
+
 #define ret1_ok(v0) {v0, true}
 #define ret2_ok(v0, v1) {v0, v1, true}
 #define ret3_ok(v0, v1, v2) {v0, v1, v2, true}
+#define ret4_ok(v0, v1, v2, v3) {v0, v1, v2, v3, true}
 
 #define ret1_fail {{}, false}
 #define ret2_fail {{}, {}, false}
 #define ret3_fail {{}, {}, {}, false}
+#define ret4_fail {{}, {}, {}, false}
 
-#define chk_var1(name0, initializer) var [name0, stx_concat(ok, __LINE__)] = (initializer); if (stx_concat(ok, __LINE__));
-#define chk_var2(name0, name1, initializer) var [name0, name1, stx_concat(ok, __LINE__)] = (initializer); if (stx_concat(ok, __LINE__));
-#define chk_set1(name0, initializer) var [stx_concat(res, __LINE__), stx_concat(ok, __LINE__)] = (initializer); if (stx_concat(ok, __LINE__)) { name0 = stx_concat(res, __LINE__); }
+#define line_res stx_concat(res, __LINE__)
+#define line_ok stx_concat(ok, __LINE__)
+#define var1(name0, initializer) var [name0, line_ok] = (initializer)
 
-#define chk_tmp1(name0, initializer) var [name0, stx_concat(ok, __LINE__)] = (initializer); defer_release(name0); if (stx_concat(ok, __LINE__));
-#define chk_tmp2(name0, name1, initializer) var [name0, name1, stx_concat(ok, __LINE__)] = (initializer); defer_release2(name0, name1); if (stx_concat(ok, __LINE__));
-#define chk_tmp3(name0, name1, name2, initializer) var [name0, name1, name2, stx_concat(ok, __LINE__)] = (initializer); defer_release2(name0, name1, name2); if (stx_concat(ok, __LINE__));
+#define if_var1(name0, initializer) var [name0, line_ok] = (initializer); if (line_ok)
+#define if_var2(name0, name1, initializer) var [name0, name1, line_ok] = (initializer); if (line_ok)
+#define if_var3(name0, name1, name2, initializer) var [name0, name1, name2, line_ok] = (initializer); if (line_ok)
+#define if_var4(name0, name1, name2, name3, initializer) var [name0, name1, name2, name3, line_ok] = (initializer); if (line_ok)
+#define if_set1(name0, initializer) var [line_res, line_ok] = (initializer); if (line_ok) { name0 = line_res; } if (line_ok)
 
-#define asr_1(name0, initializer) var [name0, stx_concat(ok, __LINE__)] = (initializer); assert(stx_concat(ok, __LINE__))
+#define if_tmp1(name0, initializer) var [name0, line_ok] = (initializer); defer_release(name0); if (line_ok)
+#define if_tmp2(name0, name1, initializer) var [name0, name1, line_ok] = (initializer); defer_release2(name0, name1); if (line_ok)
+#define if_tmp3(name0, name1, name2, initializer) var [name0, name1, name2, line_ok] = (initializer); defer_release2(name0, name1, name2); if (line_ok)
+
+#define asr_1(name0, initializer) var [name0, line_ok] = (initializer); assert(line_ok)
 
 #endif //FRANCA2_RESULTS_H

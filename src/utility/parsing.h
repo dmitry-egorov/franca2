@@ -21,10 +21,10 @@ namespace parsing {
     }
 
     ret1<uint8_t> take_digit(array_view<char>& it) {
-        chk_var1(c, peek(it)) else return ret1_fail;
+        if_var1(c, peek(it)); else return ret1_fail;
 
         var digit = c - '0';
-        chk(digit >= 0 && digit <= 9) else return ret1_fail;
+        if(digit >= 0 && digit <= 9); else return ret1_fail;
 
         take(it);
 
@@ -33,11 +33,11 @@ namespace parsing {
 
     ret1<uint> take_integer(array_view<char>& it) {
         var it_copy = it;
-        chk_var1(digit0, take_digit(it_copy)) else return ret1_fail;
+        if_var1(digit0, take_digit(it_copy)); else return ret1_fail;
 
-        var result = digit0;
+        var result = (uint)digit0;
         while(true) {
-            chk_var1(digit, take_digit(it_copy)) else break;
+            if_var1(digit, take_digit(it_copy)); else break;
             result = 10 * result + digit;
         }
 
