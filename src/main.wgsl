@@ -99,7 +99,7 @@ fn glyph_coverage_of(glyph: u32, cell_px: vec2u) -> f32 {
 }
 
 fn inlay_coverage_at(cell_index: vec2u, cell_px: vec2u) -> f32 {
-    const bracket_size = 1.0;
+    const bracket_size = 0.5;
     let inlay_id = load(code_inlay_tex, cell_index);
     if ((inlay_id & 0xff) != 0) {} else { return 0; }
     let l_px = vec2u(cell_px.x, uni.cell_size.y - cell_px.y);
@@ -223,8 +223,8 @@ fn sdf_segment(p: vec2f, a: vec2f, b: vec2f) -> f32
 }
 
 fn sdf_corner(p: vec2f, r: f32) -> f32 {
-    let a0 = (1.0 - sdf_thick_segment(p, vec2f(2.0, 4.0), vec2f(6.0, 4.0), r));
-    let a1 = (1.0 - sdf_thick_segment(p, vec2f(2.0, 4.0), vec2f(2.0, 7.0), r));
+    let a0 = (1.0 - sdf_thick_segment(p, vec2f(2.0, 5.0), vec2f(6.0, 5.0), r));
+    let a1 = (1.0 - sdf_thick_segment(p, vec2f(2.0, 5.0), vec2f(2.0, 8.0), r));
 
     return max(a0, a1);
 }

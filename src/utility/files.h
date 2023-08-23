@@ -3,13 +3,14 @@
 #include <cstdio>
 #include "syntax.h"
 #include "arenas.h"
+#include "strings.h"
 
 void release(FILE*& f) {
     if (f) fclose(f);
     f = nullptr;
 }
 
-inline arrays::array_view<char> read_file_as_string(const char* path, arenas::arena& arena = arenas::gta) {
+inline strings::string read_file_as_string(const char* path, arenas::arena& arena = arenas::gta) {
     tmp(f, fopen (path, "rb"));
     if (f); else return {};
 

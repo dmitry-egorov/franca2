@@ -1,9 +1,9 @@
-
-- [ ] local scopes
-    - [ ] block node
+- [ ] change syntax of functions to id[]
+- [ ] line and col in errors
+- [ ] get fn_id at parse time, don't store it as a node
+- [ ] block lines
+- [ ] structs
 - [ ] ?? gen wasm
-- [ ] function definitions
-- [ ] local variables
 - [ ] navigate node tree
 - [ ] compile natively with dawn
 - [ ] cursor
@@ -14,6 +14,18 @@
 - [ ] edit
 
 done
+- [+] function definitions
+- [+] function calls
+- [+] eq op
+- [+] return
+- [+] if
+- [+] loop
+- [+] recursion
+- [+] remove istring from parsing
+- [+] fib function
+- [+] local scopes
+    - [+] block node
+    - [+] local variables
 - [+] disabled blocks
 - [+] global mutable variables
 - [+] immediate execution (not lazy)

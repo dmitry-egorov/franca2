@@ -66,6 +66,15 @@ namespace iterators {
         }
     }
 
+    tt array_view<t> take_past(array_view<t>& it, const t& target) {
+        var result = array_view<t> { it.data, 0 };
+        while (true) {
+            if_var1(c, take(it)); else return result;
+            enlarge(result);
+            if (c != target); else return result;
+        }
+    }
+
     tt array_view<t> take_until_any(array_view<t>& it, const array_view<t>& targets) {
         var result = array_view<t> { it.data, 0 };
         while (true) {
@@ -74,6 +83,15 @@ namespace iterators {
 
             take(it);
             enlarge(result);
+        }
+    }
+
+    tt array_view<t> take_past_any(array_view<t>& it, const array_view<t>& targets) {
+        var result = array_view<t> { it.data, 0 };
+        while (true) {
+            if_var1(c, take(it)); else return result;
+            enlarge(result);
+            if (!contains(targets, c)); else return result;
         }
     }
 

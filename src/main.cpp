@@ -52,7 +52,6 @@ let canvas_name = "canvas";
 
 let clear_color = WGPUColor {.r = 0.1f, .g = 0.1f, .b = 0.15f, .a = 1.0f};
 
-
 struct state_t {
     struct wgpu_state {
         WGPUInstance  instance;
@@ -128,12 +127,11 @@ static bool init() {
     //print_ast(&ast);
     //display(ast, cv_it);
 
-    if_var1(compute_ast, compute_asts::parse_file("embedded/hello_world.fr")); else return false;
+    if_var1(compute_ast, compute_asts::parse_file("embedded/fib.fr")); else return false;
     compute_asts::print_ast(compute_ast);
-    var defs = compute_asts::gather_variables(compute_ast);
-    printf("Definitions: %zu\n", defs.count);
-    compute_asts::execute(compute_ast, defs, gta  );
-    compute_asts::display(compute_ast, defs, cv_it);
+    var result = compute_asts::execute(compute_ast);
+    printf("Exited with code %d\n", result);
+    compute_asts::display(compute_ast, cv_it);
 
     code_view.line_count = cv_it.cell_idx.y + 1;
 

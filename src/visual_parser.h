@@ -22,15 +22,16 @@ namespace visual_asts::parser {
     using namespace parsing;
     using namespace visual_asts;
     using namespace arenas;
+    using namespace strings;
 
     namespace {
-        node* parse_expression(array_view<char>& it, palette_color color, ast_storage& storage);
-        void  parse_prefix    (array_view<char>& it, node& node);
-        bool  parse_child     (array_view<char>& it, node& node, ast_storage& storage);
-        void  parse_sibling   (array_view<char>& it, node& node, ast_storage& storage);
+        node* parse_expression(string& it, palette_color color, ast_storage& storage);
+        void  parse_prefix    (string& it, node& node);
+        bool  parse_child     (string& it, node& node, ast_storage& storage);
+        void  parse_sibling   (string& it, node& node, ast_storage& storage);
     }
 
-    static ret1<ast> parse_text(const array_view<char>& text, ast_storage& storage) {
+    static ret1<ast> parse_text(const string& text, ast_storage& storage) {
         var iterator = text;
         var root = parse_expression(iterator, palette_color::regulars, storage);
 
@@ -49,7 +50,7 @@ namespace visual_asts::parser {
     }
 
     namespace {
-        node* parse_expression(array_view<char>& it, palette_color color, ast_storage& storage) {
+        node* parse_expression(string& it, palette_color color, ast_storage& storage) {
             ref node = *make_node(storage, {});
             node.color_id = color;
 
@@ -60,12 +61,12 @@ namespace visual_asts::parser {
             return &node;
         }
 
-        void parse_prefix(array_view<char>& it, node& node) {
+        void parse_prefix(string& it, node& node) {
             static let ends = view_of("[]");
             node.prefix_text = take_until_any(it, ends);
         }
 
-        bool parse_child(array_view<char>& it, node& node, ast_storage& storage) {
+        bool parse_child(string& it, node& node, ast_storage& storage) {
             if (take(it, '[')); else return false;
             let [d, d_ok]     = take_integer(it);
             if (d_ok) skip_whitespaces(it);
@@ -75,7 +76,7 @@ namespace visual_asts::parser {
             return true;
         }
 
-        void parse_sibling(array_view<char>& it, node& node, ast_storage& storage) {
+        void parse_sibling(string& it, node& node, ast_storage& storage) {
             node.next_sibling = parse_expression(it, node.color_id, storage);
         }
     }

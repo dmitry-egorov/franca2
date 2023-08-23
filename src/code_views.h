@@ -37,10 +37,11 @@ namespace code_views {
     struct code_view_iterator {
         code_view& view;
         uint2 cell_idx;
+        uint indent;
     };
 
-#define using_cv_iterator(code_view_iterator) ref [view, cell_idx] = code_view_iterator; ref [arena, glyphs, colors, inlays, size, line_count] = view; ref [x, y] = cell_idx
-
+#define using_cv_iterator(code_view_iterator) ref [view, cell_idx, indent] = code_view_iterator; ref [arena, glyphs, colors, inlays, size, line_count] = view; ref [x, y] = cell_idx
+#define tmp_indent(it) it.indent += 1; defer { it.indent -= 1; }
     code_view make_code_vew(const usize2& size, arena& arena = arenas::gta) { return {
         .scratch_arena = arena,
         .glyphs = alloc<uint8_t>(arena, size.w * size.h),
@@ -51,9 +52,12 @@ namespace code_views {
 
     code_view_iterator iterate(code_view& cv) { return { .view = cv }; }
 
-
     bool finished (const code_view_iterator& it) { using_cv_iterator(it); return y >= size.h; }
-    void next_line(code_view_iterator &it) { using_cv_iterator(it); x = 0; y += 1; }
+    void next_line(code_view_iterator &it) {
+        using_cv_iterator(it);
+        x  = indent * 4; //TODO: make the indent size configurable configurable
+        y += 1;
+    }
     ret1<bool> next_cell(code_view_iterator &it) {
         using_cv_iterator(it);
         if (finished(it)) return ret1_ok(false);
@@ -66,7 +70,7 @@ namespace code_views {
 
     void put_uint      (code_view_iterator &it, palette_color color, uint value);
     template<typename... Args> void put_text(code_view_iterator &it, palette_color color, const char* format, Args... args);
-    void put_text      (code_view_iterator &it, palette_color color, const array_view<char>& text);
+    void put_text      (code_view_iterator &it, palette_color color, const string& text);
     void set_glyph     (code_view_iterator &it, u8 glyph) { using_cv_iterator(it); glyphs[y * size.w + x] = glyph; }
     void set_color     (code_view_iterator &it, palette_color color) { using_cv_iterator(it); colors[y * size.w + x] = (uint8_t)color; }
     void set_inlay     (code_view_iterator &it, inlay_type inlay) { using_cv_iterator(it); inlays[y * size.w + x    ] |= (u8)inlay; }
@@ -80,14 +84,14 @@ namespace code_views {
         put_text(it, color, make_string(it.view.scratch_arena, format, args...));
     }
 
-    void put_text_in_brackets(code_view_iterator &it, palette_color color, const array_view<char>& text) {
+    void put_text_in_brackets(code_view_iterator &it, palette_color color, const string& text) {
         using enum inlay_type;
         set_inlay(it, open);
         put_text(it, color, text);
         set_inlay_prev(it, close);
     }
 
-    void put_text(code_view_iterator &it, palette_color color, const array_view<char>& text) {
+    void put_text(code_view_iterator &it, palette_color color, const string& text) {
         var text_it = text;
         while(!is_empty(text_it) && !finished(it)) {
             if_var1 (c, take(text_it)); else break;

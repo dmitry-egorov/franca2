@@ -22,67 +22,87 @@ namespace compute_asts {
     struct variable {
         uint id;
         bool is_mutable;
-        arrays::array_view<char> name;
+        string name;
         poly_value value;
     };
 
-    static arrays::array_view<variable> gather_variables(ast& ast, arenas::arena& arena = arenas::gta);
-    ret1<arrays::array_view<char>> find_name(const arrays::array_view<variable>& storage, uint id);
+    struct func {
+        uint id;
+        node* display;
+        node* body;
+    };
 
-    namespace storage {
-        using namespace arenas;
-        void gather_from_list(const node* node, array<variable>& cells);
+    struct scope {
+        uint prev_vars_count;
+        uint prev_funcs_count;
+    };
+
+    struct storage {
+        array<scope   > scopes;
+        array<variable> vars  ;
+        array<func    > funcs ;
+    };
+
+#define using_storage ref [scopes, vars, funcs] = storage
+
+    static storage make_storage(arena& arena = gta);
+
+    void push_var  (storage &, const variable&);
+    void push_scope(storage&);
+    void  pop_scope(storage&);
+    variable* find_var (storage&, uint id);
+    func*     find_func(storage&, uint id);
+
+    static storage make_storage(arena& arena) {
+        return {
+            alloc_array<scope   >(arena, 1024),
+            alloc_array<variable>(arena, 1024),
+            alloc_array<func    >(arena, 1024),
+        };
     }
 
-    static arrays::array_view<variable> gather_variables(ast& ast, arenas::arena& arena) {
-        using namespace storage;
-
-        var cells = alloc_array<variable>(arena, 1024);
-        gather_from_list(ast.root, cells);
-        return cells.data;
+    void push_var(storage& storage, const variable& v) {
+        using_storage;
+        push(vars, v);
     }
 
-    ret1<arrays::array_view<char>> find_name(const arrays::array_view<variable>& storage, const uint id) {
-        for (var i = 0u; i < storage.count; ++i) {
-            let definition = storage[i];
-            if (definition.id == id) return ret1_ok(definition.name);
-        }
-
-        return ret1_fail;
+    void push_func(storage& storage, const func& f) {
+        using_storage;
+        push(funcs, f);
     }
 
-    variable* find(arrays::array_view<variable> definitions, const uint id) {
-        for (var i = 0u; i < definitions.count; ++i) {
-            let definition = &definitions[i];
-            if (definition->id == id) return definition;
+    void push_scope(storage& storage) {
+        using_storage;
+        push(scopes, {vars.data.count, funcs.data.count});
+    }
+
+    void pop_scope(storage& storage) {
+        using_storage;
+        let scope = pop(scopes);
+        vars .data.count = scope.prev_vars_count;
+        funcs.data.count = scope.prev_funcs_count;
+    }
+#define tmp_scope(storage) push_scope(storage); defer { pop_scope(storage); }
+
+    variable* find_var(storage& storage, const uint id) {
+        using_storage;
+        var vars_view = vars.data;
+        for (var i = (int)vars_view.count - 1; i >= 0; --i) {
+            ref v = vars_view[i];
+            if (v.id == id) return &v;
         }
 
         return nullptr;
     }
-
-    namespace storage {
-        void gather_from_list(const node* node, array<variable>& cells) {
-            using enum node::type_t;
-            while (node) { defer {node = node->next; };
-                ref n = *node;
-                if (n.type == list); else continue;
-                if_ref(children, n.first_child); else continue;
-                if (value_is(children, (uint)decl_var));
-                    else {
-                        gather_from_list(&children, cells);
-                        continue;
-                    }
-
-                if_var3(id_node, mut_node, name_node, deref_list3(children.next)); else { dbg_fail_continue; }
-
-                if_var1(id  , get_int(  id_node)     ); else { dbg_fail_continue; }
-                if_var1(name, get_str(name_node)     ); else { dbg_fail_continue; }
-                if_var1(is_mutable, get_int(mut_node)); else { dbg_fail_continue; }
-
-                push(cells, {id, is_mutable != 0, name, {}});
-            }
+    func* find_func(storage& storage, const uint id) {
+        using_storage;
+        var funcs_view = funcs.data;
+        for (var i = (int)funcs_view.count - 1; i >= 0; --i) {
+            ref v = funcs_view[i];
+            if (v.id == id) return &v;
         }
 
+        return nullptr;
     }
 }
 

@@ -1,3 +1,4 @@
+- [ ] store blocks ident in the stored file
 - [ ] ??? change syntax of functions to id[]
 - [ ] ??? uuid as "qr"
 - [ ] variable declaration inside another expression?

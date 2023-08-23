@@ -10,12 +10,14 @@
 #include "utility/arrays.h"
 
 namespace visual_asts {
+    using namespace arenas;
+    using namespace strings;
+
     struct ast ;
     struct node;
 
     namespace {
         using namespace arrays;
-        using namespace arenas;
 
         void print_ast_for(const node* node);
     }
@@ -33,7 +35,7 @@ namespace visual_asts {
     struct node {
         palette_color color_id;
 
-        array_view<char> prefix_text;
+        string prefix_text;
 
         node* parent      ;
         node* first_child ;

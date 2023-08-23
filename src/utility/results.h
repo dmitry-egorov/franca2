@@ -49,6 +49,10 @@ tt4 struct ret4 {
 #define if_var4(name0, name1, name2, name3, initializer) var [name0, name1, name2, name3, line_ok] = (initializer); if (line_ok)
 #define if_set1(name0, initializer) var [line_res, line_ok] = (initializer); if (line_ok) { name0 = line_res; } if (line_ok)
 
+#define if_vari2(name0, init0, name1, init1) var [name0, line_ok##_0] = (init0); var [name1, line_ok##_1] = (init1); if (line_ok##_0 && line_ok##_1)
+#define if_vari3(name0, init0, name1, init1, name2, init2) var [name0, line_ok##_0] = (init0); var [name1, line_ok##_1] = (init1); var [name2, line_ok##_2] = (init2); if (line_ok##_0 && line_ok##_1 && line_ok##_2)
+
+
 #define if_tmp1(name0, initializer) var [name0, line_ok] = (initializer); defer_release(name0); if (line_ok)
 #define if_tmp2(name0, name1, initializer) var [name0, name1, line_ok] = (initializer); defer_release2(name0, name1); if (line_ok)
 #define if_tmp3(name0, name1, name2, initializer) var [name0, name1, name2, line_ok] = (initializer); defer_release2(name0, name1, name2); if (line_ok)
