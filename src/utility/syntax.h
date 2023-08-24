@@ -35,7 +35,8 @@ public:
 #define let const auto
 #define def constexpr
 #define ref auto&
-#define if_ref(name, ptr) ref name = *(ptr); if (ptr)
+#define ptr_line stx_concat(ptr,__LINE__)
+#define if_ref(name, init) let ptr_line = init; ref name = *(ptr_line); if (ptr_line)
 
 #define tmp(name, initializer) var name = (initializer); defer_release(name)
 

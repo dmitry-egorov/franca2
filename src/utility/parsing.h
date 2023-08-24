@@ -31,7 +31,7 @@ namespace parsing {
         return ret1_ok((uint8_t)digit);
     }
 
-    ret1<uint> take_integer(string& it) {
+    ret1<uint> take_int(string& it) {
         var it_copy = it;
         if_var1(digit0, take_digit(it_copy)); else return ret1_fail;
 
@@ -44,5 +44,13 @@ namespace parsing {
         it = it_copy;
         return ret1_ok(result);
     }
+
+    ret1<string> take_str(string& it) {
+        if (take(it, '\"')); else return ret1_fail;
+        var data = take_until(it, '\"');
+        if (take(it, '\"')); else return ret1_fail;
+        return ret1_ok(data);
+    }
+
 }
 #endif //FRANCA2_PARSING_H

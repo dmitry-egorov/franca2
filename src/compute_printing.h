@@ -14,57 +14,46 @@ namespace compute_asts {
         using namespace printing;
         using namespace strings;
 
-        void print_node_chain(const node* node_list, bool print_top_level_quotes);
-        void print_node_chain(const node& node, bool print_top_level_quotes);
+        void print_node_chain(const node*, bool print_top_level_quotes);
     }
 
     inline void print_ast(const ast& ast) {
         if(ast.root); else { printf("AST is empty\n"); return; }
-        strings ::print(ast.root->prefix);
         printing::print_node_chain(ast.root, true);
         printf("\n");
     }
 
     namespace printing {
-        void print_node_chain(const node& node, bool print_top_level_quotes) {
-            using enum node::type_t;
+        void print_node_chain(const node* first_node, bool print_top_level_quotes) {
             using enum builtin_func_id;
+            var node_p = first_node;
+            if (node_p) print(node_p->prefix);
+            while (node_p) {
+                ref node = *node_p;
 
-            switch (node.type) {
-                case literal: {
-                    if_var1(i, get_int(node))
-                        printf("%d", i);
-                    else { if_var1 (text, get_str(node)) {
-                        if (print_top_level_quotes) printf("\"");
-                        printf("%.*s", (int)text.count, text.data);
-                        if (print_top_level_quotes) printf("\"");
-                    }
-                    else {
-                        assert(false); // unreachable
-                    }}
-                    break;
+                if_var1(i, get_int(node)) {
+                    printf("%d", i);
                 }
-                case func: {
-                    if_ref(child, node.first_child); else { printf("[]"); break; }
+                else { if_var1 (text, get_str(node)) {
+                    if (print_top_level_quotes) printf("\"");
+                    printf("%.*s", (int)text.count, text.data);
+                    if (print_top_level_quotes) printf("\"");
+                }
+                else {
+                    assert(false); // unreachable
+                }}
 
+                if (is_func(node)) {
                     printf("[");
-                    print(child.prefix);
-                    print_node_chain(&child, true);
+                    if_ref(child, node.first_child) {
+                        print_node_chain(&child, true);
+                    }
                     printf("]");
-                    break;
                 }
-            }
 
-            if (node.suffix.count > 0)
                 print(node.suffix);
-
-            if (node.next)
-                print_node_chain(node.next, print_top_level_quotes);
-        }
-
-        void print_node_chain(const node* node_list, const bool print_top_level_quotes) {
-            if_ref(node, node_list); else return;
-            print_node_chain(node, print_top_level_quotes);
+                node_p = node.next;
+            }
         }
     }
 }

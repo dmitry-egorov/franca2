@@ -7,15 +7,15 @@
 #include "utility/primitives.h"
 
 enum struct palette_color {
-    regulars          = 0,
-    identifiers       = 1,
-    break_statements  = 2,
-    return_statements = 3,
-    definitions       = 4,
-    implicit_vars     = 5,
-    strings           = 6,
-    constants         = 7,
-    inlays            = 8,
+    regulars         = 0,
+    identifiers      = 1,
+    break_statements = 2,
+    controls         = 3,
+    definitions      = 4,
+    implicit_vars    = 5,
+    strings          = 6,
+    constants        = 7,
+    inlays           = 8,
 };
 
 inline var palette = std::array<uint, 256>();
@@ -28,7 +28,7 @@ void init_palette() {
     set_palette_color(regulars         , 0xa7a7ebff);
     set_palette_color(identifiers      , 0xffffffff);
     set_palette_color(break_statements , 0x416ecaff);
-    set_palette_color(return_statements, 0x3393ffff);
+    set_palette_color(controls, 0x3393ffff);
     set_palette_color(definitions      , 0xae76c0ff);
     set_palette_color(implicit_vars    , 0xbbbbbbff);
     set_palette_color(strings          , 0x6aab73ff);

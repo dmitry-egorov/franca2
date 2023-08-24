@@ -88,20 +88,21 @@ namespace compute_asts {
     poly_value to_poly(uint value) { return poly_value { .type = poly_value::type_t::poly_integer, .integer = value }; }
     poly_value to_poly(const string& value) { return poly_value { .type = poly_value::type_t::poly_string, .string = value }; }
 
+    inline auto is_func       (const node& node) -> bool { return node.type == node::type_t::func; }
     inline auto is_int_literal(const node* node) -> bool { return node->type == node::type_t::literal && node->value.type == poly_value::type_t::poly_integer; }
     inline auto is_str_literal(const node* node) -> bool { return node->type == node::type_t::literal && node->value.type == poly_value::type_t::poly_string ; }
     inline auto is_int_literal(const node& node) -> bool { return is_int_literal(&node); }
     inline auto is_str_literal(const node& node) -> bool { return is_str_literal(&node); }
 
-    inline auto get_int(const poly_value& v) -> ret1<uint> { if (v.type == poly_value::type_t::poly_integer) return ret1_ok(v.integer); else return ret1_fail; }
+    inline auto get_int(const poly_value& v) -> ret1<uint>   { if (v.type == poly_value::type_t::poly_integer) return ret1_ok(v.integer); else return ret1_fail; }
     inline auto get_str(const poly_value& v) -> ret1<string> { if (v.type == poly_value::type_t::poly_string ) return ret1_ok(v.string ); else return ret1_fail; }
-    inline auto get_int(const node& node   ) -> ret1<uint> { if (is_int_literal(node)) return ret1_ok(node.value.integer); else return ret1_fail; }
-    inline ret1<string> get_str(const node& node) { if (is_str_literal(node)) return ret1_ok(node.value.string); else return ret1_fail; }
+    inline auto get_int(const node& node   ) -> ret1<uint>   { return get_int(node.value); }
+    inline auto get_str(const node& node   ) -> ret1<string> { return get_str(node.value); }
 
 
     inline bool is_func(const node& node, uint value) {
-        if_ref (fn_id_node, node.first_child   ); else return false;
-        if_var1(fn_id     , get_int(fn_id_node)); else return false;
+        if     (is_func(node)); else return false;
+        if_var1(fn_id, get_int(node)); else return false;
         return fn_id == value;
     }
 
@@ -120,10 +121,8 @@ namespace compute_asts {
 
     inline node* make_node(ast_storage& storage, const node& node) { return alloc_one(storage.node_arena, node); }
 
-    inline node* make_func_node   (ast_storage& storage, node* first_child, node* last_child) { return make_node(storage, { .type = node::type_t::func, .first_child = first_child, .last_child = last_child }); }
-    inline node* make_literal_node(ast_storage& storage, uint i, node* next_sibling = nullptr) { return make_node(storage, { .type = node::type_t::literal, .value = to_poly(i), .next = next_sibling }); }
-    inline node* make_literal_node(ast_storage& storage, const char* s, node* next_sibling = nullptr) { return make_node(storage, { .type = node::type_t::literal, .value = to_poly(strings::view_of(s)), .next = next_sibling }); }
-    inline node* make_literal_node(ast_storage& storage, const string& s, node* next_sibling = nullptr) { return make_node(storage, { .type = node::type_t::literal, .value = to_poly(s), .next = next_sibling }); }
+    inline node* make_func_node   (ast_storage& storage, poly_value id, node* first_child, node* last_child) { return make_node(storage, { .type = node::type_t::func, .value = id, .first_child = first_child, .last_child = last_child }); }
+    inline node* make_literal_node(ast_storage& storage, poly_value id, node* next_sibling = nullptr) { return make_node(storage, { .type = node::type_t::literal, .value = id, .next = next_sibling }); }
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wnull-dereference"

@@ -68,7 +68,7 @@ namespace visual_asts::parser {
 
         bool parse_child(string& it, node& node, ast_storage& storage) {
             if (take(it, '[')); else return false;
-            let [d, d_ok]     = take_integer(it);
+            let [d, d_ok]     = take_int(it);
             if (d_ok) skip_whitespaces(it);
             node.first_child = parse_expression(it, d_ok ? (palette_color)d : palette_color::regulars, storage);
             node.first_child->parent = &node;

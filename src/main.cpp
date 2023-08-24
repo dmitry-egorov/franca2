@@ -127,7 +127,9 @@ static bool init() {
     //print_ast(&ast);
     //display(ast, cv_it);
 
-    if_var1(compute_ast, compute_asts::parse_file("embedded/fib.fr")); else return false;
+    //let source_file = "embedded/hello_world.fr";
+    let source_file = "embedded/fib.fr";
+    if_var1(compute_ast, compute_asts::parse_file(source_file)); else return false;
     compute_asts::print_ast(compute_ast);
     var result = compute_asts::execute(compute_ast);
     printf("Exited with code %d\n", result);

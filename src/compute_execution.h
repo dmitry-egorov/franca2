@@ -91,9 +91,8 @@ namespace compute_asts {
             switch (node.type) {
                 case literal: return to_res(get_literal_value(node));
                 case func   : {
-                    if_ref (fn_id_node, node.first_child); else { dbg_fail_return {}; }
-                    if_var1(fn_id, get_int(fn_id_node))  ; else { dbg_fail_return {}; }
-                    var args_node_p = fn_id_node.next;
+                    if_var1(fn_id, get_int(node.value)); else { dbg_fail_return {}; }
+                    var args_node_p = node.first_child;
 
                     if (fn_id == (uint)inactive  ) return {};
                     if (fn_id == (uint)block     ) return execute_block    (args_node_p, ctx);
@@ -123,7 +122,7 @@ namespace compute_asts {
                     tmp_scope(storage);
 
                     //TODO: support evaluating signature?
-                    var sig_node_p = display.first_child->next; //skip istring fn_id
+                    var sig_node_p = display.first_child;
                     
                     // bind arguments
                     while(sig_node_p) {
@@ -131,7 +130,7 @@ namespace compute_asts {
                         if (sig_node.type == func) {
                             assert (is_func(sig_node, (uint)decl_param));
                             if_ref (arg_node, args_node_p); else { dbg_fail_return {}; }
-                            if_var3(___, param_id_node, param_name_node, deref_list3(sig_node.first_child)); else { dbg_fail_return {}; }
+                            if_var2(param_id_node, param_name_node, deref_list2(sig_node.first_child)); else { dbg_fail_return {}; }
 
                             if_vari2(id, get_int(param_id_node), name, get_str(param_name_node)); else { dbg_fail_return {}; }
                             let arg_res = execute_node(arg_node, ctx);

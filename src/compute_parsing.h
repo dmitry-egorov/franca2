@@ -20,18 +20,14 @@ namespace compute_asts {
     namespace parser {
         using namespace iterators;
         using namespace parsing;
-        using enum node::type_t;
 
         auto parse_chain(string&, ast_storage&) -> ret2<node*, node*>;
-        auto parse_func (string&, ast_storage&) -> ret1<node*>;
-        auto parse_int  (string&, ast_storage&) -> ret1<node*>;
-        auto parse_str  (string&, ast_storage&) -> ret1<node*>;
+        auto parse_node (string&, ast_storage&) -> node*;
 
         void set_parent_to_chain(node* first_child, node* parent);
 
         auto take_whitespaces_and_comments(string&) -> string;
     }
-
 
     static auto parse_file(const char* path) -> ret1<ast> {
         var storage = ast_storage {
@@ -51,27 +47,15 @@ namespace compute_asts {
         using namespace parser;
 
         var iterator = code;
-        if_var2(first_child, last_child, parse_chain(iterator, storage)); else return ret1_fail;
+        if_var2(first_child, last_child, parse_chain(iterator, storage)); else { dbg_fail_return ret1_fail;}
         take(iterator, '\0');
-        if(is_empty(iterator)); else return ret1_fail;
+        if(is_empty(iterator)); else { dbg_fail_return ret1_fail; }
 
         let a = ast { first_child, storage };
         return ret1_ok(a);
     }
 
     namespace parser {
-        ret1<node*> parse_func(string& it, ast_storage& storage) {
-            if(take(it, '[')); else return ret1_fail;
-            if_var2(first_child, last_child, parse_chain(it, storage)); else return ret1_fail;
-            if(take(it, ']')); else return ret1_fail; //TODO: free nodes?
-
-            var result = make_func_node(storage, first_child, last_child);
-
-            set_parent_to_chain(first_child, result);
-
-            return ret1_ok(result);
-        }
-
         ret2<node*, node*> parse_chain(string& it, ast_storage& storage) {
             var first_child = (node*)nullptr;
             var  last_child = (node*)nullptr;
@@ -79,36 +63,35 @@ namespace compute_asts {
             var prefix = take_whitespaces_and_comments(it);
 
             while(!is_empty(it)) {
-                if(!is_empty(it)); else break;
+                if_ref(func_node, parse_node(it, storage)); else break;
 
-                node *next_node;
-                {if_set1(next_node, parse_int (it, storage)); else
-                {if_set1(next_node, parse_str (it, storage)); else
-                {if_set1(next_node, parse_func(it, storage)); else
-                    break; }}}
+                func_node.prefix = prefix;
+                func_node.suffix = prefix = take_whitespaces_and_comments(it);
 
-                next_node->prefix = prefix;
-                next_node->suffix = prefix = take_whitespaces_and_comments(it);
+                if (last_child) last_child->next = &func_node;
+                else            first_child = &func_node;
 
-                if (last_child) last_child->next = next_node;
-                else            first_child = next_node;
-
-                last_child = next_node;
+                last_child = &func_node;
             }
 
             return ret2_ok(first_child, last_child);
         }
 
-        ret1<node*> parse_int(string& it, ast_storage& storage) {
-            if_var1(result, take_integer(it)); else return ret1_fail;
-            return ret1_ok(make_literal_node(storage, result));
-        }
+        node* parse_node(string & it, ast_storage & storage) {
+            var id = poly_value {};
+            {if_var1(int_id, take_int(it)) { id = to_poly(int_id); } else
+            {if_var1(str_id, take_str(it)) { id = to_poly(str_id); } else
+                return nullptr; }}
 
-        ret1<node*> parse_str(string& it, ast_storage& storage) {
-            if (take(it, '\"')); else return ret1_fail;
-            var data = take_until(it, '\"');
-            take(it);
-            return ret1_ok(make_literal_node(storage, data));
+            if(take(it, '[')); else return make_literal_node(storage, id);
+            if_var2(first_child, last_child, parse_chain(it, storage)); else { dbg_fail_return nullptr; }
+            if(take(it, ']')); else { dbg_fail_return nullptr; } //TODO: free nodes?
+
+            var result = make_func_node(storage, id, first_child, last_child);
+
+            set_parent_to_chain(first_child, result);
+
+            return result;
         }
 
         ret1<string> take_line_comment(string& it) {

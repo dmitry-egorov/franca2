@@ -1,4 +1,4 @@
-- [ ] change syntax of functions to id[]
+- [ ] textual func names
 - [ ] line and col in errors
 - [ ] get fn_id at parse time, don't store it as a node
 - [ ] block lines
@@ -14,6 +14,7 @@
 - [ ] edit
 
 done
+- [+] change syntax of functions to id[]
 - [+] function definitions
 - [+] function calls
 - [+] eq op
