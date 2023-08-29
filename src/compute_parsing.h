@@ -62,34 +62,50 @@ namespace compute_asts {
 
             var prefix = take_whitespaces_and_comments(it);
 
-            while(!is_empty(it)) {
-                if_ref(func_node, parse_node(it, storage)); else break;
+            while(!is_empty(it) && !peek(it, ']')) {
+                if_ref(node, parse_node(it, storage)); else break;
 
-                func_node.prefix = prefix;
-                func_node.suffix = prefix = take_whitespaces_and_comments(it);
+                node.prefix = prefix;
+                node.suffix = prefix = take_whitespaces_and_comments(it);
 
-                if (last_child) last_child->next = &func_node;
-                else            first_child = &func_node;
+                if (last_child) last_child->next = &node;
+                else            first_child = &node;
 
-                last_child = &func_node;
+                last_child = &node;
             }
 
             return ret2_ok(first_child, last_child);
         }
 
         node* parse_node(string & it, ast_storage & storage) {
-            var id = poly_value {};
-            {if_var1(int_id, take_int(it)) { id = to_poly(int_id); } else
-            {if_var1(str_id, take_str(it)) { id = to_poly(str_id); } else
-                return nullptr; }}
+            var text = string {};
+            var text_is_quoted = true;
+            if_set1(text, take_str(it)); else {
+                text = take_until_any(it, view_of(" \t\n\r[]\""));
+                text_is_quoted = false;
+            }
 
-            if(take(it, '[')); else return make_literal_node(storage, id);
-            if_var2(first_child, last_child, parse_chain(it, storage)); else { dbg_fail_return nullptr; }
-            if(take(it, ']')); else { dbg_fail_return nullptr; } //TODO: free nodes?
+            var text_copy = text;
+            var [uint_value, can_be_uint] = take_uint(text_copy);
 
-            var result = make_func_node(storage, id, first_child, last_child);
+            var result = make_node(storage, node {
+                .text = text,
+                .text_is_quoted = text_is_quoted,
+                .can_be_uint = can_be_uint,
+                .uint_value  = uint_value,
+            });
 
-            set_parent_to_chain(first_child, result);
+            if(take(it, '[')) {
+                if_var2(first_child, last_child, parse_chain(it, storage)); else { dbg_fail_return nullptr; }
+                if(take(it, ']')); else { dbg_fail_return nullptr; } //TODO: free nodes?
+                set_parent_to_chain(first_child, result);
+                result->type = node::type_t::func;
+                result->first_child = first_child;
+                result-> last_child =  last_child;
+            }
+            else {
+                result->type = node::type_t::literal;
+            }
 
             return result;
         }

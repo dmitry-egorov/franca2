@@ -12,6 +12,10 @@ namespace strings {
 
     typedef arrays::array_view<char> string;
 
+    inline bool operator==(const string& a, const string& b) {
+        return a.count == b.count && memcmp(a.data, b.data, a.count) == 0;
+    }
+
     template<typename... Args> string make_string(arena& arena, const char* format, Args... args) {
         let [data, free_count] = arenas::free_space_of<char>(arena, 1);
         let count  = snprintf(data, free_count - 1, format, args...) + 1;

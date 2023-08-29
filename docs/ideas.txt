@@ -1,0 +1,10 @@
+- named arguments in the form of lists?
+    - def[id[recursive_fib_at] disp[recursive fib at $[n]] body[...]]
+    - are nodes self-sufficient or require to be within a context of another node?
+- alternative implementations for functions
+    - functions can have multiple implementations, that share the same signature
+    - signature can differ in implicits that it accepts?
+        - e.g. one function allocates memory, and another doesn't
+- how to change display properties of an inner node?
+    - display strings in different color, when they're a part of a function definition?
+

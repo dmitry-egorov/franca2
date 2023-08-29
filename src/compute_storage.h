@@ -20,14 +20,13 @@ namespace compute_asts {
     using enum builtin_func_id;
 
     struct variable {
-        uint id;
-        bool is_mutable;
-        string name;
+        string id;
+        string display_name;
         poly_value value;
     };
 
     struct func {
-        uint id;
+        string id;
         node* display;
         node* body;
     };
@@ -84,7 +83,7 @@ namespace compute_asts {
     }
 #define tmp_scope(storage) push_scope(storage); defer { pop_scope(storage); }
 
-    variable* find_var(storage& storage, const uint id) {
+    variable* find_var(storage& storage, const string id) {
         using_storage;
         var vars_view = vars.data;
         for (var i = (int)vars_view.count - 1; i >= 0; --i) {
@@ -94,7 +93,7 @@ namespace compute_asts {
 
         return nullptr;
     }
-    func* find_func(storage& storage, const uint id) {
+    func* find_func(storage& storage, const string id) {
         using_storage;
         var funcs_view = funcs.data;
         for (var i = (int)funcs_view.count - 1; i >= 0; --i) {

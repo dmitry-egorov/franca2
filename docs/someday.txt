@@ -1,4 +1,7 @@
+- [ ] wasm jit: https://github.com/wingo/wasm-jit
 - [ ] store blocks ident in the stored file
+- [ ] fixup sizes for sections and code
+    - [ ] implement insert into arena_array
 - [ ] ??? change syntax of functions to id[]
 - [ ] ??? uuid as "qr"
 - [ ] variable declaration inside another expression?

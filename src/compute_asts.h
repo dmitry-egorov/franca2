@@ -26,18 +26,21 @@ namespace compute_asts {
         } type;
 
         union {
-            uint integer;
+            uint   integer;
             string string;
         };
     };
 
     struct node {
+        string text;
+        bool text_is_quoted;
+        bool can_be_uint;
+        uint uint_value;
+
         enum struct type_t {
             literal,
             func,
         } type;
-
-        poly_value value;
 
         string prefix;
         string suffix;
@@ -85,44 +88,61 @@ namespace compute_asts {
         macro_show_as = 300,
     };
 
+    static let  decl_var_id   = view_of("var"  );
+    static let  decl_param_id = view_of("$"    );
+    static let    def_id = view_of("def"  );
+    static let  block_id = view_of("{}"   );
+    static let    ref_id = view_of("&"    );
+    static let    ret_id = view_of("ret"  );
+    static let     if_id = view_of("if"   );
+    static let  while_id = view_of("while");
+    static let   istr_id = view_of("istr" );
+    static let assign_id = view_of("="    );
+    static let    add_id = view_of("+"    );
+    static let    sub_id = view_of("-"    );
+    static let     eq_id = view_of("=="   );
+    static let    neq_id = view_of("!="   );
+    static let    lte_id = view_of("<="   );
+    static let    gte_id = view_of(">="   );
+    static let     lt_id = view_of("<"    );
+    static let     gt_id = view_of(">"    );
+    static let  print_id = view_of("print");
+    static let   show_id = view_of("show" );
+
     poly_value to_poly(uint value) { return poly_value { .type = poly_value::type_t::poly_integer, .integer = value }; }
     poly_value to_poly(const string& value) { return poly_value { .type = poly_value::type_t::poly_string, .string = value }; }
 
-    inline auto is_func       (const node& node) -> bool { return node.type == node::type_t::func; }
-    inline auto is_int_literal(const node* node) -> bool { return node->type == node::type_t::literal && node->value.type == poly_value::type_t::poly_integer; }
-    inline auto is_str_literal(const node* node) -> bool { return node->type == node::type_t::literal && node->value.type == poly_value::type_t::poly_string ; }
-    inline auto is_int_literal(const node& node) -> bool { return is_int_literal(&node); }
-    inline auto is_str_literal(const node& node) -> bool { return is_str_literal(&node); }
+    inline auto is_func        (const node& node) -> bool { return node.type == node::type_t::func; }
+    inline auto is_uint_literal(const node& node) -> bool { return node.type == node::type_t::literal && node.can_be_uint && !node.text_is_quoted; }
+    inline auto is_str_literal (const node& node) -> bool { return node.type == node::type_t::literal && (!node.can_be_uint || node.text_is_quoted); }
 
-    inline auto get_int(const poly_value& v) -> ret1<uint>   { if (v.type == poly_value::type_t::poly_integer) return ret1_ok(v.integer); else return ret1_fail; }
-    inline auto get_str(const poly_value& v) -> ret1<string> { if (v.type == poly_value::type_t::poly_string ) return ret1_ok(v.string ); else return ret1_fail; }
-    inline auto get_int(const node& node   ) -> ret1<uint>   { return get_int(node.value); }
-    inline auto get_str(const node& node   ) -> ret1<string> { return get_str(node.value); }
+    inline auto get_uint(const poly_value& v) -> ret1<uint>   { if (v.type == poly_value::type_t::poly_integer) return ret1_ok(v.integer); else return ret1_fail; }
+    inline auto get_str (const poly_value& v) -> ret1<string> { if (v.type == poly_value::type_t::poly_string ) return ret1_ok(v.string ); else return ret1_fail; }
+    inline auto get_uint(const node& node   ) -> ret1<uint>   { if (is_uint_literal(node)) return ret1_ok(node.uint_value); else return ret1_fail; }
+    inline auto get_str (const node& node   ) -> ret1<string> { return ret1_ok(node.text); }
+
+    inline auto get_fn_id(const node& n) -> ret1<string>   { if (is_func(n)) return ret1_ok(n.text); else return ret1_fail; }
 
 
-    inline bool is_func(const node& node, uint value) {
+    inline bool is_func(const node& node, string id) {
         if     (is_func(node)); else return false;
-        if_var1(fn_id, get_int(node)); else return false;
-        return fn_id == value;
+        return node.text == id;
     }
 
-    inline bool is_func(const node* n, uint value) {
+    inline bool is_func(const node* n, string id) {
         if_ref (node , n); else return false;
-        return is_func(node, value);
+        return is_func(node, id);
     }
 
 
-    inline bool parent_is_func(const node& node, uint value) {
+    inline bool parent_is_func(const node& node, string id) {
         if_ref(parent, node.parent); else return false;
-        return is_func(parent, value);
+        return is_func(parent, id);
     }
 
-    inline bool value_is(const node* node, uint value) { return is_int_literal(node) && node->value.integer == value; }
+    inline bool value_is(const node& node, uint value) { return is_uint_literal(node) && node.uint_value == value; }
 
     inline node* make_node(ast_storage& storage, const node& node) { return alloc_one(storage.node_arena, node); }
-
-    inline node* make_func_node   (ast_storage& storage, poly_value id, node* first_child, node* last_child) { return make_node(storage, { .type = node::type_t::func, .value = id, .first_child = first_child, .last_child = last_child }); }
-    inline node* make_literal_node(ast_storage& storage, poly_value id, node* next_sibling = nullptr) { return make_node(storage, { .type = node::type_t::literal, .value = id, .next = next_sibling }); }
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wnull-dereference"
@@ -164,4 +184,5 @@ namespace compute_asts {
         ast.root = nullptr;
     }
 }
+
 #endif //FRANCA2_COMPUTE_AST_H

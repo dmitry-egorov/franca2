@@ -17,6 +17,7 @@ namespace arrays {
     tt void enlarge (array_view<t>& v);
     tt void advance (array_view<t>& v);
     tt bool contains(const array_view<t>& view, const t& item);
+    tt array_view<t> view_of(const std::initializer_list<t>& list);
 
     tt struct array {
         array_view<t> data;
@@ -51,6 +52,10 @@ namespace arrays {
             if (view[i] == item) return true;
         }
         return false;
+    }
+
+    tt array_view<t> view_of(const std::initializer_list<t>& list) {
+        return {(t*)list.begin(), list.size()};
     }
 
     tt void push(array<t>& s, const t& value) {

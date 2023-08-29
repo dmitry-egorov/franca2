@@ -6,6 +6,8 @@
 #include <emscripten/html5_webgpu.h>
 #include <array>
 
+#include <cstdio>
+
 #include "utility/maths2.h"
 #include "utility/syntax.h"
 #include "utility/transforms.h"
@@ -20,7 +22,10 @@
 
 #define STBI_ONLY_PNG
 #define STB_IMAGE_IMPLEMENTATION
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
 #include "../third_party/stb/stb_image.h"
+#pragma clang diagnostic pop
 
 #include "color_palette.h"
 
@@ -35,6 +40,7 @@
 #include "compute_parsing.h"
 #include "compute_printing.h"
 #include "compute_storage.h"
+#include "compute_compilation.h"
 #include "compute_execution.h"
 #include "compute_display.h"
 
@@ -101,6 +107,19 @@ struct gpu_uniforms {
     std::array<uint, 256> palette;
 };
 
+EM_JS(int, run_wasm, (u8* ptr, size_t size), {
+    var text_decoder = new TextDecoder();
+    var binary = new Uint8Array(wasmMemory.buffer, ptr, size);
+    var module = new WebAssembly.Module(binary);
+    var imports = {};
+    imports["env"] = {};
+    imports["env"]["log_i32"] = (i) => console.log(i);
+    imports["env"]["log_str"] = (ptr, len) => console.log(text_decoder.decode(new Uint8Array(instance.exports.memory.buffer, ptr, len)));
+    var instance = new WebAssembly.Instance(module, imports);
+
+    return instance.exports["main"]();
+});
+
 static bool init() {
     gta_init(8 * 1024 * 1024); // 8 MB of global temp storage
 
@@ -131,8 +150,19 @@ static bool init() {
     let source_file = "embedded/fib.fr";
     if_var1(compute_ast, compute_asts::parse_file(source_file)); else return false;
     compute_asts::print_ast(compute_ast);
+
+    printf("(WASM) Compiling...\n");
+    let wasm = compute_asts::compile_wasm(compute_ast);
+    print_hex(wasm);
+
+    printf("(WASM) Running...\n");
+    var wasm_result = run_wasm(wasm.data, wasm.count);
+    printf("(WASM) Exited with code: %d\n", wasm_result);
+
+    printf("(Interpreter) Running...\n");
     var result = compute_asts::execute(compute_ast);
-    printf("Exited with code %d\n", result);
+    printf("(Interpreter) Exited with code %d\n", result);
+
     compute_asts::display(compute_ast, cv_it);
 
     code_view.line_count = cv_it.cell_idx.y + 1;
@@ -178,10 +208,10 @@ static bool init() {
 
     res.bound_timings_text_pipeline = {timing_text_pipeline, timing_text_bind_group};
 
-    res.perf_query_set = make_query_set(device, {
-        .type  = WGPUQueryType_Timestamp,
-        .count = 2,
-    });
+    //res.perf_query_set = make_query_set(device, {
+    //    .type  = WGPUQueryType_Timestamp,
+    //    .count = 2,
+    //});
 
     resize(); on_resize(resize);
 
@@ -219,13 +249,13 @@ static int draw(double /*time*/) {
     {
         tmp(encoder, make_command_encoder(device));
 
-        write_timestamp(encoder, res.perf_query_set, 0);
+        //write_timestamp(encoder, res.perf_query_set, 0);
 
         dispatch_compute_pass(encoder, res.bound_timings_text_pipeline, 1);
         draw_fullscreen_pass (encoder, swapchain, res.bound_render_pipeline, clear_color);
 
-        write_timestamp  (encoder, res.perf_query_set, 1);
-        resolve_query_set(encoder, res.perf_query_set, 0, 2, res.uni_buf, offsetof(gpu_uniforms, draw_start_timestamp));
+        //write_timestamp  (encoder, res.perf_query_set, 1);
+        //resolve_query_set(encoder, res.perf_query_set, 0, 2, res.uni_buf, offsetof(gpu_uniforms, draw_start_timestamp));
 
         submit(queue, encoder);
 
@@ -258,7 +288,9 @@ namespace impl {
         if (navigator["gpu"]) {} else { console.error("No support for WebGPU; not starting"); return; }
 
         navigator["gpu"]["requestAdapter"]().then(function (adapter) {
-            adapter["requestDevice"]({requiredFeatures: ["timestamp-query"]}).then( function (device) {
+            //var features = {requiredFeatures: ["timestamp-query"]};
+            var features = {};
+            adapter["requestDevice"](features).then( function (device) {
                 Module["preinitializedWebGPUDevice"] = device;
                 _entry_point();
             });

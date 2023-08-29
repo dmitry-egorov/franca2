@@ -1,19 +1,40 @@
-- [ ] textual func names
-- [ ] line and col in errors
-- [ ] get fn_id at parse time, don't store it as a node
-- [ ] block lines
+- [ ] lower level func def with explicit params and returns?
+- [ ] rethink literal types?
+- [ ] primitive types
 - [ ] structs
-- [ ] ?? gen wasm
-- [ ] navigate node tree
-- [ ] compile natively with dawn
+    - https://github.com/WebAssembly/tool-conventions/blob/main/BasicCABI.md
+- [ ] pointers
+- [ ] generate an array type
+- [ ] navigate node tree with keyboard
 - [ ] cursor
     - [ ] display blinking cursor
     - [ ] only redraw when state changes
     - [ ] move cursor
     - [ ] scroll view
 - [ ] edit
+- [ ] block lines
+- [ ] line and col in errors
+- [ ] wasm jit?
 
 done
+- [+] compile to wasm
+    - https://blog.scottlogic.com/2019/05/17/webassembly-compiler.html
+    - https://gist.github.com/AlexAltea/78e8da45e20fdb1bf2afb8816de53bae
+    - [+] emit empty module
+    - [+] emit module with empty function
+        - [+] emit type
+        - [+] emit func
+        - [+] emit code
+    - [+] export and call function
+    - [+] import log_int function
+    - [+] import log string function
+        - need to provide a pointer to memory
+    - [+] compile ast
+        - [+] print
+            - [+] istr
+                - [+] uint_to_string
+                - [+] uint_to_string as function
+- [+] textual func names
 - [+] change syntax of functions to id[]
 - [+] function definitions
 - [+] function calls

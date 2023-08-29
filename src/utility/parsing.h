@@ -10,13 +10,13 @@ namespace parsing {
     using namespace iterators;
     using namespace strings;
 
+    static string whitespaces = view_of(" \t\n\r");
+
     void skip_whitespaces(string& it) {
-        static let whitespaces = view_of(" \t\n\r");
         skip_while_any(it, whitespaces);
     }
 
     string take_whitespaces(string& it) {
-        static let whitespaces = view_of(" \t\n\r");
         return take_while_any(it, whitespaces);
     }
 
@@ -31,7 +31,7 @@ namespace parsing {
         return ret1_ok((uint8_t)digit);
     }
 
-    ret1<uint> take_int(string& it) {
+    ret1<uint> take_uint(string& it) {
         var it_copy = it;
         if_var1(digit0, take_digit(it_copy)); else return ret1_fail;
 

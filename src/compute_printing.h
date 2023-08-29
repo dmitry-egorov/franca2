@@ -14,39 +14,31 @@ namespace compute_asts {
         using namespace printing;
         using namespace strings;
 
-        void print_node_chain(const node*, bool print_top_level_quotes);
+        void print_node_chain(const node*);
     }
 
     inline void print_ast(const ast& ast) {
         if(ast.root); else { printf("AST is empty\n"); return; }
-        printing::print_node_chain(ast.root, true);
+        printing::print_node_chain(ast.root);
         printf("\n");
     }
 
     namespace printing {
-        void print_node_chain(const node* first_node, bool print_top_level_quotes) {
+        void print_node_chain(const node* first_node) {
             using enum builtin_func_id;
             var node_p = first_node;
             if (node_p) print(node_p->prefix);
             while (node_p) {
                 ref node = *node_p;
-
-                if_var1(i, get_int(node)) {
-                    printf("%d", i);
-                }
-                else { if_var1 (text, get_str(node)) {
-                    if (print_top_level_quotes) printf("\"");
-                    printf("%.*s", (int)text.count, text.data);
-                    if (print_top_level_quotes) printf("\"");
-                }
-                else {
-                    assert(false); // unreachable
-                }}
+                var text = node.text;
+                if (node.text_is_quoted) printf("\"");
+                printf("%.*s", (int) text.count, text.data);
+                if (node.text_is_quoted) printf("\"");
 
                 if (is_func(node)) {
                     printf("[");
                     if_ref(child, node.first_child) {
-                        print_node_chain(&child, true);
+                        print_node_chain(&child);
                     }
                     printf("]");
                 }
