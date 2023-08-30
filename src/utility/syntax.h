@@ -27,7 +27,7 @@ public:
 #define stx_concat(x,y) stx_concat_internal(x,y)
 #define defer [[maybe_unused]]let& stx_concat(stx_concat(defer_, __LINE__), __COUNTER__) = ExitScopeHelp() + [&]
 
-// release and reset a variable at the end of the current scope
+// release and reset a var_ at the end of the current scope
 #define defer_release(name) defer { release(name); }
 #define defer_release2(name0, name1) defer { release(name1); release(name0); }
 

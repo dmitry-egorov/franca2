@@ -8,10 +8,11 @@
 
 #include <cstdio>
 
+#define FRANCA2_IMPLS
+
 #include "utility/maths2.h"
 #include "utility/syntax.h"
 #include "utility/transforms.h"
-#define FRANCA2_ARRAYS_IMPL
 #include "utility/arrays.h"
 #define FRANCA2_ARENAS_IMPL
 #include "utility/arenas.h"
@@ -41,7 +42,7 @@
 #include "compute_printing.h"
 #include "compute_storage.h"
 #include "compute_compilation.h"
-#include "compute_execution.h"
+#include "compute_interpretation.h"
 #include "compute_display.h"
 
 using namespace arenas;
@@ -151,18 +152,6 @@ static bool init() {
     if_var1(compute_ast, compute_asts::parse_file(source_file)); else return false;
     compute_asts::print_ast(compute_ast);
 
-    printf("(WASM) Compiling...\n");
-    let wasm = compute_asts::compile_wasm(compute_ast);
-    print_hex(wasm);
-
-    printf("(WASM) Running...\n");
-    var wasm_result = run_wasm(wasm.data, wasm.count);
-    printf("(WASM) Exited with code: %d\n", wasm_result);
-
-    printf("(Interpreter) Running...\n");
-    var result = compute_asts::execute(compute_ast);
-    printf("(Interpreter) Exited with code %d\n", result);
-
     compute_asts::display(compute_ast, cv_it);
 
     code_view.line_count = cv_it.cell_idx.y + 1;
@@ -214,6 +203,18 @@ static bool init() {
     //});
 
     resize(); on_resize(resize);
+
+    printf("(WASM) Compiling...\n");
+    let wasm = emit_wasm(compute_ast);
+    print_hex(wasm);
+
+    printf("(WASM) Running...\n");
+    var wasm_result = run_wasm(wasm.data, wasm.count);
+    printf("(WASM) Exited with code: %d\n", wasm_result);
+
+    printf("(Interpreter) Running...\n");
+    var result = interpret(compute_ast);
+    printf("(Interpreter) Exited with code %d\n", result);
 
     return true;
 }

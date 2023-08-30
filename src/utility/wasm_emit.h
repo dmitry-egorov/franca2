@@ -1,7 +1,7 @@
 #ifndef FRANCA2_WASM_EMIT_H
 #define FRANCA2_WASM_EMIT_H
 #include "primitives.h"
-#include "arena_arrays.h"
+#include "arrayds.h"
 #include "strings.h"
 
 namespace wasm_emit {
@@ -11,8 +11,8 @@ namespace wasm_emit {
     struct wasm_emitter {
         arena& arena;
 
-        arena_array<u8> wasm;
-        arena_array<u8> section;
+        stream wasm;
+        stream section;
     };
 
 #define using_emitter ref [arena, wasm, section] =
@@ -37,20 +37,20 @@ namespace wasm_emit {
 
     enum wasm_value_type: u8 {
         vt_void = 0x40,
-        vt_i32 = 0x7f,
-        vt_f32 = 0x7d
+        vt_i32  = 0x7f,
+        vt_f32  = 0x7d
     };
 
     struct wasm_func_type {
-        array_view<wasm_value_type> params;
-        array_view<wasm_value_type> results;
+        arrayv<wasm_value_type> params;
+        arrayv<wasm_value_type> results;
     };
     typedef uint wasm_func_type_index;
 
     struct wasm_func {
         wasm_func_type_index type_index;
-        array_view<wasm_value_type> locals;
-        array_view<u8> body_wasm;
+        arrayv<wasm_value_type> locals;
+        arrayv<u8> body;
     };
 
     struct wasm_memory {
@@ -59,12 +59,12 @@ namespace wasm_emit {
     };
 
     struct wasm_data {
-        array_view<u8> data;
+        arrayv<u8> data;
     };
 
     struct wasm_func_import {
-        array_view<char> module;
-        array_view<char> name;
+        string module;
+        string name;
         wasm_func_type_index type_index;
     };
 
@@ -76,7 +76,7 @@ namespace wasm_emit {
     };
 
     struct wasm_export {
-        array_view<char> name;
+        string name;
         wasm_export_kind kind;
         uint obj_index;
     };
@@ -128,15 +128,13 @@ namespace wasm_emit {
 
     wasm_emitter make_emitter(arena& arena) { return wasm_emit::wasm_emitter {
         .arena   = arena,
-        .wasm    = make_arena_array<u8>(1024, arena),
-        .section = make_arena_array<u8>(1024, arena),
+        .wasm    = make_stream(1024, arena),
+        .section = make_stream(1024, arena),
     };}
 
-    void emit(u8 byte, arena_array<u8>& dst) {
-        push(dst, byte);
-    }
+    void emit(u8 byte, stream& dst) { push(dst, byte); }
 
-    void emit(uint n, arena_array<u8>& dst) {
+    void emit(uint n, stream& dst) {
         do {
             var byte = (u8)(n & 0x7f);
             n >>= 7;
@@ -147,7 +145,7 @@ namespace wasm_emit {
         } while (n != 0);
     }
 
-    void emit(int n, arena_array<u8>& dst) {
+    void emit(int n, stream& dst) {
         var more = true;
         while (more) {
             var byte = (u8)(n & 0x7f);
@@ -161,93 +159,75 @@ namespace wasm_emit {
         }
     }
 
-    void emit(size_t n, arena_array<u8>& dst) {
-        emit((uint)n, dst);
-    }
+    void emit(size_t n, stream& dst) { emit((uint)n, dst); }
 
-    void emit(wasm_export_kind kind, arena_array<u8>& dst) {
-        push(dst, (u8)kind);
-    }
+    void emit(wasm_export_kind kind, stream& dst) { push(dst, (u8)kind); }
+    void emit(wasm_section_id    id, stream& dst) { push(dst, (u8)id); }
+    void emit(wasm_value_type  type, stream& dst) { push(dst, (u8)type); }
+    void emit(wasm_opcode        op, stream& dst) { push(dst, (u8)op); }
 
-    void emit(wasm_section_id id, arena_array<u8>& dst) {
-        push(dst, (u8)id);
-    }
-
-    void emit(wasm_value_type type, arena_array<u8>& dst) {
-        push(dst, (u8)type);
-    }
-
-    void emit(wasm_opcode op, arena_array<u8>& dst) {
-        push(dst, (u8)op);
-    }
-
-    void emit(wasm_opcode op, uint value, arena_array<u8>& dst) {
+    void emit(wasm_opcode op, uint value, stream& dst) {
         push(dst, (u8)op);
         emit(value, dst);
     }
 
-    void emit(wasm_opcode op, int value, arena_array<u8>& dst) {
+    void emit(wasm_opcode op, int value, stream& dst) {
         push(dst, (u8)op);
         emit(value, dst);
     }
 
-    void emit(wasm_opcode op, u8 value, arena_array<u8>& dst) {
+    void emit(wasm_opcode op, u8 value, stream& dst) {
         push(dst, (u8)op);
         emit(value, dst);
     }
 
-    void emit(wasm_opcode op, uint value0, uint value1, arena_array<u8>& dst) {
+    void emit(wasm_opcode op, uint value0, uint value1, stream& dst) {
         push(dst, (u8)op);
         emit(value0, dst);
         emit(value1, dst);
     }
 
-    void emit(wasm_opcode op, int value0, int value1, arena_array<u8>& dst) {
+    void emit(wasm_opcode op, int value0, int value1, stream& dst) {
         push(dst, (u8)op);
         emit(value0, dst);
         emit(value1, dst);
     }
 
-    void emit_const(int value, arena_array<u8>& dst) {
+    void emit_const(int value, stream& dst) {
         emit(op_i32_const, value, dst);
     }
 
-    void emit_const(uint value, arena_array<u8>& dst) {
+    void emit_const(uint value, stream& dst) {
         emit_const((int)value, dst);
     }
 
-    void emit_const(size_t value, arena_array<u8>& dst) {
+    void emit_const(size_t value, stream& dst) {
         emit_const((int)value, dst);
     }
 
-    void emit_memcpy(arena_array<u8>& dst) {
+    void emit_memcpy(stream& dst) {
         emit((u8)0xfc, dst); // prefix
         emit((u8)0x0a, dst); // memory.copy
         emit((u8)0x00, dst); // memory.copy src mem idx
         emit((u8)0x00, dst); // memory.copy dst mem idx
     }
 
-    void emit_block(arena_array<u8>& dst) {
-        emit((u8)0x02, dst); // block
-        emit((u8)0x40, dst); // void
-    }
-
-    void emit_block(wasm_value_type type, arena_array<u8>& dst) {
+    void emit_block(wasm_value_type type, stream& dst) {
         emit((u8)0x02, dst); // block
         emit((u8)type, dst); // type
     }
 
-    void emit_loop(arena_array<u8>& dst) {
+    void emit_loop(stream& dst) {
         emit((u8)0x03, dst); // loop
         emit((u8)0x40, dst); // void
     }
 
-    void emit_while(arena_array<u8>& dst) {
-        emit_block(dst);
+    void emit_while(stream& dst) {
+        emit_block(vt_void, dst);
         emit_loop (dst);
     }
 
-    void emit_while_end(arena_array<u8>& dst) {
+    void emit_while_end(stream& dst) {
         emit(op_br, 0, dst);
         emit(op_end, dst);
         emit(op_end, dst);
@@ -264,23 +244,23 @@ namespace wasm_emit {
         push(emitter.wasm, {header, sizeof header});
     }
 
-    void emit_type_list(const array_view<wasm_value_type>& types, arena_array<u8>& dst) {
+    void emit_type_list(const arrayv<wasm_value_type>& types, stream& dst) {
         emit(types.count, dst);
         for (var i = (size_t)0; i < types.count; ++i) {
             emit(types[i], dst);
         }
     }
 
-    void emit(const array_view<char>& data, arena_array<u8>& dst) {
+    void emit(const string& data, stream& dst) {
         emit(data.count, dst);
         push(dst, {(u8*)data.data, data.count});
     }
 
-    void emit(const char* str, arena_array<u8>& dst) {
-        emit(view_of(str), dst);
+    void emit(const char* str, stream& dst) {
+        emit(view(str), dst);
     }
 
-    void emit(const array_view<u8>& data, arena_array<u8>& dst) {
+    void emit(const arrayv<u8>& data, stream& dst) {
         emit(data.count, dst);
         push(dst, data);
     }
@@ -293,21 +273,21 @@ namespace wasm_emit {
         reset(section);
     }
 
-    void emit_function_type_id(arena_array<u8>& dst) {
+    void emit_function_type_id(stream& dst) {
         push(dst, (u8)0x60);
     }
 
-    void emit_func_sig(const array_view<wasm_value_type>& params, const array_view<wasm_value_type>& returns, arena_array<u8>& dst) {
+    void emit_func_sig(const arrayv<wasm_value_type>& params, const arrayv<wasm_value_type>& returns, stream& dst) {
         emit_function_type_id(dst);
         emit_type_list(params, dst); // params
         emit_type_list(returns, dst); // returns
     }
 
-    void emit_func_sig(std::initializer_list<wasm_value_type> params, std::initializer_list<wasm_value_type> returns, arena_array<u8>& dst) {
+    void emit_func_sig(std::initializer_list<wasm_value_type> params, std::initializer_list<wasm_value_type> returns, stream& dst) {
         emit_func_sig(view_of(params), view_of(returns), dst);
     }
 
-    void emit_type_section(const array_view<wasm_func_type>& types, wasm_emitter& emitter) {
+    void emit_type_section(const arrayv<wasm_func_type>& types, wasm_emitter& emitter) {
         using_emitter emitter;
 
         emit(types.count, section); // num types
@@ -319,14 +299,14 @@ namespace wasm_emit {
         emit_section(wasm_section_id::type, emitter);
     }
 
-    void emit_func_import(const array_view<char>& module, const array_view<char>& name, uint type_index, arena_array<u8>& dst) {
+    void emit_func_import(const string& module, const string& name, uint type_index, stream& dst) {
         emit(module, dst);
         emit(name, dst);
         emit(wasm_export_kind::func, dst); // import kind
         emit(type_index, dst); // import type index
     }
 
-    void emit_import_section(const array_view<wasm_func_import>& func_imports, wasm_emitter& emitter) {
+    void emit_import_section(const arrayv<wasm_func_import>& func_imports, wasm_emitter& emitter) {
         using_emitter emitter;
 
         emit(func_imports.count, section); // num func_imports
@@ -338,7 +318,7 @@ namespace wasm_emit {
         emit_section(wasm_section_id::import, emitter);
     }
 
-    void emit_func_section(const array_view<wasm_func>& funcs, wasm_emitter& emitter) {
+    void emit_func_section(const arrayv<wasm_func>& funcs, wasm_emitter& emitter) {
         using_emitter emitter;
 
         emit(funcs.count, section); // num funcs_specs
@@ -350,7 +330,7 @@ namespace wasm_emit {
         emit_section(wasm_section_id::func, emitter);
     }
 
-    void emit_mem(uint min, uint max, arena_array<u8>& dst) {
+    void emit_mem(uint min, uint max, stream& dst) {
         emit((u8)0x01, dst); // type: limited
         emit(min, dst); // min
         emit(max, dst); // max
@@ -365,7 +345,7 @@ namespace wasm_emit {
         emit_section(wasm_section_id::memory, emitter);
     }
 
-    void emit_export_section(const array_view<wasm_export>& exports, wasm_emitter& emitter) {
+    void emit_export_section(const arrayv<wasm_export>& exports, wasm_emitter& emitter) {
         using_emitter emitter;
 
         emit(exports.count, section);
@@ -380,13 +360,13 @@ namespace wasm_emit {
         emit_section(wasm_section_id::export_, emitter);
     }
 
-    void emit_code_section(const array_view<wasm_func>& funcs, wasm_emitter& emitter) {
+    void emit_code_section(const arrayv<wasm_func>& funcs, wasm_emitter& emitter) {
         using_emitter emitter;
         emit(funcs.count, section); // num funcs_specs
         for (var i = (size_t)0; i < funcs.count; ++i) {
             let func = funcs[i];
             let locals = func.locals;
-            let body_wasm = func.body_wasm;
+            let body_wasm = func.body;
 
             //TODO: wrong if locals size is > 127!!!
             emit(body_wasm.count + 1 + 2 * locals.count, section); // size of the section
@@ -403,7 +383,7 @@ namespace wasm_emit {
         emit_section(wasm_section_id::code, emitter);
     }
 
-    void emit_data_section(const array_view<wasm_data>& datas, wasm_emitter& emitter) {
+    void emit_data_section(const arrayv<wasm_data>& datas, wasm_emitter& emitter) {
         using_emitter emitter;
         emit(datas.count, section); // num wasm_data
 

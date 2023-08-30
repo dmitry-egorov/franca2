@@ -10,7 +10,7 @@ namespace parsing {
     using namespace iterators;
     using namespace strings;
 
-    static string whitespaces = view_of(" \t\n\r");
+    static string whitespaces = view(" \t\n\r");
 
     void skip_whitespaces(string& it) {
         skip_while_any(it, whitespaces);

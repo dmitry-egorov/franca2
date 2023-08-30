@@ -88,26 +88,26 @@ namespace compute_asts {
         macro_show_as = 300,
     };
 
-    static let  decl_var_id   = view_of("var"  );
-    static let  decl_param_id = view_of("$"    );
-    static let    def_id = view_of("def"  );
-    static let  block_id = view_of("{}"   );
-    static let    ref_id = view_of("&"    );
-    static let    ret_id = view_of("ret"  );
-    static let     if_id = view_of("if"   );
-    static let  while_id = view_of("while");
-    static let   istr_id = view_of("istr" );
-    static let assign_id = view_of("="    );
-    static let    add_id = view_of("+"    );
-    static let    sub_id = view_of("-"    );
-    static let     eq_id = view_of("=="   );
-    static let    neq_id = view_of("!="   );
-    static let    lte_id = view_of("<="   );
-    static let    gte_id = view_of(">="   );
-    static let     lt_id = view_of("<"    );
-    static let     gt_id = view_of(">"    );
-    static let  print_id = view_of("print");
-    static let   show_id = view_of("show" );
+    static let  decl_var_id   = view("var");
+    static let  decl_param_id = view("$");
+    static let         def_id = view("def");
+    static let       block_id = view("{}");
+    static let         ref_id = view("&");
+    static let         ret_id = view("ret");
+    static let          if_id = view("if");
+    static let       while_id = view("while");
+    static let        istr_id = view("istr");
+    static let      assign_id = view("=");
+    static let         add_id = view("+");
+    static let         sub_id = view("-");
+    static let          eq_id = view("==");
+    static let          ne_id = view("!=");
+    static let          le_id = view("<=");
+    static let          ge_id = view(">=");
+    static let          lt_id = view("<");
+    static let          gt_id = view(">");
+    static let       print_id = view("print");
+    static let        show_id = view("show");
 
     poly_value to_poly(uint value) { return poly_value { .type = poly_value::type_t::poly_integer, .integer = value }; }
     poly_value to_poly(const string& value) { return poly_value { .type = poly_value::type_t::poly_string, .string = value }; }

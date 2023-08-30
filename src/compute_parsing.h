@@ -81,7 +81,7 @@ namespace compute_asts {
             var text = string {};
             var text_is_quoted = true;
             if_set1(text, take_str(it)); else {
-                text = take_until_any(it, view_of(" \t\n\r[]\""));
+                text = take_until_any(it, view(" \t\n\r[]\""));
                 text_is_quoted = false;
             }
 
@@ -113,10 +113,10 @@ namespace compute_asts {
         ret1<string> take_line_comment(string& it) {
             var result = string { it.data, 0 };
 
-            static let line_comment_prefix = view_of("//");
+            static let line_comment_prefix = view("//");
             if(take(it, line_comment_prefix)); else return ret1_fail;
 
-            let line_ends = view_of("\r\n");
+            let line_ends = view("\r\n");
             var text = take_until_any(it, line_ends);
 
             result.count = line_comment_prefix.count + text.count;

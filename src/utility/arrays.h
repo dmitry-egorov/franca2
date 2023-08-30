@@ -7,20 +7,20 @@
 #include "syntax.h"
 
 namespace arrays {
-    tt struct array_view {
+    tt struct arrayv {
         t*     data;
         size_t count;
 
               t& operator[](size_t index);
         const t& operator[](size_t index) const;
     };
-    tt void enlarge (array_view<t>& v);
-    tt void advance (array_view<t>& v);
-    tt bool contains(const array_view<t>& view, const t& item);
-    tt array_view<t> view_of(const std::initializer_list<t>& list);
+    tt void enlarge (arrayv<t>& v);
+    tt void advance (arrayv<t>& v);
+    tt bool contains(const arrayv<t>& view, const t& item);
+    tt arrayv<t> view_of(const std::initializer_list<t>& list);
 
     tt struct array {
-        array_view<t> data;
+        arrayv<t> data;
         size_t capacity;
     };
 
@@ -30,31 +30,31 @@ namespace arrays {
 }
 #endif //FRANCA2_ARRAYS_H
 
-#ifdef FRANCA2_ARRAYS_IMPL
+#ifdef FRANCA2_IMPLS
 #ifndef FRANCA2_ARRAYS_I
 #define FRANCA2_ARRAYS_I
 namespace arrays {
-    tt const t &array_view<t>::operator[](const size_t index) const { return data[index]; }
+    tt const t &arrayv<t>::operator[](const size_t index) const { return data[index]; }
 
-    tt t &array_view<t>::operator[](const size_t index) { return data[index]; }
+    tt t &arrayv<t>::operator[](const size_t index) { return data[index]; }
 
-    tt void enlarge   (array_view<t>& v) { v.count += 1; }
-    tt void enlarge_by(array_view<t>& v, const size_t count) { v.count += count; }
+    tt void enlarge   (arrayv<t>& v) { v.count += 1; }
+    tt void enlarge_by(arrayv<t>& v, const size_t count) { v.count += count; }
 
-    tt void advance(array_view<t>& v) {
+    tt void advance(arrayv<t>& v) {
         assert(v.count > 0);
         v.count -= 1;
         v.data  += 1;
     }
 
-    tt bool contains(const array_view<t>& view, const t &item) {
+    tt bool contains(const arrayv<t>& view, const t &item) {
         for (var i = 0u; i < view.count; i += 1) {
             if (view[i] == item) return true;
         }
         return false;
     }
 
-    tt array_view<t> view_of(const std::initializer_list<t>& list) {
+    tt arrayv<t> view_of(const std::initializer_list<t>& list) {
         return {(t*)list.begin(), list.size()};
     }
 
@@ -75,4 +75,4 @@ namespace arrays {
     }
 }
 #endif
-#endif //FRANCA2_ARRAYS_IMPL
+#endif //FRANCA2_IMPLS

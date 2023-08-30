@@ -15,15 +15,17 @@ print[istr[&[a]" + "&[b]" = "+[&[a] &[b]]]]
 if[1 =[b 6]]
 print[istr[&[a]" + "&[b]" = "+[&[a] &[b]]]]
 
-def[my_sum istr["sum of "$[a]" and "$[b]] +[&[a] &[b]]]
 print[istr[my_sum[&[a] &[b]]]]
 
-ret[&[sum]]
+ret[42]
 
-//show[disp  istr["show "$[id]" as "$[pattern]]]
-//show[var   istr["let "$[name]" = "$[value]]]
-//show[&     istr[$[name]]]
-//show[$     istr[$[name]]]
-//show[=     istr[$[a]" = "$[b]]]
-//show[+     istr[$[a]" + "$[b]]]
-//show[print istr["println "$[text]]]
+///////////////////////
+def[my_sum istr["sum of "$[a]" and "$[b]] +[&[a] &[b]]]
+
+show[disp  istr["show "$[id]" as "$[pattern]]]
+show[var   istr["let "$[name]" = "$[value]]]
+show[&     istr[$[name]]]
+show[$     istr[$[name]]]
+show[=     istr[$[a]" = "$[b]]]
+show[+     istr[$[a]" + "$[b]]]
+show[print istr["println "$[text]]]

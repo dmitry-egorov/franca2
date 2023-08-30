@@ -26,9 +26,9 @@ namespace code_views {
 
     struct code_view {
         arena& scratch_arena;
-        array_view<uint8_t> glyphs;
-        array_view<uint8_t> colors;
-        array_view<uint8_t> inlays;
+        arrayv<uint8_t> glyphs;
+        arrayv<uint8_t> colors;
+        arrayv<uint8_t> inlays;
 
         usize2 size;
         uint   line_count;

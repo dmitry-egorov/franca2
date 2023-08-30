@@ -63,7 +63,7 @@ namespace visual_asts::parser {
         }
 
         void parse_prefix(string& it, node& node) {
-            static let ends = view_of("[]");
+            static let ends = view("[]");
             node.prefix_text = take_until_any(it, ends);
         }
 

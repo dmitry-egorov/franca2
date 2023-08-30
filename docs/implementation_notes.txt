@@ -1,4 +1,4 @@
-- variable declaration
+- var_ declaration
     - id
     - display string
     - mutability

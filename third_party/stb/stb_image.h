@@ -1957,7 +1957,7 @@ typedef struct
    int img_mcu_x, img_mcu_y;
    int img_mcu_w, img_mcu_h;
 
-// variable of jpeg image component
+// var_ of jpeg image component
    struct
    {
       int id;

@@ -18,7 +18,7 @@ namespace line_view_gen {
     }
 
     struct line_view {
-        array_view <uint8_t> glyphs;
+        arrayv <uint8_t> glyphs;
         uint width;
     };
 

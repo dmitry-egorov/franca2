@@ -1,10 +1,16 @@
+- [ ] generalize string builder for istr
+- [ ] should gather defs when creating a new scope?
+- [ ] linear stack
+- [ ] inline functions? (e.g. for istr)
+- [ ] primitive types
 - [ ] lower level func def with explicit params and returns?
 - [ ] rethink literal types?
-- [ ] primitive types
+- [ ] support nested func definitions? (gather recursively)
 - [ ] structs
     - https://github.com/WebAssembly/tool-conventions/blob/main/BasicCABI.md
 - [ ] pointers
 - [ ] generate an array type
+- [ ] imports? to import a prelude
 - [ ] navigate node tree with keyboard
 - [ ] cursor
     - [ ] display blinking cursor
@@ -17,6 +23,8 @@
 - [ ] wasm jit?
 
 done
+- [+] out of order definitions
+    - [+] declare_func, define_func
 - [+] compile to wasm
     - https://blog.scottlogic.com/2019/05/17/webassembly-compiler.html
     - https://gist.github.com/AlexAltea/78e8da45e20fdb1bf2afb8816de53bae

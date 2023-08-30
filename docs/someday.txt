@@ -1,8 +1,8 @@
 - [ ] wasm jit: https://github.com/wingo/wasm-jit
 - [ ] store blocks ident in the stored file
 - [ ] fixup sizes for sections and code
-    - [ ] implement insert into arena_array
+    - [ ] implement insert into arrayd
 - [ ] ??? change syntax of functions to id[]
 - [ ] ??? uuid as "qr"
-- [ ] variable declaration inside another expression?
+- [ ] var_ declaration inside another expression?
 - [ ] compare performance of generating diag text on cpu and gpu

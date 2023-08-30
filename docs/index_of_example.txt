@@ -42,7 +42,7 @@ contexts:
     - is it a declaration or something else?
 
 - display context:
-    - e.g. rename loop variable
+    - e.g. rename loop var_
     - display functions differently
 
 - runtime function context

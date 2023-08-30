@@ -40,17 +40,10 @@ namespace compute_asts {
 #define using_display_ctx ref [it, storage, inactive_level] = ctx
 
         void display_node_chain(node*, context&);
-    }
-
-    inline void display(ast& ast, code_view_iterator& it, arena& arena) {
-        var storage = make_storage(arena);
-        var ctx = displaying::context {it, storage, 0 };
-        display_node_chain(ast.root, ctx);
-    }
-
-    namespace displaying {
         void display_node(node&, context&);
         void display_node(node*, context&);
+
+        void gather_definitions(node&, context&);
 
         bool display_func(string fn_id, node* args, context&);
         void display_func(const func& , node* args, context&);
@@ -78,20 +71,33 @@ namespace compute_asts {
         void put_text_in_brackets(palette_color color, const string& text, context&);
 
         palette_color color_of(poly_value value);
+    }
 
-        void display_node(node *node, context& ctx) {
-            if_ref(n, node); else return;
-            display_node(n, ctx);
-        }
+    inline void display(ast& ast, code_view_iterator& it, arena& arena) {
+        var storage = make_storage(arena);
+        var ctx = displaying::context {it, storage, 0 };
+        display_node_chain(ast.root, ctx);
+    }
+
+    namespace displaying {
 
         void display_node_chain(node* first_node, context& ctx) {
             using_display_ctx;
+
+            for (var node_p = first_node; node_p; node_p = node_p->next) {
+                gather_definitions(*node_p, ctx);
+            }
 
             for (var node_p = first_node; node_p; node_p = node_p->next) {
                 ref node = *node_p;
                 display_node(node, ctx);
                 put_text(inlays, node.suffix, ctx);
             }
+        }
+
+        void display_node(node *node, context& ctx) {
+            if_ref(n, node); else return;
+            display_node(n, ctx);
         }
 
         void display_node(node& node, context& ctx) {
@@ -115,28 +121,37 @@ namespace compute_asts {
             //TODO: support string literals as fn id
             let fn_id = node.text;
             //if (fn_id == "(uint)inactive"     ) { display_inactive     (args_node_p, ctx); return; } //TODO: parse comments as inactive node?
-            if (fn_id ==  block_id) { display_block     (args_node_p, ctx); return; }
-            if (fn_id == decl_var_id) { display_decl_var  (args_node_p, ctx); return; }
+            if (fn_id ==      block_id) { display_block     (args_node_p, ctx); return; }
+            if (fn_id ==   decl_var_id) { display_decl_var  (args_node_p, ctx); return; }
             if (fn_id == decl_param_id) { display_decl_param(args_node_p, ctx); return; }
-            if (fn_id ==    def_id) { display_decl_func (args_node_p, ctx); return; }
-            if (fn_id ==    ref_id) { display_ref_var   (args_node_p, ctx); return; }
-            if (fn_id ==    ret_id) { display_return    (args_node_p, ctx); return; }
-            if (fn_id ==     if_id) { display_if        (args_node_p, ctx); return; }
-            if (fn_id ==  while_id) { display_loop      (args_node_p, ctx); return; }
-            if (fn_id ==   istr_id) { display_istring   (args_node_p, ctx); return; }
-            if (fn_id == assign_id) { display_op_assign (args_node_p, ctx); return; }
-            if (fn_id ==    add_id) { display_bop(args_node_p, ctx, view_of(" + " )); return; }
-            if (fn_id ==    sub_id) { display_bop(args_node_p, ctx, view_of(" - " )); return; }
-            if (fn_id ==     eq_id) { display_bop(args_node_p, ctx, view_of(" == ")); return; }
-            if (fn_id ==    neq_id) { display_bop(args_node_p, ctx, view_of(" != ")); return; }
-            if (fn_id ==    lte_id) { display_bop(args_node_p, ctx, view_of(" <= ")); return; }
-            if (fn_id ==    gte_id) { display_bop(args_node_p, ctx, view_of(" >= ")); return; }
-            if (fn_id ==     lt_id) { display_bop(args_node_p, ctx, view_of(" < " )); return; }
-            if (fn_id ==     gt_id) { display_bop(args_node_p, ctx, view_of(" > " )); return; }
-            if (fn_id ==  print_id) { display_fn_print  (args_node_p, ctx); return; }
-            if (fn_id ==   show_id) { display_macro_show(args_node_p, ctx); return; }
+            if (fn_id ==        def_id) { display_decl_func (args_node_p, ctx); return; }
+            if (fn_id ==        ref_id) { display_ref_var   (args_node_p, ctx); return; }
+            if (fn_id ==        ret_id) { display_return    (args_node_p, ctx); return; }
+            if (fn_id ==         if_id) { display_if        (args_node_p, ctx); return; }
+            if (fn_id ==      while_id) { display_loop      (args_node_p, ctx); return; }
+            if (fn_id ==       istr_id) { display_istring   (args_node_p, ctx); return; }
+            if (fn_id ==     assign_id) { display_op_assign (args_node_p, ctx); return; }
+            if (fn_id ==        add_id) { display_bop(args_node_p, ctx, view(" + ")); return; }
+            if (fn_id ==        sub_id) { display_bop(args_node_p, ctx, view(" - ")); return; }
+            if (fn_id ==         eq_id) { display_bop(args_node_p, ctx, view(" == ")); return; }
+            if (fn_id ==         ne_id) { display_bop(args_node_p, ctx, view(" != ")); return; }
+            if (fn_id ==         le_id) { display_bop(args_node_p, ctx, view(" <= ")); return; }
+            if (fn_id ==         ge_id) { display_bop(args_node_p, ctx, view(" >= ")); return; }
+            if (fn_id ==         lt_id) { display_bop(args_node_p, ctx, view(" < ")); return; }
+            if (fn_id ==         gt_id) { display_bop(args_node_p, ctx, view(" > ")); return; }
+            if (fn_id ==      print_id) { display_fn_print  (args_node_p, ctx); return; }
+            if (fn_id ==       show_id) { display_macro_show(args_node_p, ctx); return; }
 
-            if(display_func(fn_id, args_node_p, ctx)); else { put_text_in_brackets(inlays, view_of(" "), ctx); dbg_fail_return; }
+            if(display_func(fn_id, args_node_p, ctx)); else { put_text_in_brackets(inlays, view(" "), ctx); dbg_fail_return; }
+        }
+
+        void gather_definitions(node& node, context& context) {
+            if (is_func(node, def_id)); else return;
+
+            if_var3(id_node, disp_node, body_node, deref_list3(node.first_child)); else { dbg_fail_return; }
+            var id = id_node.text;
+
+            push_func(context.storage, compute_asts::func { id, &disp_node, &body_node });
         }
 
         bool display_func(string fn_id, node* args, context& ctx) {
@@ -160,7 +175,7 @@ namespace compute_asts {
                         break;
                     }
                     case func: {
-                        assert(is_func(sig_node, view_of("$")));
+                        assert(is_func(sig_node, view("$")));
                         if_ref(arg_node, args); else { dbg_fail_return; }
                         display_node(arg_node, ctx);
                         args = arg_node.next;
@@ -202,7 +217,7 @@ namespace compute_asts {
             var name = id;
             var init_node_p = id_node.next;
 
-            put_text(controls, view_of("var "), ctx);
+            put_text(controls, view("var "), ctx);
 
             if (init_node_p) { if_ref(name_node, init_node_p->next) {
                 name = name_node.text;
@@ -211,7 +226,7 @@ namespace compute_asts {
             put_text_in_brackets(identifiers, name, ctx);
 
             if_ref(init_node, init_node_p) {
-                put_text(regulars, view_of(" = "), ctx);
+                put_text(regulars, view(" = "), ctx);
                 display_node(init_node, ctx);
             }
 
@@ -234,16 +249,13 @@ namespace compute_asts {
         void display_decl_func(node* args, context& ctx) {
             using_display_ctx;
 
-            if_var3(id_node, disp_node, body_node, deref_list3(args)); else { dbg_fail_return; }
-            var id = id_node.text;
+            if_var3(__, disp_node, body_node, deref_list3(args)); else { dbg_fail_return; }
 
-            push_func(storage, compute_asts::func { id, &disp_node, &body_node });
-
-            put_text(definitions, view_of("def "), ctx);
+            put_text(definitions, view("def "), ctx);
 
             tmp_scope(storage);
             display_node(disp_node, ctx);
-            put_text(regulars, view_of(": "), ctx);
+            put_text(regulars, view(": "), ctx);
             display_node(body_node, ctx);
         }
 
@@ -252,7 +264,7 @@ namespace compute_asts {
 
             if_ref (id_node, args); else { dbg_fail_return; }
             var id = id_node.text;
-            if_ref (v, find_var(storage, id)); else { put_text(inlays, view_of(" "), ctx); dbg_fail_return; }
+            if_ref (v, find_var(storage, id)); else { put_text(inlays, view(" "), ctx); dbg_fail_return; }
 
             put_text_in_brackets(identifiers, v.display_name, ctx);
         }
@@ -260,7 +272,7 @@ namespace compute_asts {
         void display_return(node* args, context& ctx) {
             using_display_ctx;
 
-            put_text(controls, view_of("return "), ctx);
+            put_text(controls, view("return "), ctx);
 
             if_ref (value_node, args); else { return; }
             display_node(value_node, ctx);
@@ -270,7 +282,7 @@ namespace compute_asts {
             using_display_ctx;
 
             if_var2(cond_node, body_node, deref_list2(args)); else { dbg_fail_return; }
-            put_text(controls, view_of("if "), ctx);
+            put_text(controls, view("if "), ctx);
 
             display_node(cond_node, ctx);
             put_text(regulars, cond_node.suffix, ctx);
@@ -281,7 +293,7 @@ namespace compute_asts {
             using_display_ctx;
 
             if_var2(cond_node, body_node, deref_list2(args)); else { dbg_fail_return; }
-            put_text(controls, view_of("while "), ctx);
+            put_text(controls, view("while "), ctx);
 
             display_node(cond_node, ctx);
             put_text(regulars, cond_node.suffix, ctx);
@@ -291,7 +303,7 @@ namespace compute_asts {
         void display_istring(node* args, context& ctx) {
             using_display_ctx;
 
-            if_ref(args_list, args); else { put_text(strings, view_of(" "), ctx); return;}
+            if_ref(args_list, args); else { put_text(strings, view(" "), ctx); return;}
             display_node_chain(&args_list, ctx);
         }
 
@@ -300,10 +312,10 @@ namespace compute_asts {
 
             if_var2(id_node, value_node, deref_list2(args)); else { dbg_fail_return; }
             var id = id_node.text;
-            if_ref (v , find_var(storage, id)); else { put_text(inlays, view_of(" "), ctx); dbg_fail_return; }
+            if_ref (v , find_var(storage, id)); else { put_text(inlays, view(" "), ctx); dbg_fail_return; }
 
             put_text(identifiers, v.display_name, ctx);
-            put_text(regulars, view_of(" = "), ctx);
+            put_text(regulars, view(" = "), ctx);
             display_node(value_node, ctx);
         }
 
@@ -320,7 +332,7 @@ namespace compute_asts {
             if_ref(text_node, args); else return;
 
             using_display_ctx;
-            put_text(regulars, view_of("print "), ctx);
+            put_text(regulars, view("print "), ctx);
             display_node(text_node, ctx);
         }
 
@@ -330,11 +342,11 @@ namespace compute_asts {
             if_ref (id_node, args); else { dbg_fail_return; }
             var id = id_node.text;
 
-            put_text(definitions, view_of("show "), ctx);
+            put_text(definitions, view("show "), ctx);
             put_text(inlays     , id_node.prefix, ctx);
             put_text(identifiers, id, ctx);
             put_text(inlays     , id_node.suffix, ctx);
-            put_text(definitions, view_of("as "), ctx);
+            put_text(definitions, view("as "), ctx);
 
             if_ref(disp_node, id_node.next); else { dbg_fail_return; }
             display_node(disp_node, ctx);
