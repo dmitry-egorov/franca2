@@ -46,7 +46,7 @@ namespace visual_asts::parser {
             arenas::make(1024 * 1024 * sizeof(char))
         };
 
-        if_var1(ast, parse_text(read_file_as_string(path, storage.text_arena), storage)); else { release(storage); return ret1_fail; }
+        if_var1(ast, parse_text(files::read_file_as_string(path, storage.text_arena), storage)); else { release(storage); return ret1_fail; }
         return ret1_ok(ast);
     }
 

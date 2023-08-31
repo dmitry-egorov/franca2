@@ -1,5 +1,6 @@
-- named arguments in the form of lists?
-    - def[id[recursive_fib_at] disp[recursive fib at $[n]] body[...]]
+- named arguments?
+    - def[id[recursive_fib_at] disp["recursive fib at "$[n]] body[...]]
+    - def[id:recursive_fib_at disp:["recursive fib at "$[n]] body:...]
     - are nodes self-sufficient or require to be within a context of another node?
 - alternative implementations for functions
     - functions can have multiple implementations, that share the same signature

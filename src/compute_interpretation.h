@@ -11,7 +11,7 @@
 #include "utility/maths2.h"
 #include "utility/arrays.h"
 #include "utility/arenas.h"
-#include "utility/arrayds.h"
+#include "utility/arr_dyns.h"
 #include "utility/iterators.h"
 #include "utility/strings.h"
 #include "code_views.h"
@@ -34,9 +34,10 @@ namespace compute_asts {
 
         struct context {
             storage& storage;
+            arr_view<u8> memory;
             arena  & arena;
         };
-#define using_exec_ctx ref [storage, arena] = ctx
+#define using_exec_ctx ref [storage, memory, arena] = ctx
 #define bop_lambda(op) [](uint a, uint b) { return (uint)(a op b); }
 
         auto interpret_nodes_chain(node*, context&) -> exec_result;
@@ -45,14 +46,19 @@ namespace compute_asts {
         auto gather_defs(node&, context&) -> void;
 
         auto interpret_block    (node*, context&) -> exec_result;
-        auto interpret_decl_var (node*, context&) -> exec_result;
+        auto interpret_decl_local (node *, context &) -> exec_result;
         auto interpret_var_ref  (node*, context&) -> poly_value ;
         auto interpret_return   (node*, context&) -> exec_result;
+        auto interpret_as       (node*, context&) -> exec_result;
         auto interpret_if       (node*, context&) -> exec_result;
         auto interpret_loop     (node*, context&) -> exec_result;
+        auto interpret_store8   (node*, context&) -> exec_result;
         auto interpret_op_assign(node*, context&) -> exec_result;
-        auto interpret_bop      (node *, uint (*f)(uint, uint), context &) -> exec_result;
-        auto interpret_istr  (node *, context &) -> exec_result;
+        auto interpret_minus    (node*, context&) -> exec_result;
+        auto interpret_bop      (node*, uint (*f)(uint, uint), context&) -> exec_result;
+        auto interpret_bop_a    (node*, uint (*f)(uint, uint), context&) -> exec_result;
+        auto interpret_istr     (node*, context&) -> exec_result;
+        auto interpret_chr      (node*, context&) -> exec_result;
         auto interpret_fn_print (node*, context&) -> exec_result;
 
         auto get_literal_value(node&) -> poly_value;
@@ -67,7 +73,8 @@ namespace compute_asts {
 
     uint interpret(const ast& ast, arena& arena) {
         var storage = make_storage(arena);
-        var ctx = interpretation::context {.storage = storage, .arena = arena};
+        var memory  = alloc<u8>(arena, 64 * 1024);
+        var ctx = interpretation::context {.storage = storage, .memory = memory, .arena = arena};
         var r = interpret_nodes_chain(ast.root, ctx);
         if_var1(i, get_uint(r.value)); else return 0xffffffff;
         return i;
@@ -99,25 +106,36 @@ namespace compute_asts {
                     var args_node_p = node.first_child;
 
                     //if (fn_id == (uint)inactive  ) return {};
-                    if (fn_id ==    block_id) return interpret_block    (args_node_p, ctx);
-                    if (fn_id == decl_var_id) return interpret_decl_var (args_node_p, ctx);
-                    if (fn_id ==      def_id) return {};
-                    if (fn_id ==      ref_id) return to_res(interpret_var_ref(args_node_p, ctx));
-                    if (fn_id ==      ret_id) return interpret_return   (args_node_p, ctx);
-                    if (fn_id ==       if_id) return interpret_if       (args_node_p, ctx);
-                    if (fn_id ==    while_id) return interpret_loop     (args_node_p, ctx);
-                    if (fn_id ==     istr_id) return interpret_istr  (args_node_p, ctx);
-                    if (fn_id ==   assign_id) return interpret_op_assign(args_node_p, ctx);
-                    if (fn_id ==      add_id) return interpret_bop(args_node_p, bop_lambda(+) , ctx);
-                    if (fn_id ==      sub_id) return interpret_bop(args_node_p, bop_lambda(-) , ctx);
-                    if (fn_id ==       eq_id) return interpret_bop(args_node_p, bop_lambda(==), ctx);
-                    if (fn_id ==       ne_id) return interpret_bop(args_node_p, bop_lambda(!=), ctx);
-                    if (fn_id ==       le_id) return interpret_bop(args_node_p, bop_lambda(<=), ctx);
-                    if (fn_id ==       ge_id) return interpret_bop(args_node_p, bop_lambda(>=), ctx);
-                    if (fn_id ==       lt_id) return interpret_bop(args_node_p, bop_lambda(<) , ctx);
-                    if (fn_id ==       gt_id) return interpret_bop(args_node_p, bop_lambda(>) , ctx);
-                    if (fn_id ==    print_id) return interpret_fn_print (args_node_p, ctx);
-                    if (fn_id ==     show_id) return {};
+                    if (fn_id ==      block_id) return interpret_block     (args_node_p, ctx);
+                    if (fn_id == decl_local_id) return interpret_decl_local(args_node_p, ctx);
+                    if (fn_id ==        def_id) return {};
+                    if (fn_id ==        ref_id) return to_res(interpret_var_ref(args_node_p, ctx));
+                    if (fn_id ==        ret_id) return interpret_return   (args_node_p, ctx);
+                    if (fn_id ==         as_id) return interpret_as       (args_node_p, ctx);
+                    if (fn_id ==         if_id) return interpret_if       (args_node_p, ctx);
+                    if (fn_id ==      while_id) return interpret_loop     (args_node_p, ctx);
+                    if (fn_id ==       istr_id) return interpret_istr     (args_node_p, ctx);
+                    if (fn_id ==        chr_id) return interpret_chr      (args_node_p, ctx);
+                    if (fn_id ==   store_u8_id) return interpret_store8   (args_node_p, ctx);
+                    if (fn_id ==     assign_id) return interpret_op_assign(args_node_p, ctx);
+                    if (fn_id ==        sub_id) return interpret_minus    (args_node_p, ctx);
+                    if (fn_id ==        add_id) return interpret_bop      (args_node_p, bop_lambda(+) , ctx);
+                    if (fn_id ==        mul_id) return interpret_bop      (args_node_p, bop_lambda(*) , ctx);
+                    if (fn_id ==        div_id) return interpret_bop      (args_node_p, bop_lambda(/) , ctx);
+                    if (fn_id ==        rem_id) return interpret_bop      (args_node_p, bop_lambda(%) , ctx);
+                    if (fn_id ==      add_a_id) return interpret_bop_a    (args_node_p, bop_lambda(+) , ctx);
+                    if (fn_id ==      sub_a_id) return interpret_bop_a    (args_node_p, bop_lambda(-) , ctx);
+                    if (fn_id ==      mul_a_id) return interpret_bop_a    (args_node_p, bop_lambda(*) , ctx);
+                    if (fn_id ==      div_a_id) return interpret_bop_a    (args_node_p, bop_lambda(/) , ctx);
+                    if (fn_id ==      rem_a_id) return interpret_bop_a    (args_node_p, bop_lambda(%) , ctx);
+                    if (fn_id ==         eq_id) return interpret_bop      (args_node_p, bop_lambda(==), ctx);
+                    if (fn_id ==         ne_id) return interpret_bop      (args_node_p, bop_lambda(!=), ctx);
+                    if (fn_id ==         le_id) return interpret_bop      (args_node_p, bop_lambda(<=), ctx);
+                    if (fn_id ==         ge_id) return interpret_bop      (args_node_p, bop_lambda(>=), ctx);
+                    if (fn_id ==         lt_id) return interpret_bop      (args_node_p, bop_lambda(<) , ctx);
+                    if (fn_id ==         gt_id) return interpret_bop      (args_node_p, bop_lambda(>) , ctx);
+                    if (fn_id ==      print_id) return interpret_fn_print (args_node_p, ctx);
+                    if (fn_id ==       show_id) return {};
 
                     if_ref(fn, find_func(storage, fn_id)); else { printf("func %.*s not found!\n", (int)fn_id.count, fn_id.data); dbg_fail_return {}; }
                     if_ref(display, fn.display)          ; else { dbg_fail_return {}; }
@@ -162,10 +180,10 @@ namespace compute_asts {
 
             if (is_func(node, def_id)); else return;
 
-            if_var3(id_node, disp_node, body_node, deref_list3(node.first_child)); else { dbg_fail_return; }
+            if_var4(id_node, disp_node, type_node, body_node, deref4(node.first_child)); else { dbg_fail_return; }
             var id = id_node.text;
 
-            push_func(storage, compute_asts::func { id, &disp_node, &body_node });
+            push_func(storage, { id, &disp_node, &type_node, &body_node });
         }
 
         exec_result interpret_block(node* args, context& ctx) {
@@ -175,16 +193,16 @@ namespace compute_asts {
             return interpret_nodes_chain(args, ctx);
         }
 
-        exec_result interpret_decl_var(node* args, context& ctx) {
+        exec_result interpret_decl_local(node * args, context & ctx) {
             using_exec_ctx;
 
-            if_ref(id_node, args); else { dbg_fail_return {}; }
+            if_var2(id_node, type_node, deref2(args)); else { dbg_fail_return {}; }
 
             var id   = id_node.text;
             var name = id;
 
             var initial_value = poly_value {};
-            if_ref(init_node, id_node.next) {
+            if_ref(init_node, type_node.next) {
                 let r = interpret_node(init_node, ctx);
                 if (r.is_returning) return r;
                 initial_value = r.value;
@@ -222,9 +240,14 @@ namespace compute_asts {
             return r;
         }
 
+        exec_result interpret_as(node* args, context& ctx) {
+            if_ref(value_node, args); else { dbg_fail_return {}; }
+            return interpret_node(value_node, ctx);
+        }
+
         exec_result interpret_if(node* args, context& ctx) {
             using_exec_ctx;
-            if_var2(cond_node, body_node, deref_list2(args)); else { dbg_fail_return {}; }
+            if_var2(cond_node, body_node, deref2(args)); else { dbg_fail_return {}; }
 
             let cond_r = interpret_node(cond_node, ctx);
             if (cond_r.is_returning) return cond_r;
@@ -241,7 +264,7 @@ namespace compute_asts {
 
         exec_result interpret_loop(node* args, context& ctx) {
             using_exec_ctx;
-            if_var2(cond_node, body_node, deref_list2(args)); else { dbg_fail_return {}; }
+            if_var2(cond_node, body_node, deref2(args)); else { dbg_fail_return {}; }
             var last_result = exec_result {};
 
             while (true) {
@@ -260,6 +283,22 @@ namespace compute_asts {
             return last_result;
         }
 
+        exec_result interpret_store8(node* args, context& ctx) {
+            using_exec_ctx;
+
+            if_var2(mem_offset_node, value_node, deref2(args)); else { dbg_fail_return {}; }
+            let mem_offset_r = interpret_node(mem_offset_node, ctx);
+            if (mem_offset_r.is_returning) return mem_offset_r;
+            if_var1(mem_offset, get_uint(mem_offset_r.value)); else { dbg_fail_return {}; }
+
+            var val_r = interpret_node(value_node, ctx);
+            if (val_r.is_returning) return val_r;
+            if_var1(value, get_uint(val_r.value)); else { dbg_fail_return {}; }
+
+            ctx.memory[mem_offset] = (u8)value;
+            return {};
+        }
+
         exec_result interpret_op_assign(node* args, context& ctx) {
             using_exec_ctx;
 
@@ -274,12 +313,32 @@ namespace compute_asts {
             return r;
         }
 
-        exec_result interpret_bop(node * args, uint (*f)(uint, uint), context & ctx) {
+        exec_result interpret_minus(node * args, context & ctx) {
             if_ref(a_node, args       ); else { dbg_fail_return {}; }
-            if_ref(b_node, a_node.next); else { dbg_fail_return {}; }
-
             let a_r = interpret_node(a_node, ctx);
             if (a_r.is_returning) return a_r;
+            let a_value = a_r.value;
+            if (a_value.type == poly_integer); else { dbg_fail_return {}; }
+
+            if_ref(b_node, a_node.next); else {
+                return to_res(-a_r.value.integer);
+            }
+
+            let b_r = interpret_node(b_node, ctx);
+            if (b_r.is_returning) return b_r;
+
+            let b_value = b_r.value;
+            if (b_value.type == poly_integer); else { dbg_fail_return {}; }
+
+            return to_res(a_value.integer - b_value.integer);
+        }
+
+        exec_result interpret_bop(node * args, uint (*f)(uint, uint), context & ctx) {
+            if_ref(a_node, args       ); else { dbg_fail_return {}; }
+            let a_r = interpret_node(a_node, ctx);
+            if (a_r.is_returning) return a_r;
+
+            if_ref(b_node, a_node.next); else { dbg_fail_return {}; }
             let b_r = interpret_node(b_node, ctx);
             if (b_r.is_returning) return b_r;
 
@@ -289,6 +348,22 @@ namespace compute_asts {
             if (a_value.type == poly_integer && b_value.type == poly_integer); else { dbg_fail_return {}; }
 
             return to_res(f(a_value.integer, b_value.integer));
+        }
+
+        exec_result interpret_bop_a(node* args, uint (*f)(uint, uint), context& ctx) {
+            using_exec_ctx;
+
+            if_ref(id_node, args); else { dbg_fail_return {}; }
+            if_ref(init_node, id_node.next); else { dbg_fail_return {}; }
+            var id = id_node.text;
+
+            if_ref(variable, find_var(storage, id)); else { dbg_fail_return {}; }
+            if (variable.value.type == poly_integer); else { dbg_fail_return {}; }
+            var r = interpret_node(init_node, ctx);
+            if (r.value.type == poly_integer); else { dbg_fail_return {}; }
+            if (r.is_returning) return r;
+            variable.value = to_poly(f(variable.value.integer, r.value.integer));
+            return r;
         }
 
         exec_result interpret_istr(node* nodes, context& ctx) {
@@ -305,16 +380,22 @@ namespace compute_asts {
             return to_res(result_storage.data);
         }
 
+        exec_result interpret_chr(node* args, context& ctx) {
+            using_exec_ctx;
+
+            if_ref(value_node, args); else { dbg_fail_return {}; }
+            return to_res(sub(value_node.text, 1));
+        }
+
         exec_result interpret_fn_print(node* args, context& ctx) {
             using_exec_ctx;
-            if_ref(text_node, args); else { dbg_fail_return {}; }
-            let r = interpret_node(text_node, ctx);
+            let r = interpret_istr(args, ctx);
             if (r.is_returning) return r;
 
             let text = r.value;
 
             var result_str = string {};
-            if_var1(i, get_uint(text)) { result_str = make_string(arena, "%d", i); } else {
+            if_var1(i, get_uint(text)) { result_str = make_string(arena, "%u", i); } else {
             if_var1(s, get_str (text)) { result_str = s; }
                 else { result_str = view(""); assert(false); }}
 
@@ -331,13 +412,13 @@ namespace compute_asts {
         }
 
         void push_uint(dstring& storage, const uint value) {
-            push(storage, make_string(*storage.arena, "%d", value));
+            push(storage, make_string(*storage.arena, "%u", value));
         }
 
         void push_value(dstring& storage, const poly_value& value) {
             switch (value.type) {
                 case poly_value::type_t::poly_integer: {
-                    var text = make_string(*storage.arena, "%d", value.integer);
+                    var text = make_string(*storage.arena, "%u", value.integer);
                     push(storage, text);
                     break;
                 }

@@ -1,51 +1,23 @@
-print[istr[fib_at[40]]]
-print[istr[recursive_fib_at[7]]]
-ret[322]
+print[fib_at[40]]
+print[rec_fib_at[7]]
 
 /////////////////////
-
 def[fib_at istr["fib at "$[n]] {}[
-if[==[&[n] 0] ret[0]]
-if[==[&[n] 1] ret[1]]
+    if[==[&[n] 0] ret[0]]
+    if[==[&[n] 1] ret[1]]
 
-var[i  2]
-var[v0 0]
-var[v1 1]
-while[<=[&[i] &[n]] {}[
-var[t &[v1]]
-=[v1 +[&[v0] &[v1]]]
-=[v0 &[t]]
-=[i +[&[i] 1]]]]
-ret[&[v1]]]]
+    var[i  2]
+    var[v0 0]
+    var[v1 1]
+    while[<=[&[i] &[n]] {}[
+        var[t  &[v1]]
+         +=[v1 &[v0]]
+          =[v0 &[t]]
+         +=[i  1]]]
 
-def[recursive_fib_at istr["recursive fib at "$[n]] {}[
-if[==[&[n] 0] ret[0]]
-if[==[&[n] 1] ret[1]]
-ret[+[()[recursive_fib_at[()[-[&[n] 1]]]] ()[recursive_fib_at[()[-[&[n] 2]]]]]]]]
+    ret[&[v1]]]]
 
-def[() istr["("$[expr]")"] &[expr]]
-
-/////////////////////
-//def[id[fib_at] disp["fib at "$[n]] body[
-//if[cond[==[&[n] 0]] then[ret[0]]]
-//if[cond[==[&[n] 1]] then[ret[1]]]
-//
-//var[id[i]  init[2]]
-//var[id[v0] init[0]]
-//var[id[v1] init[1]]
-//while[cond[<=[&[i] &[n]]] body[
-//var[id[t] init[&[v1]]]
-//=[v1 +[&[v0] &[v1]]]
-//=[v0 &[t]]
-//=[i +[&[i] 1]]]]
-//ret[&[v1]]]]
-//
-//def[id[()] disp["("$[expr]")"] body[&[expr]]]
-//
-//def[id[recursive_fib_at] disp[recursive fib at $[n]] body[
-//if[cond[==[&[n] 0]] then[ret[0]]]
-//if[cond[==[&[n] 1]] then[ret[1]]]
-//ret[+[()[recursive_fib_at[()[-[&[n] 1]]]] ()[recursive_fib_at[()[-[&[n] 2]]]]]]]]
-//
-//print[fib_at[10]]
-//print[recursive_fib_at[7]]
+def[rec_fib_at istr["recursive fib at "$[n]] {}[
+    if[==[&[n] 0] ret[0]]
+    if[==[&[n] 1] ret[1]]
+    ret[+[()[rec_fib_at[()[-[&[n] 1]]]] ()[rec_fib_at[()[-[&[n] 2]]]]]]]]

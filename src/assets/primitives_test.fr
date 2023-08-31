@@ -1,0 +1,9 @@
+var[a_u32 u32 0]
+var[b_u32 u32 1]
+
+print["a = "&[a_u32]", b = "&[b_u32]", sum = "+[&[a_u32] &[b_u32]]", diff = "-[&[a_u32] &[b_u32]]]
+
+//var[a_i32 i32 0]
+//var[b_i32 i32 1]
+//print["sum = "+[&[a_i32] &[b_i32]]]
+//print["dif = "-[&[a_i32] &[b_i32]]]

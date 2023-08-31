@@ -10,11 +10,13 @@
 #include "utility/strings.h"
 #include "utility/iterators.h"
 #include "utility/parsing.h"
+#include "out/utility/files.h"
 
 #include "compute_asts.h"
 
 namespace compute_asts {
     static auto parse_file(const char* path) -> ret1<ast>;
+    static auto parse_files(const arr_view<char*> paths) -> ret1<ast>;
     static auto parse_code(const string& code, ast_storage& storage) -> ret1<ast>;
 
     namespace parser {
@@ -30,16 +32,26 @@ namespace compute_asts {
     }
 
     static auto parse_file(const char* path) -> ret1<ast> {
-        var storage = ast_storage {
-            arenas::make(1024 * sizeof(node)),
-            arenas::make(1024 * 1024 * sizeof(char))
-        };
+        var storage = make_ast_storage();
 
-        if_var1(ast, parse_code(read_file_as_string(path, storage.text_arena), storage)); else {
+        if_var1(ast, parse_code(files::read_file_as_string(path, storage.text_arena), storage)); else {
             printf("Parsing %s failed\n", path);
             release(storage);
             return ret1_fail;
         }
+        return ret1_ok(ast);
+    }
+
+    static auto parse_files(const arr_view<const char*> paths) -> ret1<ast> {
+        var storage = make_ast_storage();
+        let code = files::read_files_as_string(paths, view("\n\n"), storage.text_arena);
+        printf("Source:\n%.*s\n", (int)code.count, code.data);
+        if_var1(ast, parse_code(code, storage)); else {
+            printf("Parsing failed\n");
+            release(storage);
+            return ret1_fail;
+        }
+
         return ret1_ok(ast);
     }
 
@@ -48,7 +60,6 @@ namespace compute_asts {
 
         var iterator = code;
         if_var2(first_child, last_child, parse_chain(iterator, storage)); else { dbg_fail_return ret1_fail;}
-        take(iterator, '\0');
         if(is_empty(iterator)); else { dbg_fail_return ret1_fail; }
 
         let a = ast { first_child, storage };
@@ -66,7 +77,7 @@ namespace compute_asts {
                 if_ref(node, parse_node(it, storage)); else break;
 
                 node.prefix = prefix;
-                node.suffix = prefix = take_whitespaces_and_comments(it);
+                prefix = node.suffix;
 
                 if (last_child) last_child->next = &node;
                 else            first_child = &node;
@@ -77,7 +88,7 @@ namespace compute_asts {
             return ret2_ok(first_child, last_child);
         }
 
-        node* parse_node(string & it, ast_storage & storage) {
+        node* parse_node(string& it, ast_storage& storage) {
             var text = string {};
             var text_is_quoted = true;
             if_set1(text, take_str(it)); else {
@@ -88,26 +99,31 @@ namespace compute_asts {
             var text_copy = text;
             var [uint_value, can_be_uint] = take_uint(text_copy);
 
-            var result = make_node(storage, node {
+            ref result = make_node(storage, node {
                 .text = text,
                 .text_is_quoted = text_is_quoted,
                 .can_be_uint = can_be_uint,
                 .uint_value  = uint_value,
             });
 
+            let next_text = take_whitespaces_and_comments(it);
+
             if(take(it, '[')) {
                 if_var2(first_child, last_child, parse_chain(it, storage)); else { dbg_fail_return nullptr; }
                 if(take(it, ']')); else { dbg_fail_return nullptr; } //TODO: free nodes?
-                set_parent_to_chain(first_child, result);
-                result->type = node::type_t::func;
-                result->first_child = first_child;
-                result-> last_child =  last_child;
+                set_parent_to_chain(first_child, &result);
+                result.type = node::type_t::func;
+                result.first_child = first_child;
+                result. last_child =  last_child;
+                result.infix = next_text;
+                result.suffix = take_whitespaces_and_comments(it);
             }
             else {
-                result->type = node::type_t::literal;
+                result.type   = node::type_t::literal;
+                result.suffix = next_text;
             }
 
-            return result;
+            return &result;
         }
 
         ret1<string> take_line_comment(string& it) {

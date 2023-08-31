@@ -1,0 +1,42 @@
+// Prelude:
+def[() istr["("$[expr u32]")"] u32 &[expr]]
+
+def[u32_to_str istr["write "$[n u32]" as string at "$[ptr u32]] u32 {}[
+    if[==[&[n] 0] {}[
+         store_u8[&[ptr] chr[0]]
+         ret[+[&[ptr] 1]]]]
+
+    var[d u32 1000000000]
+    while[>[&[d] &[n]] {}[/=[d 10]]]
+
+    while[>[&[d] 0] {}[
+        store_u8[&[ptr] ()[+[chr[0] %[()[/[&[n] &[d]]] 10]]]]
+        +=[ptr 1]
+        /=[d 10]]]
+
+    ret[&[ptr]]]]
+
+def[i32_to_str istr["write "$[n i32]" as string at "$[ptr u32]] u32 {}[
+    if[<[&[n] 0] {}[
+        store_u8[&[ptr] chr[-]]
+        +=[ptr 1]
+        =[n -[&[n]]]
+    ]]
+
+    ret[u32_to_str[as[&[n] u32] &[ptr]]]
+]]
+
+// mod[u2str inline 1]
+
+
+// Enum example
+// enum[enum_item[op_i32_add 0x6a]]
+
+// Inline wasm example:
+// wasm[+ istr[$[a]" + "$[b]]
+//    opcode[op_i32_add]]
+
+// This requires comptime execution
+// Local variable wasm example:
+// wasm[= istr[$[local_id]" + "$[b]]
+//     opcode[op_local_set local_id]]

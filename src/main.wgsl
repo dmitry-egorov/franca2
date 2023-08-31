@@ -223,8 +223,8 @@ fn sdf_segment(p: vec2f, a: vec2f, b: vec2f) -> f32
 }
 
 fn sdf_corner(p: vec2f, r: f32) -> f32 {
-    let a0 = (1.0 - sdf_thick_segment(p, vec2f(2.0, 5.0), vec2f(6.0, 5.0), r));
-    let a1 = (1.0 - sdf_thick_segment(p, vec2f(2.0, 5.0), vec2f(2.0, 8.0), r));
+    let a0 = (1.0 - sdf_thick_segment(p, vec2f(1.0, 4.0), vec2f(7.0, 4.0), r));
+    let a1 = (1.0 - sdf_thick_segment(p, vec2f(1.0, 4.0), vec2f(1.0, 8.0), r));
 
     return max(a0, a1);
 }

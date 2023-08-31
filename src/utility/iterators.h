@@ -11,19 +11,19 @@ namespace iterators {
     using namespace arenas;
     using namespace arrays;
 
-    tt bool is_empty(const arrayv<t>& it) { return it.count == 0; }
+    tt bool is_empty(const arr_view<t>& it) { return it.count == 0; }
 
-    tt ret1<t> peek(arrayv<t>& it) {
+    tt ret1<t> peek(arr_view<t>& it) {
         if (it.count != 0); else return ret1_fail;
         return ret1_ok(it[0]);
     }
 
-    tt bool peek(arrayv<t>& it, const t& value) {
+    tt bool peek(arr_view<t>& it, const t& value) {
         if (it.count != 0); else return false;
         return it[0] == value;
     }
 
-    tt ret1<t> take(arrayv<t>& it) {
+    tt ret1<t> take(arr_view<t>& it) {
         if (it.count != 0); else return ret1_fail;
 
         let result = it[0];
@@ -31,14 +31,14 @@ namespace iterators {
         return ret1_ok(result);
     }
 
-    tt bool take(arrayv<t>& it, const t& value) {
+    tt bool take(arr_view<t>& it, const t& value) {
         if_var1 (c, peek(it)); else return false;
              if (c == value ); else return false;
         take(it);
         return true;
     }
 
-    tt bool take(arrayv<t>& it, const arrayv<t>& sequence) {
+    tt bool take(arr_view<t>& it, const arr_view<t>& sequence) {
         if (it.count >= sequence.count); else return false;
 
         var it_copy    = it;
@@ -54,7 +54,7 @@ namespace iterators {
         return true;
     }
 
-    tt arrayv<t> take_until(arrayv<t>& it, const t& target) {
+    tt arr_view<t> take_until(arr_view<t>& it, const t& target) {
         var result = it;
         result.count = 0;
 
@@ -66,8 +66,8 @@ namespace iterators {
         }
     }
 
-    tt arrayv<t> take_past(arrayv<t>& it, const t& target) {
-        var result = arrayv<t> {it.data, 0 };
+    tt arr_view<t> take_past(arr_view<t>& it, const t& target) {
+        var result = arr_view<t> {it.data, 0 };
         while (true) {
             if_var1(c, take(it)); else return result;
             enlarge(result);
@@ -75,8 +75,8 @@ namespace iterators {
         }
     }
 
-    tt arrayv<t> take_until_any(arrayv<t>& it, const arrayv<t>& targets) {
-        var result = arrayv<t> {it.data, 0 };
+    tt arr_view<t> take_until_any(arr_view<t>& it, const arr_view<t>& targets) {
+        var result = arr_view<t> {it.data, 0 };
         while (true) {
             if_var1 (c, peek(it)          ); else return result;
                  if (!contains(targets, c)); else return result;
@@ -86,8 +86,8 @@ namespace iterators {
         }
     }
 
-    tt arrayv<t> take_past_any(arrayv<t>& it, const arrayv<t>& targets) {
-        var result = arrayv<t> {it.data, 0 };
+    tt arr_view<t> take_past_any(arr_view<t>& it, const arr_view<t>& targets) {
+        var result = arr_view<t> {it.data, 0 };
         while (true) {
             if_var1(c, take(it)); else return result;
             enlarge(result);
@@ -95,8 +95,8 @@ namespace iterators {
         }
     }
 
-    tt arrayv<t> take_while_any(arrayv<t>& it, const arrayv<t>& targets) {
-        var result = arrayv<t> {it.data, 0 };
+    tt arr_view<t> take_while_any(arr_view<t>& it, const arr_view<t>& targets) {
+        var result = arr_view<t> {it.data, 0 };
         while (true) {
             if_var1 (c, peek(it)         ); else return result;
                  if (contains(targets, c)); else return result;
@@ -106,7 +106,7 @@ namespace iterators {
         }
     }
 
-    tt bool skip_until(arrayv<t>& it, const t& target) {
+    tt bool skip_until(arr_view<t>& it, const t& target) {
         while (true) {
             if_var1(c, peek(it)); else return false;
             if (c == target) return true;
@@ -114,14 +114,14 @@ namespace iterators {
         }
     }
 
-    tt bool skip_past(arrayv<t>& it, const t& target) {
+    tt bool skip_past(arr_view<t>& it, const t& target) {
         while (true) {
             if_var1 (c, take(it)); else return false;
             if (c == target) return true;
         }
     }
 
-    tt void skip_while(arrayv<t>& it, const t& target) {
+    tt void skip_while(arr_view<t>& it, const t& target) {
         while (true) {
             if_var1 (c, peek(it)); else return;
             if (c != target) return;
@@ -129,7 +129,7 @@ namespace iterators {
         }
     }
 
-    tt void skip_while_any(arrayv<t>& it, const arrayv<t>& targets) {
+    tt void skip_while_any(arr_view<t>& it, const arr_view<t>& targets) {
         while (true) {
             if_var1 (c, peek(it));          else return;
                  if (contains(targets, c)); else return;

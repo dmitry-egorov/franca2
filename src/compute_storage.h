@@ -28,18 +28,19 @@ namespace compute_asts {
     struct func {
         string id;
         node* display;
+        node* type;
         node* body;
     };
 
     struct scope {
-        uint prev_vars_count;
-        uint prev_funcs_count;
+        size_t prev_vars_count;
+        size_t prev_funcs_count;
     };
 
     struct storage {
-        array<scope   > scopes;
-        array<variable> vars  ;
-        array<func    > funcs ;
+        arr_dyn<scope   > scopes;
+        arr_dyn<variable> vars  ;
+        arr_dyn<func    > funcs ;
     };
 
 #define using_storage ref [scopes, vars, funcs] = storage
@@ -54,9 +55,9 @@ namespace compute_asts {
 
     static storage make_storage(arena& arena) {
         return {
-            alloc_array<scope   >(arena, 1024),
-            alloc_array<variable>(arena, 1024),
-            alloc_array<func    >(arena, 1024),
+            make_arr_dyn<scope   >(1024, arena),
+            make_arr_dyn<variable>(1024, arena),
+            make_arr_dyn<func    >(1024, arena),
         };
     }
 
@@ -85,6 +86,7 @@ namespace compute_asts {
 
     variable* find_var(storage& storage, const string id) {
         using_storage;
+
         var vars_view = vars.data;
         for (var i = (int)vars_view.count - 1; i >= 0; --i) {
             ref v = vars_view[i];
@@ -93,6 +95,7 @@ namespace compute_asts {
 
         return nullptr;
     }
+
     func* find_func(storage& storage, const string id) {
         using_storage;
         var funcs_view = funcs.data;

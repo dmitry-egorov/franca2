@@ -7,20 +7,24 @@
 #include "syntax.h"
 
 namespace arrays {
-    tt struct arrayv {
+    tt struct arr_view {
         t*     data;
         size_t count;
 
               t& operator[](size_t index);
         const t& operator[](size_t index) const;
     };
-    tt void enlarge (arrayv<t>& v);
-    tt void advance (arrayv<t>& v);
-    tt bool contains(const arrayv<t>& view, const t& item);
-    tt arrayv<t> view_of(const std::initializer_list<t>& list);
+    tt void enlarge (arr_view<t>& v);
+    tt void advance (arr_view<t>& v);
+    tt bool contains(const arr_view<t>& view, const t& item);
+    tt size_t count(const arr_view<t>& view, const t& item);
+    tt arr_view<t> sub(const arr_view<t>& view, size_t count);
+    tt arr_view<t> sub_past_last(const arr_view<t>& view, const t& item);
+    tt arr_view<t> view(const std::initializer_list<t>& list);
+
 
     tt struct array {
-        arrayv<t> data;
+        arr_view<t> data;
         size_t capacity;
     };
 
@@ -34,27 +38,46 @@ namespace arrays {
 #ifndef FRANCA2_ARRAYS_I
 #define FRANCA2_ARRAYS_I
 namespace arrays {
-    tt const t &arrayv<t>::operator[](const size_t index) const { return data[index]; }
+    tt const t& arr_view<t>::operator[](const size_t index) const { assert(index < count); return data[index]; }
+    tt t& arr_view<t>::operator[](const size_t index) { assert(index < count); return data[index]; }
 
-    tt t &arrayv<t>::operator[](const size_t index) { return data[index]; }
+    tt void enlarge   (arr_view<t>& v) { v.count += 1; }
+    tt void enlarge_by(arr_view<t>& v, const size_t count) { v.count += count; }
 
-    tt void enlarge   (arrayv<t>& v) { v.count += 1; }
-    tt void enlarge_by(arrayv<t>& v, const size_t count) { v.count += count; }
-
-    tt void advance(arrayv<t>& v) {
+    tt void advance(arr_view<t>& v) {
         assert(v.count > 0);
         v.count -= 1;
         v.data  += 1;
     }
 
-    tt bool contains(const arrayv<t>& view, const t &item) {
+    tt bool contains(const arr_view<t>& view, const t &item) {
         for (var i = 0u; i < view.count; i += 1) {
             if (view[i] == item) return true;
         }
         return false;
     }
 
-    tt arrayv<t> view_of(const std::initializer_list<t>& list) {
+    tt size_t count(const arr_view<t>& view, const t& item) {
+        var count = (size_t)0;
+        for (var i = 0u; i < view.count; i += 1) {
+            if (view[i] == item) count++;
+        }
+        return count;
+    }
+    tt arr_view<t> sub(const arr_view<t>& view, size_t count) {
+        assert(count <= view.count);
+        return {view.data, count};
+    }
+
+    tt arr_view<t> sub_past_last(const arr_view<t>& view, const t& item) {
+        var last = (size_t)0;
+        for (var i = 0u; i < view.count; i += 1) {
+            if (view[i] == item) last = i + 1;
+        }
+        return {view.data, last};
+    }
+
+    tt arr_view<t> view(const std::initializer_list<t>& list) {
         return {(t*)list.begin(), list.size()};
     }
 

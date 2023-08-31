@@ -5,14 +5,14 @@
 #include <cstring>
 #include "syntax.h"
 #include "arrays.h"
-#include "arrayds.h"
+#include "arr_dyns.h"
 
 namespace strings {
     using namespace arrays;
     using namespace arenas;
 
-    typedef arrays::arrayv<char> string;
-    typedef arrayd<char> dstring;
+    typedef arrays::arr_view<char> string;
+    typedef arr_dyn<char> dstring;
 
     inline bool operator==(const string& a, const string& b) {
         return a.count == b.count && memcmp(a.data, b.data, a.count) == 0;
@@ -35,7 +35,7 @@ namespace strings {
     }
 
     dstring make_string_builder(size_t initial_capacity, arena& arena) {
-        return make_darray<char>(initial_capacity, arena, 1);
+        return make_arr_dyn<char>(initial_capacity, arena, 1);
     }
 }
 

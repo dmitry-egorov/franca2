@@ -26,9 +26,9 @@ namespace code_views {
 
     struct code_view {
         arena& scratch_arena;
-        arrayv<uint8_t> glyphs;
-        arrayv<uint8_t> colors;
-        arrayv<uint8_t> inlays;
+        arr_view<u8> glyphs;
+        arr_view<u8> colors;
+        arr_view<u8> inlays;
 
         usize2 size;
         uint   line_count;
@@ -44,9 +44,9 @@ namespace code_views {
 #define tmp_indent(it) it.indent += 1; defer { it.indent -= 1; }
     code_view make_code_vew(const usize2& size, arena& arena = arenas::gta) { return {
         .scratch_arena = arena,
-        .glyphs = alloc<uint8_t>(arena, size.w * size.h),
-        .colors = alloc<uint8_t>(arena, size.w * size.h),
-        .inlays = alloc<uint8_t>(arena, size.w * size.h),
+        .glyphs = alloc<u8>(arena, size.w * size.h),
+        .colors = alloc<u8>(arena, size.w * size.h),
+        .inlays = alloc<u8>(arena, size.w * size.h),
         .size = size
     };}
 
@@ -58,6 +58,7 @@ namespace code_views {
         x  = indent * 4; //TODO: make the indent size configurable configurable
         y += 1;
     }
+
     ret1<bool> next_cell(code_view_iterator &it) {
         using_cv_iterator(it);
         if (finished(it)) return ret1_ok(false);
@@ -71,10 +72,15 @@ namespace code_views {
     void put_uint      (code_view_iterator &it, palette_color color, uint value);
     template<typename... Args> void put_text(code_view_iterator &it, palette_color color, const char* format, Args... args);
     void put_text      (code_view_iterator &it, palette_color color, const string& text);
-    void set_glyph     (code_view_iterator &it, u8 glyph) { using_cv_iterator(it); glyphs[y * size.w + x] = glyph; }
-    void set_color     (code_view_iterator &it, palette_color color) { using_cv_iterator(it); colors[y * size.w + x] = (uint8_t)color; }
-    void set_inlay     (code_view_iterator &it, inlay_type inlay) { using_cv_iterator(it); inlays[y * size.w + x    ] |= (u8)inlay; }
-    void set_inlay_prev(code_view_iterator &it, inlay_type inlay) { using_cv_iterator(it); inlays[y * size.w + x - 1] |= (u8)inlay; }
+    void set_glyph     (code_view_iterator &it, u8 glyph);
+    void set_color     (code_view_iterator &it, palette_color color);
+    void set_inlay     (code_view_iterator &it, inlay_type inlay);
+    void set_inlay_prev(code_view_iterator &it, inlay_type inlay);
+
+    u8* cell_at(arr_view<u8>& view, const uint2& idx, const code_view& cv) {
+        if (idx.x >= 0 && idx.x < cv.size.w && idx.y >= 0 && idx.y < cv.size.h); else return nullptr;
+        return &view[idx.y * cv.size.w + idx.x];
+    }
 
     void put_uint(code_view_iterator &it, palette_color color, uint value) {
         put_text(it, color, "%d", value);
@@ -111,6 +117,33 @@ namespace code_views {
                 if(skip_past(text_it, '\n')); else break;
             }
         }
+    }
+
+    void set_glyph(code_view_iterator &it, u8 glyph) {
+        using_cv_iterator(it);
+        if_ref(cell, cell_at(glyphs, cell_idx, view)); else return;
+        cell = glyph;
+    }
+
+    void set_color(code_view_iterator &it, palette_color color) {
+        using_cv_iterator(it);
+        if_ref(cell, cell_at(colors, cell_idx, view)); else return;
+        cell = (u8)color;
+    }
+
+    void set_inlay(code_view_iterator &it, inlay_type inlay) {
+        using_cv_iterator(it);
+        if_ref(cell, cell_at(inlays, cell_idx, view)); else return;
+        cell |= (u8)inlay;
+    }
+
+    void set_inlay_prev(code_view_iterator &it, inlay_type inlay) {
+        using_cv_iterator(it);
+        var idx = cell_idx;
+        idx.x -= 1;
+
+        if_ref(cell, cell_at(inlays, idx, view)); else return;
+        cell |= (u8)inlay;
     }
 }
 

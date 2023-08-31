@@ -79,7 +79,6 @@ struct state_t {
     struct view_state {
         bool dirty;
     } view;
-
 };
 
 #define using_state ref[wgpu, res, view] = state
@@ -114,15 +113,14 @@ EM_JS(int, run_wasm, (u8* ptr, size_t size), {
     var module = new WebAssembly.Module(binary);
     var imports = {};
     imports["env"] = {};
-    imports["env"]["log_i32"] = (i) => console.log(i);
-    imports["env"]["log_str"] = (ptr, len) => console.log(text_decoder.decode(new Uint8Array(instance.exports.memory.buffer, ptr, len)));
+    imports["env"]["print_str"] = (ptr, len) => console.log(text_decoder.decode(new Uint8Array(instance.exports.memory.buffer, ptr, len)));
     var instance = new WebAssembly.Instance(module, imports);
 
     return instance.exports["main"]();
 });
 
 static bool init() {
-    gta_init(8 * 1024 * 1024); // 8 MB of global temp storage
+    gta_init(8 * 1024 * 1024); // 16 MB of global temp storage
 
     init_palette();
 
@@ -148,8 +146,16 @@ static bool init() {
     //display(ast, cv_it);
 
     //let source_file = "embedded/hello_world.fr";
-    let source_file = "embedded/fib.fr";
-    if_var1(compute_ast, compute_asts::parse_file(source_file)); else return false;
+    //let source_file = "embedded/fib.fr";
+    let source_files = arrays::view({
+        //"embedded/hello_world.fr",
+        //"embedded/fib.fr",
+        //"embedded/test0.fr",
+        "embedded/primitives_test.fr",
+        "embedded/prelude.fr",
+    });
+    if_var1(compute_ast, compute_asts::parse_files(source_files)); else return false;
+    printf("\nAST:\n");
     compute_asts::print_ast(compute_ast);
 
     compute_asts::display(compute_ast, cv_it);
@@ -204,15 +210,15 @@ static bool init() {
 
     resize(); on_resize(resize);
 
-    printf("(WASM) Compiling...\n");
+    printf("\n(WASM) Compiling...\n");
     let wasm = emit_wasm(compute_ast);
-    print_hex(wasm);
+    printf("(WASM) Compiled.\n");
 
-    printf("(WASM) Running...\n");
+    printf("\n(WASM) Running...\n");
     var wasm_result = run_wasm(wasm.data, wasm.count);
     printf("(WASM) Exited with code: %d\n", wasm_result);
 
-    printf("(Interpreter) Running...\n");
+    printf("\n(Interpreter) Running...\n");
     var result = interpret(compute_ast);
     printf("(Interpreter) Exited with code %d\n", result);
 

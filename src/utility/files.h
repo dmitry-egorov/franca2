@@ -5,25 +5,61 @@
 #include "arenas.h"
 #include "strings.h"
 
-void release(FILE*& f) {
-    if (f) fclose(f);
-    f = nullptr;
-}
+namespace files {
+    using namespace arrays;
+    using namespace arenas;
+    using namespace strings;
 
-inline strings::string read_file_as_string(const char* path, arenas::arena& arena = arenas::gta) {
-    tmp(f, fopen (path, "rb"));
-    if (f); else return {};
+    void release(FILE*& f);
+    inline string read_file_as_string(const char* path, arena& arena = gta);
+    inline string read_files_as_string(const arr_view<const char*>& paths, string separator = view(""), arena& arena = gta);
 
-    fseek (f, 0, SEEK_END);
-    let length = ftell(f);
-    fseek (f, 0, SEEK_SET);
+    void release(FILE*& f) {
+        if (f) fclose(f);
+        f = nullptr;
+    }
 
-    var buffer = arenas::alloc_g<char>(arena, length + 1);
-    fread(buffer.data, 1, length, f);
+    string read_file_as_string(const char* path, arena& arena) {
+        tmp(f, fopen (path, "rb"));
+        if (f); else return {};
 
-    buffer[length] = 0;
+        fseek (f, 0, SEEK_END);
+        let length = ftell(f);
+        fseek (f, 0, SEEK_SET);
 
-    return buffer;
+        var buffer = arenas::alloc_g<char>(arena, length);
+        fread(buffer.data, 1, length, f);
+
+        return buffer;
+    }
+
+    string read_files_as_string(const arr_view<const char*>& paths, string separator, arena& arena) {
+        var length = (size_t)0;
+        for (var i = 0u; i < paths.count; ++i) {
+            tmp(f, fopen (paths[i], "rb"));
+            if (f); else return {};
+
+            fseek (f, 0, SEEK_END);
+            length += ftell(f);
+
+            if (i < paths.count - 1)  length += separator.count;
+        }
+
+        var loaded_bytes = 0u;
+        var buffer = arenas::alloc_g<char>(arena, length);
+        for (var i = 0u; i < paths.count; ++i) {
+            tmp(f, fopen (paths[i], "rb"));
+            if (f); else return {};
+            loaded_bytes += fread(buffer.data + loaded_bytes, 1, length - loaded_bytes, f);
+            if (i < paths.count - 1) memcpy(buffer.data + loaded_bytes, separator.data, separator.count);
+            loaded_bytes += separator.count;
+        }
+
+        return buffer;
+    }
+
+
+
 }
 
 #endif //FRANCA2_FILES_H

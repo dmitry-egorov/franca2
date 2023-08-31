@@ -400,7 +400,7 @@ namespace wgpu_ex {
     }
 
     inline WGPUShaderModule make_wgsl_shader_module_from_file(WGPUDevice device, const char* const path, const char* label = nullptr, arena& arena = gta) {
-        let code = read_file_as_string(path, arena);
+        let code = files::read_file_as_string(path, arena);
         let wgsl = WGPUShaderModuleWGSLDescriptor {
             .chain = { .sType = WGPUSType_ShaderModuleWGSLDescriptor },
             .code = code.data,

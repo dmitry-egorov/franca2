@@ -28,13 +28,13 @@ namespace arenas {
     inline void*  next       (const arena&, uint align = sizeof(size_t));
     inline size_t bytes_left (const arena&, uint align = sizeof(size_t));
 
-    tt arrayv<t> free_space_of(arena&, uint align = sizeof(size_t));
+    tt arr_view<t> free_space_of(arena&, uint align = sizeof(size_t));
     inline void*     alloc_g(arena&, size_t size_bytes, uint align = sizeof(size_t));
-    tt arrayv<t> alloc_g(arena&, size_t count, uint align = sizeof(size_t));
+    tt arr_view<t> alloc_g(arena&, size_t count, uint align = sizeof(size_t));
 
     inline void*     alloc(arena&, size_t size_bytes, uint align = sizeof(size_t));
-    tt arrayv<t> alloc(arena&, size_t count, uint align = sizeof(size_t));
-    tt arrayv<t> alloc(arena& arena, std::initializer_list<t> list, uint align = sizeof(size_t));
+    tt arr_view<t> alloc(arena&, size_t count, uint align = sizeof(size_t));
+    tt arr_view<t> alloc(arena& arena, std::initializer_list<t> list, uint align = sizeof(size_t));
 
     tt t* alloc_one(arena& arena, const t& item, uint align = sizeof(size_t));
 
@@ -43,11 +43,11 @@ namespace arenas {
     inline void gta_reset  ();
 
     inline void*     gta_alloc_g(size_t size_bytes, uint align = sizeof(size_t));
-    tt arrayv<t> gta_alloc_g(size_t count, uint align = sizeof(size_t));
+    tt arr_view<t> gta_alloc_g(size_t count, uint align = sizeof(size_t));
 
     inline void*     gta_alloc(size_t size_bytes, uint align = sizeof(size_t));
-    tt arrayv<t> gta_alloc(size_t count, uint align = sizeof(size_t));
-    tt arrayv<t> gta_alloc(std::initializer_list<t> list, uint align = sizeof(size_t));
+    tt arr_view<t> gta_alloc(size_t count, uint align = sizeof(size_t));
+    tt arr_view<t> gta_alloc(std::initializer_list<t> list, uint align = sizeof(size_t));
 
     tt t* gta_one(const t& item, uint align = sizeof(size_t));
 
@@ -88,20 +88,23 @@ namespace arenas {
         return arena.size_bytes - next_offset(arena, align);
     }
 
-    tt arrayv<t> free_space_of(arena &arena, const uint align) {
+    tt arr_view<t> free_space_of(arena &arena, const uint align) {
         let offset = next_offset(arena, align);
         return { (t*)((char*)arena.memory + offset), (uint)((arena.size_bytes - offset) / sizeof(t)) };
     }
 
-    void *alloc_g(arena &arena, const size_t size_bytes, const uint align) {
+    void* alloc_g(arena &arena, const size_t size_bytes, const uint align) {
         let offset         = next_offset(arena, align);
         let new_used_bytes = offset + size_bytes;
-        assert(new_used_bytes <= arena.size_bytes);
+        if (new_used_bytes <= arena.size_bytes); else {
+            printf("Arena overflow! Requested: %zu, new size: %zu, available: %zu, align: %d\n", size_bytes, new_used_bytes, arena.size_bytes, align);
+            dbg_fail_return nullptr;
+        }
         arena.used_bytes = new_used_bytes;
         return (char*)arena.memory + offset;
     }
 
-    tt arrayv<t> alloc_g(arena &arena, const size_t count, const uint align) {
+    tt arr_view<t> alloc_g(arena &arena, const size_t count, const uint align) {
         return { (t*)alloc_g(arena, count * sizeof(t), align), (uint)count };
     }
 
@@ -111,11 +114,11 @@ namespace arenas {
         return result;
     }
 
-    tt arrayv<t> alloc  (arena &arena, const size_t count, const uint align) {
+    tt arr_view<t> alloc  (arena &arena, const size_t count, const uint align) {
         return { (t*)alloc(arena, count * sizeof(t), align), (uint)count };
     }
 
-    tt arrayv<t> alloc(arena& arena, const std::initializer_list<t> list, const uint align) {
+    tt arr_view<t> alloc(arena& arena, const std::initializer_list<t> list, const uint align) {
         let count = list.size();
         if(count > 0); else return { 0, 0 };
 
@@ -145,11 +148,11 @@ namespace arenas {
     void gta_reset() { reset(gta); }
 
     void* gta_alloc_g(const size_t size_bytes, const uint align) { return alloc_g(gta, size_bytes, align); }
-    tt arrayv<t> gta_alloc_g(const size_t count, const uint align) { return alloc_g<t>(gta, count, align); }
+    tt arr_view<t> gta_alloc_g(const size_t count, const uint align) { return alloc_g<t>(gta, count, align); }
 
     void* gta_alloc(const size_t size_bytes, const uint align) { return alloc(gta, size_bytes, align); }
-    tt arrayv<t> gta_alloc(const size_t count, const uint align) { return alloc<t>(gta, count, align); }
-    tt arrayv<t> gta_alloc(const std::initializer_list<t> list, const uint align) { return alloc<t>(gta, list, align); }
+    tt arr_view<t> gta_alloc(const size_t count, const uint align) { return alloc<t>(gta, count, align); }
+    tt arr_view<t> gta_alloc(const std::initializer_list<t> list, const uint align) { return alloc<t>(gta, list, align); }
 
     tt t* gta_one(const t& item, const uint align) { return alloc_one<t>(gta, item, align); }
 }

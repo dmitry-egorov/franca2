@@ -19,6 +19,21 @@ namespace compute_asts {
     using namespace strings;
     using namespace code_views;
 
+    enum class primitive_type {
+        unknown,
+        invalid,
+        pt_i8 ,
+        pt_i16,
+        pt_i32,
+        pt_i64,
+        pt_u8 ,
+        pt_u16,
+        pt_u32,
+        pt_u64,
+        pt_f32,
+        pt_f64,
+    };
+
     struct poly_value {
         enum class type_t {
             poly_integer,
@@ -42,7 +57,10 @@ namespace compute_asts {
             func,
         } type;
 
+        primitive_type value_type;
+
         string prefix;
+        string infix ;
         string suffix;
 
         node* parent;
@@ -88,18 +106,29 @@ namespace compute_asts {
         macro_show_as = 300,
     };
 
-    static let  decl_var_id   = view("var");
+    static let  decl_local_id = view("var");
     static let  decl_param_id = view("$");
     static let         def_id = view("def");
     static let       block_id = view("{}");
     static let         ref_id = view("&");
     static let         ret_id = view("ret");
+    static let          as_id = view("as");
     static let          if_id = view("if");
     static let       while_id = view("while");
     static let        istr_id = view("istr");
+    static let         chr_id = view("chr");
+    static let    store_u8_id = view("store_u8");
     static let      assign_id = view("=");
     static let         add_id = view("+");
     static let         sub_id = view("-");
+    static let         mul_id = view("*");
+    static let         div_id = view("/");
+    static let         rem_id = view("%");
+    static let       add_a_id = view("+=");
+    static let       sub_a_id = view("-=");
+    static let       mul_a_id = view("*=");
+    static let       div_a_id = view("/=");
+    static let       rem_a_id = view("%=");
     static let          eq_id = view("==");
     static let          ne_id = view("!=");
     static let          le_id = view("<=");
@@ -108,6 +137,13 @@ namespace compute_asts {
     static let          gt_id = view(">");
     static let       print_id = view("print");
     static let        show_id = view("show");
+
+    ast_storage make_ast_storage() {
+        return {
+            arenas::make(2 * 1048 * sizeof(node)),
+            arenas::make(2 * 1024 * 1024 * sizeof(char))
+        };
+    }
 
     poly_value to_poly(uint value) { return poly_value { .type = poly_value::type_t::poly_integer, .integer = value }; }
     poly_value to_poly(const string& value) { return poly_value { .type = poly_value::type_t::poly_string, .string = value }; }
@@ -142,35 +178,35 @@ namespace compute_asts {
 
     inline bool value_is(const node& node, uint value) { return is_uint_literal(node) && node.uint_value == value; }
 
-    inline node* make_node(ast_storage& storage, const node& node) { return alloc_one(storage.node_arena, node); }
+    inline node& make_node(ast_storage& storage, const node& node) { return *alloc_one(storage.node_arena, node); }
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wnull-dereference"
-    inline ret2<node&, node&> deref_list2(node* n) {
+    inline ret2<node&, node&> deref2(node* n) {
         using namespace compute_asts;
         static let fail = ret2<node&, node&>{*((node*) nullptr), *((node*) nullptr), false};
         if_ref(node0, n         ); else return fail;
         if_ref(node1, node0.next); else return fail;
-        return {node0, node1, true};
+        return ret2_ok(node0, node1);
     }
 
-    inline ret3<node&, node&, node&> deref_list3(node* n) {
+    inline ret3<node&, node&, node&> deref3(node* n) {
         using namespace compute_asts;
         static let fail = ret3<node&, node&, node&>{*((node*) nullptr), *((node*) nullptr), *((node*) nullptr), false};
         if_ref(node0, n         ); else return fail;
         if_ref(node1, node0.next); else return fail;
         if_ref(node2, node1.next); else return fail;
-        return {node0, node1, node2, true};
+        return ret3_ok(node0, node1, node2);
     }
 
-    inline ret4<node&, node&, node&, node&> deref_list4(node* n) {
+    inline ret4<node&, node&, node&, node&> deref4(node* n) {
         using namespace compute_asts;
         static let fail = ret4<node&, node&, node&, node&>{*((node*) nullptr), *((node*) nullptr), *((node*) nullptr), *((node*) nullptr), false};
         if_ref(node0, n         ); else return fail;
         if_ref(node1, node0.next); else return fail;
         if_ref(node2, node1.next); else return fail;
         if_ref(node3, node2.next); else return fail;
-        return {node0, node1, node2, node3, true};
+        return ret4_ok(node0, node1, node2, node3);
     }
 #pragma clang diagnostic pop
 
