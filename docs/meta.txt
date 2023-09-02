@@ -1,0 +1,7 @@
+meta-programming:
+
+def[bop istr[$[a #[t]]" "$[op binary_op]" "$[b #[t]]] #[t] #comptime[{}[
+    // Note: type checking should be done at the argument passing level
+    // since the type of both variables is t
+    emit[bop_to_wasm[op t]]
+]]]

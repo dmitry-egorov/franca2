@@ -5,7 +5,7 @@
 #include <emscripten/em_js.h>
 #include <emscripten/html5_webgpu.h>
 #include <array>
-
+#include <chrono>
 #include <cstdio>
 
 #define FRANCA2_IMPLS
@@ -120,12 +120,16 @@ EM_JS(int, run_wasm, (u8* ptr, size_t size), {
 });
 
 static bool init() {
+    using namespace std::chrono;
+
     gta_init(8 * 1024 * 1024); // 16 MB of global temp storage
 
     init_palette();
 
     using_state;
     using_wgpu_state;
+
+    var memory_used = gta.used_bytes;
 
     if ((instance = make_instance  ({}    ))); else return false;
     if ((device   = get_wgpu_device(      ))); else return false;
@@ -138,6 +142,8 @@ static bool init() {
 
     if_tmp2(font_texture, font_tv, load_8bit_texture_from_png_file(device, "embedded/jb.png")); else return(false);
 
+    printf("Resources loaded. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+
     var code_view = make_code_vew(code_view_size);
     var cv_it = iterate(code_view);
 
@@ -149,16 +155,19 @@ static bool init() {
     //let source_file = "embedded/fib.fr";
     let source_files = arrays::view({
         //"embedded/hello_world.fr",
-        //"embedded/fib.fr",
         //"embedded/test0.fr",
         "embedded/primitives_test.fr",
+        //"embedded/fib.fr",
         "embedded/prelude.fr",
     });
     if_var1(compute_ast, compute_asts::parse_files(source_files)); else return false;
     printf("\nAST:\n");
     compute_asts::print_ast(compute_ast);
+    printf("AST parsed. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     compute_asts::display(compute_ast, cv_it);
+
+    printf("Code view generated. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     code_view.line_count = cv_it.cell_idx.y + 1;
 
@@ -210,17 +219,24 @@ static bool init() {
 
     resize(); on_resize(resize);
 
+    printf("WGPU ready. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+
+    let compile_start = std::chrono::high_resolution_clock::now();
     printf("\n(WASM) Compiling...\n");
     let wasm = emit_wasm(compute_ast);
-    printf("(WASM) Compiled.\n");
+    printf("(WASM) Compiled in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
+    let wasm_start = std::chrono::high_resolution_clock::now();
     printf("\n(WASM) Running...\n");
     var wasm_result = run_wasm(wasm.data, wasm.count);
     printf("(WASM) Exited with code: %d\n", wasm_result);
+    printf("(WASM) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - wasm_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
+    let intr_start = std::chrono::high_resolution_clock::now();
     printf("\n(Interpreter) Running...\n");
     var result = interpret(compute_ast);
     printf("(Interpreter) Exited with code %d\n", result);
+    printf("(Interpreter) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - intr_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     return true;
 }

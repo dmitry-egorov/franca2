@@ -55,9 +55,9 @@ namespace compute_asts {
 
     static storage make_storage(arena& arena) {
         return {
-            make_arr_dyn<scope   >(1024, arena),
-            make_arr_dyn<variable>(1024, arena),
-            make_arr_dyn<func    >(1024, arena),
+            make_arr_dyn<scope   >(1024, arena, 8),
+            make_arr_dyn<variable>(1024, arena, 8),
+            make_arr_dyn<func    >(1024, arena, 8),
         };
     }
 

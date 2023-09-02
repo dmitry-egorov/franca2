@@ -1,1 +1,1 @@
-print["Hello, World! "42]
+print["Hello, World!"]

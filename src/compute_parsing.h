@@ -100,10 +100,10 @@ namespace compute_asts {
             var [uint_value, can_be_uint] = take_uint(text_copy);
 
             ref result = make_node(storage, node {
-                .text = text,
+                .text           = text,
                 .text_is_quoted = text_is_quoted,
-                .can_be_uint = can_be_uint,
-                .uint_value  = uint_value,
+                .can_be_uint    = can_be_uint,
+                .uint_value     = uint_value,
             });
 
             let next_text = take_whitespaces_and_comments(it);
@@ -115,7 +115,7 @@ namespace compute_asts {
                 result.type = node::type_t::func;
                 result.first_child = first_child;
                 result. last_child =  last_child;
-                result.infix = next_text;
+                result.infix  = next_text;
                 result.suffix = take_whitespaces_and_comments(it);
             }
             else {

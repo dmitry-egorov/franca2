@@ -1,23 +1,23 @@
 print[fib_at[40]]
-print[rec_fib_at[7]]
+print[rec_fib_at[12]]
 
 /////////////////////
-def[fib_at istr["fib at "$[n]] {}[
-    if[==[&[n] 0] ret[0]]
-    if[==[&[n] 1] ret[1]]
+def[fib_at istr["fib at "$[n u32]] u32 {}[
+    if[==[n 0] ret[0]]
+    if[==[n 1] ret[1]]
 
-    var[i  2]
-    var[v0 0]
-    var[v1 1]
-    while[<=[&[i] &[n]] {}[
-        var[t  &[v1]]
-         +=[v1 &[v0]]
-          =[v0 &[t]]
+    var[i  u32 2]
+    var[v0 u32 0]
+    var[v1 u32 1]
+    while[<=[i n] {}[
+        var[t u32 v1]
+         +=[v1 v0]
+          =[v0 t ]
          +=[i  1]]]
 
-    ret[&[v1]]]]
+    ret[v1]]]
 
-def[rec_fib_at istr["recursive fib at "$[n]] {}[
-    if[==[&[n] 0] ret[0]]
-    if[==[&[n] 1] ret[1]]
-    ret[+[()[rec_fib_at[()[-[&[n] 1]]]] ()[rec_fib_at[()[-[&[n] 2]]]]]]]]
+def[rec_fib_at istr["recursive fib at "$[n u32]] u32 {}[
+    if[==[n 0] ret[0]]
+    if[==[n 1] ret[1]]
+    ret[+[()[rec_fib_at[()[-[n 1]]]] ()[rec_fib_at[()[-[n 2]]]]]]]]

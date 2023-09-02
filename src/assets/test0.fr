@@ -2,25 +2,26 @@ print[0]
 print[42]
 print["Hello, World!"]
 
-var[a 122]
-var[b 3]
-var[sum +[&[a] &[b]]]
+var[a   u32 122]
+var[b   u32   3]
 
-print["a = "&[a]]
+print[+[a b]]
 
-print["The sum of "&[a]" and "&[b]" is "&[sum]]
-print[&[a]" + "&[b]" = "&[sum]]
-print[&[a]" + "&[b]" = "+[&[a] &[b]]]
+var[sum u32 +[a b]]
+
+print["a = "a]
+
+print["The sum of "a" and "b" is "sum]
+print[a" + "b" = "sum]
+print[a" + "b" = "+[a b]]
 
 if[1 =[b 6]]
-print[&[a]" + "&[b]" = "+[&[a] &[b]]]
+print[a" + "b" = "+[a b]]
 
-//print[my_sum[&[a] &[b]]]
-
-ret[42]
+print[my_sum[a b]]
 
 ///////////////////////
-//def[my_sum istr["sum of "$[a]" and "$[b]] +[&[a] &[b]]]
+def[my_sum istr["sum of "$[a u32]" and "$[b u32]] u32 +[a b]]
 
 ///////////////////////////
 //show[disp  istr["show "$[id]" as "$[pattern]]]

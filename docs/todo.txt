@@ -1,18 +1,18 @@
-- [ ] identifier node type, and get rid of &[x] everywhere
 - [ ] primitive types
     - every local has a type
     - every expression has a type
     - show error when types don't match?
     - choose arithmetic operations based on type
-    - [ ] specify types
+    - [+] specify types
         - [+] primitives test
         - [+] prelude
-        - [ ] others
+        - [+] others
     - [+] take type in var   defs
     - [+] take type in param defs
     - [+] take type in func  defs
-    - [ ] determine node type when emitting
-    - [ ] print different types
+    - [+] determine node type when emitting
+    - [+] print different types
+    - [ ] interpreter types
     - [ ] parse negatives
     - [ ] parse floats
 - [ ] stack structs
@@ -23,6 +23,7 @@
     - [ ] pop from stack instead of binding to parameters
     - [ ] apply inline modifiers
 - [ ] inline wasm
+- [ ] scrolling
 - [ ] pointers
     - [ ] linear stack?
     - [ ] base memory as global variable?
@@ -47,6 +48,7 @@
 - [ ] wasm jit?
 
 done
+- [+] identifier node type, and get rid of &[x] everywhere
 - [+] chars
 - [+] +=, ...
 - [+] show whitespaces, but ignore the ones before indentation

@@ -20,8 +20,9 @@ namespace compute_asts {
     using namespace code_views;
 
     enum class primitive_type {
-        unknown,
-        invalid,
+        pt_unknown,
+        pt_invalid,
+        pt_void,
         pt_i8 ,
         pt_i16,
         pt_i32,
@@ -32,17 +33,49 @@ namespace compute_asts {
         pt_u64,
         pt_f32,
         pt_f64,
+        pt_str,
+        pt_enum_size
+    };
+    using enum primitive_type;
+
+    enum class binary_op {
+        bop_invalid,
+        bop_eq,
+        bop_ne,
+        bop_le,
+        bop_ge,
+        bop_lt,
+        bop_gt,
+        bop_add,
+        bop_sub,
+        bop_mul,
+        bop_div,
+        bop_rem,
+        bop_and,
+        bop_or,
+        bop_xor,
+        bop_shl,
+        bop_shr,
+        bop_rotl,
+        bop_rotr,
+        bop_enum_size
     };
 
     struct poly_value {
-        enum class type_t {
-            poly_integer,
-            poly_string
-        } type;
+        primitive_type type;
 
         union {
-            uint   integer;
-            string string;
+              u8   u8;
+             u16   u16;
+            uint   u32;
+             u64   u64;
+              i8   i8;
+             i16   i16;
+             int   i32;
+             i64   i64;
+             float f32;
+            double f64;
+            string str;
         };
     };
 
@@ -110,7 +143,6 @@ namespace compute_asts {
     static let  decl_param_id = view("$");
     static let         def_id = view("def");
     static let       block_id = view("{}");
-    static let         ref_id = view("&");
     static let         ret_id = view("ret");
     static let          as_id = view("as");
     static let          if_id = view("if");
@@ -145,15 +177,15 @@ namespace compute_asts {
         };
     }
 
-    poly_value to_poly(uint value) { return poly_value { .type = poly_value::type_t::poly_integer, .integer = value }; }
-    poly_value to_poly(const string& value) { return poly_value { .type = poly_value::type_t::poly_string, .string = value }; }
+    poly_value to_poly(uint value) { return poly_value { .type = pt_u32, .u32 = value }; }
+    poly_value to_poly(const string& value) { return poly_value { .type = pt_str, .str = value }; }
 
     inline auto is_func        (const node& node) -> bool { return node.type == node::type_t::func; }
     inline auto is_uint_literal(const node& node) -> bool { return node.type == node::type_t::literal && node.can_be_uint && !node.text_is_quoted; }
-    inline auto is_str_literal (const node& node) -> bool { return node.type == node::type_t::literal && (!node.can_be_uint || node.text_is_quoted); }
+    inline auto is_str_literal (const node& node) -> bool { return node.type == node::type_t::literal && node.text_is_quoted; }
 
-    inline auto get_uint(const poly_value& v) -> ret1<uint>   { if (v.type == poly_value::type_t::poly_integer) return ret1_ok(v.integer); else return ret1_fail; }
-    inline auto get_str (const poly_value& v) -> ret1<string> { if (v.type == poly_value::type_t::poly_string ) return ret1_ok(v.string ); else return ret1_fail; }
+    inline auto get_uint(const poly_value& v) -> ret1<uint>   { if (v.type == pt_u32) return ret1_ok(v.u32  ); else return ret1_fail; }
+    inline auto get_str (const poly_value& v) -> ret1<string> { if (v.type == pt_str) return ret1_ok(v.str); else return ret1_fail; }
     inline auto get_uint(const node& node   ) -> ret1<uint>   { if (is_uint_literal(node)) return ret1_ok(node.uint_value); else return ret1_fail; }
     inline auto get_str (const node& node   ) -> ret1<string> { return ret1_ok(node.text); }
 
