@@ -42,7 +42,6 @@
 #include "compute_printing.h"
 #include "compute_storage.h"
 #include "compute_compilation.h"
-#include "compute_interpretation.h"
 #include "compute_display.h"
 
 using namespace arenas;
@@ -231,12 +230,6 @@ static bool init() {
     var wasm_result = run_wasm(wasm.data, wasm.count);
     printf("(WASM) Exited with code: %d\n", wasm_result);
     printf("(WASM) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - wasm_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
-
-    let intr_start = std::chrono::high_resolution_clock::now();
-    printf("\n(Interpreter) Running...\n");
-    var result = interpret(compute_ast);
-    printf("(Interpreter) Exited with code %d\n", result);
-    printf("(Interpreter) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - intr_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     return true;
 }
