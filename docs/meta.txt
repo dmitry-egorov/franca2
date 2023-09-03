@@ -1,7 +1,15 @@
 meta-programming:
 
-def[bop istr[$[a #[t]]" "$[op binary_op]" "$[b #[t]]] #[t] #comptime[{}[
+def[bop istr[$[a #[t type]]" "#[op binary_op]" "$[b #[t]]] #[t] #comptime[
     // Note: type checking should be done at the argument passing level
     // since the type of both variables is t
-    emit[bop_to_wasm[op t]]
-]]]
+    emit[bop_to_wasm[op t]]]]
+
+// declare separate function for each operator and type
+::[binary_operators arr[...] array_of[string]]
+::[arithmetic_types arr[...] array_of[type  ]]
+
+#run[for[op binary_operators {}[
+     for[t  arithmetic_types {}[
+         ::[#[op] fn[istr[$[a #[t]]" "op" "$[b #[t]]] t #emit[
+             #[istr["op_"op"_"t]]]]]]]]]]

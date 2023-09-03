@@ -1,30 +1,50 @@
 // Prelude:
 def[() istr["("$[expr u32]")"] u32 expr]
 
-def[u32_to_str istr["write "$[n u32]" as string at "$[ptr u32]] u32 {}[
+def[push_char istr["push "$[c u32]" into "$[dst u32]] u32 {}[
+    store_u8[dst c]
+    ret[+[dst 1]]]]
+
+def[push_str istr["push "$[src u32]" "$[n u32]" into "$[dst u32]] u32 {}[
+    memcpy[src n dst]
+    ret[+[dst n]]]]
+
+def[push_u32 istr["push "$[n u32]" into "$[dst u32]] u32 {}[
     if[==[n 0] {}[
-         store_u8[ptr chr[0]]
-         ret[+[ptr 1]]]]
+        ret[push_char[chr[0] dst]]]]
 
     var[d u32 1000000000]
     while[>[d n] {}[/=[d 10]]]
 
     while[>[d 0] {}[
-        store_u8[ptr ()[+[chr[0] %[()[/[n d]] 10]]]]
-        +=[ptr 1]
+        =[dst push_char[()[+[chr[0] %[()[/[n d]] 10]]] dst]]
         /=[d 10]]]
 
-    ret[ptr]]]
+    ret[dst]]]
 
-def[i32_to_str istr["write "$[n i32]" as string at "$[ptr u32]] u32 {}[
+def[push_i32 istr["push "$[n i32]" into "$[dst u32]] u32 {}[
     if[<[n as[0 i32]] {}[
-        store_u8[ptr chr[-]]
-        +=[ptr 1]
-        =[n -[n]]
-    ]]
+        =[dst push_char[chr[-] dst]]
+        =[n -[n]]]]
 
-    ret[u32_to_str[as[n u32] ptr]]
-]]
+    ret[push_u32[as[n u32] dst]]]]
+
+def[push_f32 istr["push "$[f f32]" into "$[dst u32]] u32 {}[
+    if[<[f 0.0] {}[
+        =[dst push_char[chr[-] dst]]
+        =[f -[0.0 f]]]]
+
+    var[n_x_100 u32 as[*[f 100.0] u32]]
+
+    =[dst push_u32 [/[n_x_100 100] dst]]
+    =[dst push_char[chr[.] dst]]
+
+    var[d u32 10]
+    while[>[d 0] {}[
+        =[dst push_char[()[+[chr[0] %[()[/[n_x_100 d]] 10]]] dst]]
+        /=[d 10]]]
+
+    ret[dst]]]
 
 // mod[u2str inline 1]
 

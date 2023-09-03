@@ -150,13 +150,11 @@ static bool init() {
     //print_ast(&ast);
     //display(ast, cv_it);
 
-    //let source_file = "embedded/hello_world.fr";
-    //let source_file = "embedded/fib.fr";
     let source_files = arrays::view({
-        //"embedded/hello_world.fr",
-        //"embedded/test0.fr",
+        "embedded/hello_world.fr",
+        "embedded/test0.fr",
         "embedded/primitives_test.fr",
-        //"embedded/fib.fr",
+        "embedded/fib.fr",
         "embedded/prelude.fr",
     });
     if_var1(compute_ast, compute_asts::parse_files(source_files)); else return false;
@@ -164,8 +162,8 @@ static bool init() {
     compute_asts::print_ast(compute_ast);
     printf("AST parsed. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
+    printf("\nGenerating code view...\n");
     compute_asts::display(compute_ast, cv_it);
-
     printf("Code view generated. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     code_view.line_count = cv_it.cell_idx.y + 1;
@@ -222,7 +220,7 @@ static bool init() {
 
     let compile_start = std::chrono::high_resolution_clock::now();
     printf("\n(WASM) Compiling...\n");
-    let wasm = emit_wasm(compute_ast);
+    let wasm = compile(compute_ast);
     printf("(WASM) Compiled in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     let wasm_start = std::chrono::high_resolution_clock::now();

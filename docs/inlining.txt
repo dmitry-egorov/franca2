@@ -1,0 +1,19 @@
+Inlining
+
+f:b - a
+
+normal:
+a
+b
+call f
+
+f :: (a, b) -> c
+    b - a
+
+inlined:
+// [a b]
+set.local $b0 // [a]
+set.local $a0 // []
+get.local $b0 // [b]
+get.local $a0 // [b a]
+i32.sub

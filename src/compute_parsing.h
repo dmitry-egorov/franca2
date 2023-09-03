@@ -97,13 +97,21 @@ namespace compute_asts {
             }
 
             var text_copy = text;
+            var [ int_value, can_be_int]  = take_int (text_copy);
+            text_copy = text;
             var [uint_value, can_be_uint] = take_uint(text_copy);
+            text_copy = text;
+            var [float_value, can_be_float] = take_float(text_copy);
 
             ref result = make_node(storage, node {
                 .text           = text,
                 .text_is_quoted = text_is_quoted,
+                .can_be_int     = can_be_int,
                 .can_be_uint    = can_be_uint,
+                .can_be_float   = can_be_float,
+                . int_value     =  int_value,
                 .uint_value     = uint_value,
+                .float_value    = float_value,
             });
 
             let next_text = take_whitespaces_and_comments(it);

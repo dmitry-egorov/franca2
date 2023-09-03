@@ -51,7 +51,7 @@ namespace compute_asts {
         void display_inactive  (node*, context&);
         void display_block     (node*, context&);
         void display_macro_show(node*, context&);
-        void display_decl_local  (node *, context &);
+        void display_decl_local(node*, context&);
         void display_decl_param(node*, context&);
         void display_decl_func (node*, context&);
         void display_return    (node*, context&);
@@ -60,18 +60,22 @@ namespace compute_asts {
         void display_loop      (node*, context&);
         void display_istr      (node*, context&);
         void display_chr       (node*, context&);
-        void display_store_u8    (node *, context &);
+        void display_store_u8  (node*, context&);
         void display_op_assign (node*, context&);
         void display_minus     (node*, context&);
         void display_bop       (node*, const string&, context&);
         void display_bop_a     (node*, const string&, context&);
         void display_fn_print  (node*, context&);
+        void display_memcpy    (node*, context&);
+        void display_round     (node*, context&);
 
         void  open_inlay_brackets(context &);
         void close_brackets(context&);
-        void put_uint(palette_color color, uint  value  , context&);
-        void put_text(palette_color color, const string&, context&);
-        void put_text(palette_color color, const char*  , context&);
+        void put_int  (palette_color color,   int value  , context&);
+        void put_uint (palette_color color,  uint value  , context&);
+        void put_float(palette_color color, float value  , context&);
+        void put_text (palette_color color, const string&, context&);
+        void put_text (palette_color color, const char*  , context&);
         void put_text_in_brackets(palette_color color, const string& text, context&);
     }
 
@@ -114,8 +118,18 @@ namespace compute_asts {
                 return;
             }
 
+            if (is_int_literal(node)) { // literal
+                put_int(constants, node.int_value, ctx);
+                return;
+            }
+
             if (is_uint_literal(node)) { // literal
                 put_uint(constants, node.uint_value, ctx);
+                return;
+            }
+
+            if (is_float_literal(node)) { // literal
+                put_float(constants, node.float_value, ctx);
                 return;
             }
 
@@ -125,7 +139,7 @@ namespace compute_asts {
                 return;
             }
 
-            if_ref(v, find_var(storage, node.text)); else { put_text(inlays, view(" "), ctx); dbg_fail_return; }
+            if_ref(v, find_var(storage, node.text)); else { printf("Variable not found: %.*s\n", (int)node.text.count, node.text.data); put_text(inlays, view(" "), ctx); dbg_fail_return; }
             put_text_in_brackets(identifiers, v.display_name, ctx);
         }
 
@@ -170,8 +184,11 @@ namespace compute_asts {
             if (fn_id ==         ge_id) { display_bop       (args, view(" >= "), ctx); return; }
             if (fn_id ==         lt_id) { display_bop       (args, view(" < " ), ctx); return; }
             if (fn_id ==         gt_id) { display_bop       (args, view(" > " ), ctx); return; }
+            if (fn_id ==     memcpy_id) { display_memcpy    (args, ctx); return; }
             if (fn_id ==      print_id) { display_fn_print  (args, ctx); return; }
             if (fn_id ==       show_id) { display_macro_show(args, ctx); return; }
+            if (fn_id ==      round_id) { display_round     (args, ctx); return; }
+
 
             display_func(fn_id, args, ctx);
         }
@@ -201,8 +218,14 @@ namespace compute_asts {
                         break;
                     }
                     case func: {
-                        assert(is_func(disp_node, view("$")));
-                        if_ref(arg_node, args); else { dbg_fail_return; }
+                        if(is_func(disp_node, view("$"))); else {
+                            printf("Only parameter nodes are supported in display strings: %.*s\n", (int)disp_node.text.count, disp_node.text.data);
+                            dbg_fail_return;
+                        }
+                        if_ref(arg_node, args); else {
+                            printf("Missing parameter: %.*s\n", (int)disp_node.first_child->text.count, disp_node.first_child->text.data);
+                            dbg_fail_return;
+                        }
                         display_node(arg_node, ctx);
                         args = arg_node.next;
                         break;
@@ -231,7 +254,7 @@ namespace compute_asts {
             tmp_scope (storage);
             tmp_indent(it);
 
-            next_line(it);
+            put_text(inlays, "\n", ctx);
             display_node_chain(args, ctx);
         }
 
@@ -412,9 +435,16 @@ namespace compute_asts {
             display_istr(args, ctx);
         }
 
+        void display_memcpy(node* args, context& ctx) {
+            if_var3(src_node, src_count_node, dst_node, deref3(args)); else { dbg_fail_return; }
+            put_text(regulars, view("copy "), ctx);
+            display_node(src_node, ctx);
+            put_text(regulars, view(" "), ctx);
+            display_node(src_count_node, ctx);
+            put_text(regulars, view(" into "), ctx);
+            display_node(dst_node, ctx);
+        }
         void display_macro_show(node* args, context& ctx) {
-            using_display_ctx;
-
             if_ref (id_node, args); else { dbg_fail_return; }
             var id = id_node.text;
 
@@ -428,6 +458,14 @@ namespace compute_asts {
             display_node(disp_node, ctx);
         }
 
+        void display_round(node* args, context& ctx) {
+            if_ref(a_node, args); else { dbg_fail_return; }
+            put_text    (definitions, view("round "), ctx);
+            put_text    (inlays     , a_node.prefix , ctx);
+            display_node(a_node                     , ctx);
+            put_text    (inlays     , a_node.suffix , ctx);
+        }
+
         void open_inlay_brackets(context & ctx) {
             set_inlay(ctx.iterator, open);
         }
@@ -436,8 +474,16 @@ namespace compute_asts {
             set_inlay_prev(ctx.iterator, close);
         }
 
+        void put_int(palette_color color, int value, context& ctx) {
+            put_int(ctx.iterator, ctx.inactive_level > 0 ? inlays : color, value);
+        }
+
         void put_uint(palette_color color, uint value, context& ctx) {
             put_uint(ctx.iterator, ctx.inactive_level > 0 ? inlays : color, value);
+        }
+
+        void put_float(palette_color color, float value, context& ctx) {
+            put_float(ctx.iterator, ctx.inactive_level > 0 ? inlays : color, value);
         }
 
         void put_text(palette_color color, const string& text, context& ctx) {

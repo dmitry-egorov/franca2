@@ -12,7 +12,7 @@
 #include "compute_asts.h"
 
 namespace compute_asts {
-    arr_view<u8> emit_wasm(const ast&, arena& = gta);
+    arr_view<u8> compile(const ast&, arena& = gta);
 
     namespace compilation {
         using namespace wasm_emit;
@@ -63,12 +63,11 @@ namespace compute_asts {
             arena& arena;
         };
 
-
         static wasm_opcode bop_to_wasm_op[(u32)pt_enum_size * (u32)bop_enum_size];
 
         context make_context(arena& arena);
 
-        void emit_fn_main(node*, context &);
+        void compile_fn_main(node *, context &);
 
         void gather_defs(node*, context&);
 
@@ -78,6 +77,7 @@ namespace compute_asts {
         void emit_func_def        (node&, context&);
         void emit_func_call       (node&, context&);
         void emit_istr            (node&, context&);
+        void emit_memcpy          (node&, context&);
         void emit_chr             (node&, context&);
         void emit_minus           (node&, context&);
         void emit_bop  (binary_op, node&, context&);
@@ -90,8 +90,8 @@ namespace compute_asts {
         void  pop_scope(context&);
         #define tmp_compilation_scope(ctx) push_scope(ctx); defer { pop_scope(ctx); }
 
-        auto find_local(string id, context&) -> local*;
-        auto find_func (string id, context&) -> func*;
+        auto find_local     (string id, context&) -> local*;
+        auto find_func      (string id, context&) -> func*;
         auto find_func_index(string id, context&) -> ret1<uint>;
 
         func& declare_import(const char* module_id, const char* id, const std::initializer_list<primitive_type>& params, const std::initializer_list<primitive_type>& results, context& ctx);
@@ -104,7 +104,7 @@ namespace compute_asts {
         void   end_func_definition(context&);
         #define tmp_func_definition_scope(func, ctx) begin_func_definition(func, ctx); defer { end_func_definition(ctx); }
 
-        auto get_curr_func(context&) -> func&;
+        auto curr_func_of(context &) -> func&;
 
         void set_mem(const char* export_name, uint min, uint max, context&);
         void set_mem(string export_name, uint min, uint max, context&);
@@ -128,7 +128,7 @@ namespace compute_asts {
         void set_bop_to_wasm(binary_op, primitive_type, wasm_opcode);
     }
 
-    arr_view<u8> emit_wasm(const ast& ast, arena& arena) {
+    arr_view<u8> compile(const ast& ast, arena& arena) {
         using namespace compilation;
         using namespace wasm_emit;
         using enum wasm_export_kind;
@@ -141,7 +141,7 @@ namespace compute_asts {
 
         set_mem("memory", 1, 1, ctx);
 
-        emit_fn_main(ast.root, ctx);
+        compile_fn_main(ast.root, ctx);
 
         // emit wasm
         ref emitter = ctx.emitter;
@@ -183,16 +183,15 @@ namespace compute_asts {
 
             push(func_specs, wasm_func);
 
-            if (func.exported) {
+            if (func.exported)
                 push(exports, wasm_export {.name = func.id, .kind = ek_func, .obj_index = func.index});
-            }
         }
 
         var datas = view({wasm_data{ctx.data.data}});
 
         printf("func types: %zu\n", func_types.count);
-        printf("imports   : %zu\n", imports.data.count);
-        printf("exports   : %zu\n", exports.data.count);
+        printf("imports   : %zu\n", imports   .data.count);
+        printf("exports   : %zu\n", exports   .data.count);
         printf("funcs     : %zu\n", func_specs.data.count);
         printf("wasm:\n");
 
@@ -211,7 +210,7 @@ namespace compute_asts {
     }
 
     namespace compilation {
-        void emit_fn_main(node* root, context & ctx) {
+        void compile_fn_main(node* root, context & ctx) {
             using enum primitive_type;
 
             ref func = declare_func("main", ctx);
@@ -221,8 +220,8 @@ namespace compute_asts {
             tmp_func_definition_scope(func, ctx);
             emit_scoped_chain(root, ctx);
             emit(op_i32_const, 0u, func.body);
-            emit(op_return, func.body);
-            emit(op_end, func.body);
+            emit(op_return       , func.body);
+            emit(op_end          , func.body);
         }
 
         void emit_scoped_chain(node* chain, context& ctx) {
@@ -237,14 +236,8 @@ namespace compute_asts {
             using namespace wasm_emit;
             using enum wasm_opcode;
 
-            ref curr_func = get_curr_func(ctx);
+            ref curr_func = curr_func_of(ctx);
             ref body = curr_func.body;
-
-            if (is_uint_literal(node)) {
-                emit_const(node.uint_value, body);
-                node.value_type = pt_u32;
-                return;
-            }
 
             if (is_str_literal(node)) {
                 let str    = node.text;
@@ -252,6 +245,24 @@ namespace compute_asts {
                 emit_const(offset   , body);
                 emit_const(str.count, body);
                 node.value_type = pt_str;
+                return;
+            }
+
+            if (is_uint_literal(node)) {
+                emit_const(node.uint_value, body);
+                node.value_type = pt_u32;
+                return;
+            }
+
+            if (is_int_literal(node)) {
+                emit_const(node.int_value, body);
+                node.value_type = pt_i32;
+                return;
+            }
+
+            if (is_float_literal(node)) {
+                emit_const(node.float_value, body);
+                node.value_type = pt_f32;
                 return;
             }
 
@@ -326,7 +337,7 @@ namespace compute_asts {
         }
 
         void emit_func_call(node& node, context& ctx) {
-            ref curr_func = get_curr_func(ctx);
+            ref curr_func = curr_func_of(ctx);
             ref body = curr_func.body;
 
             if_var1(fn_id, get_fn_id(node)); else { dbg_fail_return; }
@@ -335,7 +346,14 @@ namespace compute_asts {
             if (fn_id == as_id) {
                 if_var2(arg_node, type_node, deref2(args_node_p)); else { dbg_fail_return; }
                 emit_node(arg_node, ctx);
-                node.value_type = primitive_type_by(type_node.text);
+                var src_type = arg_node.value_type;
+                var dst_type = primitive_type_by(type_node.text);
+                if (src_type == pt_f32 && dst_type == pt_u32)
+                    emit(op_i32_trunc_f32_u, body);
+                if (src_type == pt_f32 && dst_type == pt_i32)
+                    emit(op_i32_trunc_f32_s, body);
+
+                node.value_type = dst_type;
                 return;
             }
 
@@ -377,25 +395,26 @@ namespace compute_asts {
                 return;
             }
 
-            if (fn_id ==   sub_id) { emit_minus         (node, ctx); return; }
-            if (fn_id ==   add_id) { emit_bop  (bop_add, node, ctx); return; }
-            if (fn_id ==   mul_id) { emit_bop  (bop_mul, node, ctx); return; }
-            if (fn_id ==   div_id) { emit_bop  (bop_div, node, ctx); return; }
-            if (fn_id ==   rem_id) { emit_bop  (bop_rem, node, ctx); return; }
-            if (fn_id == add_a_id) { emit_bop_a(bop_add, node, ctx); return; }
-            if (fn_id == sub_a_id) { emit_bop_a(bop_sub, node, ctx); return; }
-            if (fn_id == mul_a_id) { emit_bop_a(bop_mul, node, ctx); return; }
-            if (fn_id == div_a_id) { emit_bop_a(bop_div, node, ctx); return; }
-            if (fn_id == rem_a_id) { emit_bop_a(bop_rem, node, ctx); return; }
-            if (fn_id ==    eq_id) { emit_bop  (bop_eq , node, ctx); return; }
-            if (fn_id ==    ne_id) { emit_bop  (bop_ne , node, ctx); return; }
-            if (fn_id ==    le_id) { emit_bop  (bop_le , node, ctx); return; }
-            if (fn_id ==    ge_id) { emit_bop  (bop_ge , node, ctx); return; }
-            if (fn_id ==    lt_id) { emit_bop  (bop_lt , node, ctx); return; }
-            if (fn_id ==    gt_id) { emit_bop  (bop_gt , node, ctx); return; }
-            if (fn_id ==  istr_id) { emit_istr          (node, ctx); return; }
-            if (fn_id ==   chr_id) { emit_chr           (node, ctx); return; }
-            if (fn_id ==   def_id) { emit_func_def      (node, ctx); return; }
+            if (fn_id ==     eq_id) { emit_bop  (bop_eq , node, ctx); return; }
+            if (fn_id ==     ne_id) { emit_bop  (bop_ne , node, ctx); return; }
+            if (fn_id ==     le_id) { emit_bop  (bop_le , node, ctx); return; }
+            if (fn_id ==     ge_id) { emit_bop  (bop_ge , node, ctx); return; }
+            if (fn_id ==     lt_id) { emit_bop  (bop_lt , node, ctx); return; }
+            if (fn_id ==     gt_id) { emit_bop  (bop_gt , node, ctx); return; }
+            if (fn_id ==    add_id) { emit_bop  (bop_add, node, ctx); return; }
+            if (fn_id ==    sub_id) { emit_minus         (node, ctx); return; }
+            if (fn_id ==    mul_id) { emit_bop  (bop_mul, node, ctx); return; }
+            if (fn_id ==    div_id) { emit_bop  (bop_div, node, ctx); return; }
+            if (fn_id ==    rem_id) { emit_bop  (bop_rem, node, ctx); return; }
+            if (fn_id ==  add_a_id) { emit_bop_a(bop_add, node, ctx); return; }
+            if (fn_id ==  sub_a_id) { emit_bop_a(bop_sub, node, ctx); return; }
+            if (fn_id ==  mul_a_id) { emit_bop_a(bop_mul, node, ctx); return; }
+            if (fn_id ==  div_a_id) { emit_bop_a(bop_div, node, ctx); return; }
+            if (fn_id ==  rem_a_id) { emit_bop_a(bop_rem, node, ctx); return; }
+            if (fn_id ==   istr_id) { emit_istr          (node, ctx); return; }
+            if (fn_id ==    chr_id) { emit_chr           (node, ctx); return; }
+            if (fn_id ==    def_id) { emit_func_def      (node, ctx); return; }
+            if (fn_id == memcpy_id) { emit_memcpy        (node, ctx); return; }
 
             if (fn_id == block_id) {
                 tmp_compilation_scope(ctx);
@@ -410,11 +429,12 @@ namespace compute_asts {
             if (fn_id == if_id) {
                 if_var2(cond_node, then_node, deref2(args_node_p)); else { dbg_fail_return; }
                 emit_node(cond_node, ctx);
-                emit(op_if, (u8)0x40, body);
 
+                emit(op_if, (u8)0x40, body);
                 tmp_compilation_scope(ctx);
                 emit_body(then_node, ctx);
                 emit(op_end, body);
+
                 node.value_type = pt_void; // TODO: allow returning from ifs
                 return;
             }
@@ -436,6 +456,15 @@ namespace compute_asts {
             if (fn_id == print_id) {
                 emit_istr(node, ctx);
                 emit_func_call(view("print_str"), ctx);
+                node.value_type = pt_void; // TODO: allow returning from prints
+                return;
+            }
+
+            if (fn_id == round_id) {
+                if_ref(arg, args_node_p); else { dbg_fail_return; }
+                emit_node(arg, ctx);
+                emit(op_f32_nearest, body);
+                node.value_type = pt_f32;
                 return;
             }
 
@@ -445,7 +474,7 @@ namespace compute_asts {
         }
 
         void emit_func_call(const func& func, node* args, context& ctx) {
-            ref curr_func = get_curr_func(ctx);
+            ref curr_func = curr_func_of(ctx);
 
             //TODO: #cleanup: deal with extra parameters?
             var arg_node_p = args;
@@ -464,10 +493,12 @@ namespace compute_asts {
         }
 
         void emit_istr(node& node, context& ctx) {
-            ref curr_func = get_curr_func(ctx);
+            ref curr_func = curr_func_of(ctx);
             // TODO: implement with string builder
-            if_var1(u32_to_str_id, find_func_index(view("u32_to_str"), ctx)); else { dbg_fail_return; }
-            if_var1(i32_to_str_id, find_func_index(view("i32_to_str"), ctx)); else { dbg_fail_return; }
+            if_var1(push_u32, find_func_index(view("push_u32"), ctx)); else { dbg_fail_return; }
+            if_var1(push_i32, find_func_index(view("push_i32"), ctx)); else { dbg_fail_return; }
+            if_var1(push_f32, find_func_index(view("push_f32"), ctx)); else { dbg_fail_return; }
+            if_var1(push_str, find_func_index(view("push_str"), ctx)); else { dbg_fail_return; }
 
             ref body = curr_func.body;
 
@@ -475,34 +506,18 @@ namespace compute_asts {
             // convert uints to strings
 
             // var mem_offset = 1024;
-            var dst = add_local(view("mem_offset"), pt_u32, ctx).index;
+            var dst = add_local(view("dst"), pt_u32, ctx).index;
             emit_const(       1024, body);
             emit(op_local_set, dst, body);
 
             for(var node_p = node.first_child; node_p; node_p = node_p->next) {
                 ref arg_node = *node_p;
-                if (is_str_literal(arg_node)) {
-                    let str = arg_node.text;
-                    var str_offset = add_data(str, ctx);
 
-                    // memcpy(dst_ptr, str_offset, str.count);
-                    emit(op_local_get, dst, body);
-                    emit_const (str_offset, body);
-                    emit_const (str.count , body);
-                    emit_memcpy            (body);
-
-                    // mem_offset += str.count;
-                    emit(op_local_get, dst, body);
-                    emit_const  (str.count, body);
-                    emit(op_i32_add       , body);
-                    emit(op_local_set, dst, body);
-                    continue;
-                }
-
-                // mem_offset = *_to_str(fn(), mem_offset);
+                // dst = push_*(fn(), dst);
                 emit_node(arg_node, ctx);
 
-                let fn = arg_node.value_type == pt_i32 ? i32_to_str_id : u32_to_str_id;
+                let t  = arg_node.value_type;
+                let fn = t == pt_str ? push_str : t == pt_i32 ? push_i32 : t == pt_f32 ? push_f32 : push_u32;
                 emit(op_local_get, dst, body);
                 emit(op_call,       fn, body);
                 emit(op_local_set, dst, body);
@@ -517,37 +532,52 @@ namespace compute_asts {
             node.value_type = pt_str;
         }
 
+        void emit_memcpy(node& node, context& ctx) {
+            ref curr_func = curr_func_of(ctx);
+            ref body = curr_func.body;
+
+            if_var3(src_node, src_count_node, dst_node, deref3(node.first_child)); else { dbg_fail_return; }
+            emit_node(      dst_node, ctx); if (      dst_node.value_type == pt_u32); else { dbg_fail_return; }
+            emit_node(      src_node, ctx); if (      src_node.value_type == pt_u32); else { dbg_fail_return; }
+            emit_node(src_count_node, ctx); if (src_count_node.value_type == pt_u32); else { dbg_fail_return; }
+            wasm_emit::emit_memcpy(body);
+        }
+
         void emit_chr(node& node, context& ctx) {
-            ref curr_func = get_curr_func(ctx);
+            ref curr_func = curr_func_of(ctx);
 
             if_ref(value_node, node.first_child); else { dbg_fail_return; }
-            assert(!is_func(value_node));
+            if(!is_func(value_node)); else { dbg_fail_return; }
             let c = value_node.text[0];
             emit_const((uint)c, curr_func.body);
             node.value_type = pt_u32; // TODO: pt_u8
         }
 
         void emit_minus(node& node, context& ctx) {
-            ref curr_func = get_curr_func(ctx);
+            ref curr_func = curr_func_of(ctx);
+            ref body      = curr_func.body;
 
             if_ref(a_node, node.first_child); else { dbg_fail_return; }
             if_ref(b_node, a_node.next); else {
-                emit_const(         0, curr_func.body);
-                emit_node (    a_node, ctx      );
-                emit      (op_i32_sub, curr_func.body);
-                node.value_type = pt_i32; // TODO: check compatible and proper cast
+                //TODO: need to determine the type before emitting the node for this
+                //if (a_node.value_type == pt_f32)
+                //    emit_const(0.0f, body);
+                //else
+                //    emit_const(0, body);
+
+                emit_const(     0, body);
+                emit_node (a_node, ctx );
+                let vt = a_node.value_type;
+                emit(get_bop_to_wasm(bop_sub, vt), body);
+                node.value_type = vt; // TODO: check compatible and proper cast
                 return;
             }
 
-            emit_node(a_node, ctx);
-            emit_node(b_node, ctx);
-            assert(a_node.value_type == b_node.value_type);
-            emit(op_i32_sub, curr_func.body);
-            node.value_type = a_node.value_type;
+            emit_bop(bop_sub, node, ctx);
         }
 
         void emit_bop(binary_op op, node& node, context& ctx) {
-            ref curr_func = get_curr_func(ctx);
+            ref curr_func = curr_func_of(ctx);
 
             if_var2(a_node, b_node, deref2(node.first_child)); else { dbg_fail_return; }
 
@@ -566,7 +596,7 @@ namespace compute_asts {
         }
 
         void emit_bop_a(binary_op bop, node& node, context& ctx) {
-            ref curr_func = get_curr_func(ctx);
+            ref curr_func = curr_func_of(ctx);
             ref body      = curr_func.body;
 
             if_var2(var_id_node, value_node, deref2(node.first_child)); else { dbg_fail_return; }
@@ -601,7 +631,7 @@ namespace compute_asts {
         }
 
         void emit_func_call(const string& id, context& ctx) {
-            ref curr_func = get_curr_func(ctx);
+            ref curr_func = curr_func_of(ctx);
             if_ref(func, find_func(id, ctx)); else { dbg_fail_return; }
             emit(op_call, func.index, curr_func.body);
         }
@@ -687,7 +717,7 @@ namespace compute_asts {
             pop(ctx.func_stack);
         }
 
-        func& get_curr_func(context& ctx) {
+        func& curr_func_of(context & ctx) {
             var f_pp = last_of(ctx.func_stack);
             if_ref(f_p, f_pp); else { assert(false); }
             if_ref(f  , f_p ); else { assert(false); }
@@ -715,11 +745,11 @@ namespace compute_asts {
         }
 
         local& add_local(string id, primitive_type type, context& ctx) {
-            ref curr_func = get_curr_func(ctx);
+            ref curr_func = curr_func_of(ctx);
             push(curr_func.locals, type);
 
             var index = curr_func.params.data.count + curr_func.locals.data.count - 1;
-            var v = local {.id = id, .index = index, .type = type };
+            var v = local {.id = id, .index = index, .type = type};
             return push(ctx.locals_in_scope, v);
         }
 
@@ -777,7 +807,9 @@ namespace compute_asts {
         }
 
         wasm_opcode get_bop_to_wasm(binary_op bop, primitive_type pt) {
-            return bop_to_wasm_op[(u32)bop * (u32)pt_enum_size + (u32)pt];
+            var result = bop_to_wasm_op[(u32)bop * (u32)pt_enum_size + (u32)pt];
+            if (result != op_unreachable); else { printf("Unsupported combination of op %u and type %u\n", (uint)bop, (uint)pt); dbg_fail_return result; }
+            return result;
         }
 
         void set_bop_to_wasm(binary_op bop, primitive_type pt, wasm_opcode op) {

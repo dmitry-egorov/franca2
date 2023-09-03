@@ -11,8 +11,8 @@ solution ideas:
 - separate displaying from editing
     - parseless code
     - bind names explicitly
-    - no ambiguity in identifiers
-    - can display anything that makes sense without worrying about parsing ambiguity
+        - no ambiguity in identifiers
+    - can extend the language without worrying about parsing ambiguity
     - question: how to edit such a representation?
     - negative: lose some editing speed?
 

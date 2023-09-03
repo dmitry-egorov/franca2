@@ -41,8 +41,53 @@ namespace parsing {
             result = 10 * result + digit;
         }
 
+        if (is_empty(it_copy)); else return ret1_fail;
+
         it = it_copy;
         return ret1_ok(result);
+    }
+
+    ret1<int> take_int(string& it) {
+        var it_copy = it;
+
+        var negative = false;
+        negative = take(it_copy, '-');
+        if_var1(uint_value, take_uint(it_copy)); else return ret1_fail;
+        if (uint_value <= INT_MAX); else return ret1_fail;
+
+        let int_value = negative ? -(int)uint_value : (int)uint_value;
+        it = it_copy;
+        return ret1_ok(int_value);
+    }
+
+    ret1<float> take_float(string& it) {
+        var it_copy = it;
+
+        var negative = false;
+        negative = take(it_copy, '-');
+
+        if_var1(digit0, take_digit(it_copy)); else return ret1_fail;
+
+        var uint_result = (uint)digit0;
+        while(true) {
+            if_var1(digit, take_digit(it_copy)); else break;
+            uint_result = 10 * uint_result + digit;
+        }
+
+        var result = (float)uint_result;
+        if (take(it_copy, '.')) {
+            var fraction = 0.1f;
+            while(true) {
+                if_var1(digit, take_digit(it_copy)); else break;
+                result += (float)digit * fraction;
+                fraction /= 10;
+            }
+        }
+
+        if (is_empty(it_copy)); else return ret1_fail;
+
+        it = it_copy;
+        return ret1_ok(negative ? -result : result);
     }
 
     ret1<string> take_str(string& it) {

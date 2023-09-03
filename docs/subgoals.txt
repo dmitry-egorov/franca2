@@ -1,0 +1,2 @@
+- [ ] move as much as possible to the prelude (and other core files)
+- [ ] represent strings as structs

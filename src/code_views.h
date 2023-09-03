@@ -82,7 +82,15 @@ namespace code_views {
         return &view[idx.y * cv.size.w + idx.x];
     }
 
+    void put_float(code_view_iterator &it, palette_color color, float value) {
+        put_text(it, color, "%f", value);
+    }
+
     void put_uint(code_view_iterator &it, palette_color color, uint value) {
+        put_text(it, color, "%u", value);
+    }
+
+    void put_int(code_view_iterator &it, palette_color color, int value) {
         put_text(it, color, "%d", value);
     }
 
@@ -98,6 +106,7 @@ namespace code_views {
     }
 
     void put_text(code_view_iterator &it, palette_color color, const string& text) {
+        printf("%.*s", (int)text.count, text.data);
         var text_it = text;
         while(!is_empty(text_it) && !finished(it)) {
             if_var1 (c, take(text_it)); else break;

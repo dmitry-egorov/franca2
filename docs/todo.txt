@@ -1,28 +1,17 @@
-- [ ] primitive types
-    - every local has a type
-    - every expression has a type
-    - show error when types don't match?
-    - choose arithmetic operations based on type
-    - [+] specify types
-        - [+] primitives test
-        - [+] prelude
-        - [+] others
-    - [+] take type in var   defs
-    - [+] take type in param defs
-    - [+] take type in func  defs
-    - [+] determine node type when emitting
-    - [+] print different types
-    - [ ] interpreter types
-    - [ ] parse negatives
-    - [ ] parse floats
-- [ ] stack structs
-    - treat as multiple variables
-    - no pointers (yet)
+- [ ] literal types
+    - [ ] allow literal types
+    - [ ] separate typechecking step
 - [ ] generalize string builder for istr
+- [ ] named arguments (for default parameters)
+- [ ] memory stack
+    - secondary call stack, located in memory
+    - used for structs and to get references to local variables
+- [ ] infer types before emitting
 - [ ] inline functions
     - [ ] pop from stack instead of binding to parameters
     - [ ] apply inline modifiers
 - [ ] inline wasm
+    - need iterative compilation?
 - [ ] scrolling
 - [ ] pointers
     - [ ] linear stack?
@@ -48,6 +37,23 @@
 - [ ] wasm jit?
 
 done
+- [+] primitive types
+    - every local has a type
+    - every expression has a type
+    - show error when types don't match?
+    - choose arithmetic operations based on type
+    - [+] specify types
+        - [+] primitives test
+        - [+] prelude
+        - [+] others
+    - [+] take type in var   defs
+    - [+] take type in param defs
+    - [+] take type in func  defs
+    - [+] determine node type when emitting
+    - [+] print different types
+    - [+] parse negatives
+    - [+] parse floats
+    - [+] print floats
 - [+] identifier node type, and get rid of &[x] everywhere
 - [+] chars
 - [+] +=, ...

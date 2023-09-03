@@ -328,7 +328,7 @@ namespace wasm_emit {
         .section = make_stream(1024, arena),
     };}
 
-    void emit(u8  byte, stream& dst) { push(dst, byte); }
+    void emit(u8 byte, stream& dst) { push(dst, byte); }
 
     void emit(uint n, stream& dst) {
         do {
@@ -356,6 +356,7 @@ namespace wasm_emit {
     }
 
     void emit(size_t n, stream& dst) { emit((uint)n, dst); }
+    void emit(float  f, stream& dst) { push(dst, {(u8*)&f, 4}); }
 
     void emit(wasm_export_kind kind, stream& dst) { push(dst, (u8)kind); }
     void emit(wasm_section_id    id, stream& dst) { push(dst, (u8)id); }
@@ -364,28 +365,33 @@ namespace wasm_emit {
     void emit(wasm_opcode_ex     op, stream& dst) { push(dst, (u8)((u16)op >> 8)); push(dst, (u8)((u16)op & 0xff)); }
 
     void emit(wasm_opcode op, uint value, stream& dst) {
-        push(dst, (u8)op);
+        emit((u8)op, dst);
         emit(value, dst);
     }
 
     void emit(wasm_opcode op, int value, stream& dst) {
-        push(dst, (u8)op);
+        emit((u8)op, dst);
         emit(value, dst);
     }
 
     void emit(wasm_opcode op, u8 value, stream& dst) {
-        push(dst, (u8)op);
+        emit((u8)op, dst);
+        emit(value, dst);
+    }
+
+    void emit(wasm_opcode op, float value, stream& dst) {
+        emit((u8)op, dst);
         emit(value, dst);
     }
 
     void emit(wasm_opcode op, uint value0, uint value1, stream& dst) {
-        push(dst, (u8)op);
+        emit((u8)op, dst);
         emit(value0, dst);
         emit(value1, dst);
     }
 
     void emit(wasm_opcode op, int v0, int v1, stream& dst) {
-        push(dst, (u8)op);
+        emit((u8)op, dst);
         emit(v0, dst);
         emit(v1, dst);
     }
@@ -402,6 +408,10 @@ namespace wasm_emit {
 
     void emit_const(uint value, stream& dst) {
         emit_const((int)value, dst);
+    }
+
+    void emit_const(float value, stream& dst) {
+        emit(op_f32_const, value, dst);
     }
 
     void emit_const(size_t value, stream& dst) {
@@ -464,7 +474,7 @@ namespace wasm_emit {
     }
 
     void emit_function_type_id(stream& dst) {
-        push(dst, (u8)0x60);
+        emit((u8)0x60, dst);
     }
 
     void emit_func_sig(const arr_view<wasm_value_type>& params, const arr_view<wasm_value_type>& returns, stream& dst) {

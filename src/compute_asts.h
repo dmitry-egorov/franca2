@@ -82,8 +82,12 @@ namespace compute_asts {
     struct node {
         string text;
         bool text_is_quoted;
-        bool can_be_uint;
-        uint uint_value;
+        bool can_be_int  ;
+        bool can_be_uint ;
+        bool can_be_float;
+        int     int_value;
+        uint   uint_value;
+        float float_value;
 
         enum struct type_t {
             literal,
@@ -167,8 +171,10 @@ namespace compute_asts {
     static let          ge_id = view(">=");
     static let          lt_id = view("<");
     static let          gt_id = view(">");
+    static let      memcpy_id = view("memcpy");
     static let       print_id = view("print");
     static let        show_id = view("show");
+    static let       round_id = view("round");
 
     ast_storage make_ast_storage() {
         return {
@@ -180,12 +186,15 @@ namespace compute_asts {
     poly_value to_poly(uint value) { return poly_value { .type = pt_u32, .u32 = value }; }
     poly_value to_poly(const string& value) { return poly_value { .type = pt_str, .str = value }; }
 
-    inline auto is_func        (const node& node) -> bool { return node.type == node::type_t::func; }
-    inline auto is_uint_literal(const node& node) -> bool { return node.type == node::type_t::literal && node.can_be_uint && !node.text_is_quoted; }
-    inline auto is_str_literal (const node& node) -> bool { return node.type == node::type_t::literal && node.text_is_quoted; }
+    inline auto is_func         (const node& node) -> bool { return node.type == node::type_t::func; }
+    inline auto is_int_literal  (const node& node) -> bool { return node.type == node::type_t::literal && node.can_be_int   && !node.text_is_quoted; }
+    inline auto is_uint_literal (const node& node) -> bool { return node.type == node::type_t::literal && node.can_be_uint  && !node.text_is_quoted; }
+    inline auto is_float_literal(const node& node) -> bool { return node.type == node::type_t::literal && node.can_be_float && !node.text_is_quoted; }
+    inline auto is_str_literal  (const node& node) -> bool { return node.type == node::type_t::literal && node.text_is_quoted; }
 
     inline auto get_uint(const poly_value& v) -> ret1<uint>   { if (v.type == pt_u32) return ret1_ok(v.u32  ); else return ret1_fail; }
     inline auto get_str (const poly_value& v) -> ret1<string> { if (v.type == pt_str) return ret1_ok(v.str); else return ret1_fail; }
+    inline auto get_int (const node& node   ) -> ret1<int >   { if (is_int_literal (node)) return ret1_ok(node. int_value); else return ret1_fail; }
     inline auto get_uint(const node& node   ) -> ret1<uint>   { if (is_uint_literal(node)) return ret1_ok(node.uint_value); else return ret1_fail; }
     inline auto get_str (const node& node   ) -> ret1<string> { return ret1_ok(node.text); }
 
@@ -208,6 +217,7 @@ namespace compute_asts {
         return is_func(parent, id);
     }
 
+    inline bool value_is(const node& node,  int value) { return is_int_literal(node)  && node. int_value == value; }
     inline bool value_is(const node& node, uint value) { return is_uint_literal(node) && node.uint_value == value; }
 
     inline node& make_node(ast_storage& storage, const node& node) { return *alloc_one(storage.node_arena, node); }
