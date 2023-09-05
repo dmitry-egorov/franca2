@@ -1,0 +1,5 @@
+// TODO: allow this
+// probably need to pass 'a' by reference
+// var[a u32 100]
+// def[foo istr["foo"] u32 {}[
+//     ret[a]]]

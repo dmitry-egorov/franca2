@@ -43,11 +43,11 @@ namespace compute_asts {
         void print_node_chain(const node* first_node) {
             using enum builtin_func_id;
             var node_p = first_node;
-            if (node_p) print(node_p->prefix);
+            if (node_p) printf(node_p->prefix);
             while (node_p) {
                 ref node = *node_p;
                 print_node(node);
-                print(node.suffix);
+                printf(node.suffix);
                 node_p = node.next;
             }
         }

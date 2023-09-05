@@ -1,6 +1,21 @@
+- [ ] wasm_def return (need overriding)
+- [ ] wasm_def binary ops
+- [ ] strings as compound types? that means a primitive can be expanded as multiple wasm consts
+- [ ] inline by creating a new var at the call site or reusing a var if it's passed directly
+- [ ] fix referencing locals outside a function
+    - [ ] pass outside locals by reference?
+- [ ] display inline wasm
+    - [ ]
+- [ ] move store_u8 to prelude
+    - [ ] accept u8 instead of u32
+    - [ ] wasm definition
+- [ ] types at the end of var
 - [ ] literal types
+    - [ ] gather scopes and definitions as a separate pass
+    - [ ] typecheck as a separate pass
     - [ ] allow literal types
-    - [ ] separate typechecking step
+- [ ] constants
+    - [ ] function definitions are constants
 - [ ] generalize string builder for istr
 - [ ] named arguments (for default parameters)
 - [ ] memory stack
@@ -37,6 +52,10 @@
 - [ ] wasm jit?
 
 done
+- [+] override functions
+- [+] single emit function, polymorphic over parameter count
+- [+] wasm_def
+    - define pure wasm function
 - [+] primitive types
     - every local has a type
     - every expression has a type

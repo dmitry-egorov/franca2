@@ -37,7 +37,7 @@ namespace files {
         var length = (size_t)0;
         for (var i = 0u; i < paths.count; ++i) {
             tmp(f, fopen (paths[i], "rb"));
-            if (f); else return {};
+            if (f); else { printf("Failed to open file %s\n", paths[i]); continue; }
 
             fseek (f, 0, SEEK_END);
             length += ftell(f);

@@ -150,20 +150,31 @@ static bool init() {
     //print_ast(&ast);
     //display(ast, cv_it);
 
-    let source_files = arrays::view({
-        "embedded/hello_world.fr",
-        "embedded/test0.fr",
-        "embedded/primitives_test.fr",
-        "embedded/fib.fr",
-        "embedded/prelude.fr",
-    });
-    if_var1(compute_ast, compute_asts::parse_files(source_files)); else return false;
+    //let source_files = arrays::view({
+    //    //"embedded/hello_world.fr",
+    //    //"embedded/test0.fr",
+    //    //"embedded/primitives_test.fr",
+    //    //"embedded/fib.fr",
+    //    "embedded/prelude.fr",
+    //});
+    var source_files = make_arr_dyn<const char*>(16);
+    //push(source_files, (const char*)"embedded/scope_vars_test.fr");
+    //push(source_files, (const char*)"embedded/hello_world.fr");
+    //push(source_files, (const char*)"embedded/test0.fr");
+    //push(source_files, (const char*)"embedded/primitives_test.fr");
+    //push(source_files, (const char*)"embedded/fib.fr");
+    push(source_files, (const char*)"embedded/prelude.fr");
+
+    wasm_emit::init();
+
+    if_var1(compute_ast, compute_asts::parse_files(source_files.data)); else return false;
     printf("\nAST:\n");
     compute_asts::print_ast(compute_ast);
     printf("AST parsed. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     printf("\nGenerating code view...\n");
     compute_asts::display(compute_ast, cv_it);
+    printf(cv_it.builder.data);
     printf("Code view generated. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     code_view.line_count = cv_it.cell_idx.y + 1;

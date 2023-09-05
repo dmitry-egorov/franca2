@@ -1,44 +1,24 @@
 // Prelude:
-def[() istr["("$[expr u32]")"] u32 expr]
 
-def[push_char istr["push "$[c u32]" into "$[dst u32]] u32 {}[
-    store_u8[dst c]
-    ret[+[dst 1]]]]
+var[x f32 0.51]
+print["round "x" = "round[x]]
 
-def[push_str istr["push "$[src u32]" "$[n u32]" into "$[dst u32]] u32 {}[
-    memcpy[src n dst]
+def_wasm[round istr["round "$[f f32]] f32 op_f32_nearest]
+def_wasm[round istr["round "$[f f64]] f64 op_f64_nearest]
+
+def[push istr["push "$[src u32]" "$[n u32]" into "$[dst u32]] u32 {}[
+    mem_copy[src n dst]
     ret[+[dst n]]]]
 
-def[push_u32 istr["push "$[n u32]" into "$[dst u32]] u32 {}[
-    if[==[n 0] {}[
-        ret[push_char[chr[0] dst]]]]
-
-    var[d u32 1000000000]
-    while[>[d n] {}[/=[d 10]]]
-
-    while[>[d 0] {}[
-        =[dst push_char[()[+[chr[0] %[()[/[n d]] 10]]] dst]]
-        /=[d 10]]]
-
-    ret[dst]]]
-
-def[push_i32 istr["push "$[n i32]" into "$[dst u32]] u32 {}[
-    if[<[n as[0 i32]] {}[
-        =[dst push_char[chr[-] dst]]
-        =[n -[n]]]]
-
-    ret[push_u32[as[n u32] dst]]]]
-
-def[push_f32 istr["push "$[f f32]" into "$[dst u32]] u32 {}[
+def[push istr["push "$[f f32]" into "$[dst u32]] u32 {}[
     if[<[f 0.0] {}[
         =[dst push_char[chr[-] dst]]
         =[f -[0.0 f]]]]
 
-    var[n_x_100 u32 as[*[f 100.0] u32]]
-
-    =[dst push_u32 [/[n_x_100 100] dst]]
+    =[dst push[as[f u32] dst]]
     =[dst push_char[chr[.] dst]]
 
+    var[n_x_100 u32 as[*[f 100.0] u32] "n x 100"]
     var[d u32 10]
     while[>[d 0] {}[
         =[dst push_char[()[+[chr[0] %[()[/[n_x_100 d]] 10]]] dst]]
@@ -46,9 +26,50 @@ def[push_f32 istr["push "$[f f32]" into "$[dst u32]] u32 {}[
 
     ret[dst]]]
 
-// mod[u2str inline 1]
+def[push istr["push "$[n i32]" into "$[dst u32]] u32 {}[
+    if[<[n as[0 i32]] {}[
+        =[dst push_char[chr[-] dst]]
+        =[n -[n]]]]
+
+    ret[push[as[n u32] dst]]]]
+
+def[push istr["push "$[n u32]" into "$[dst u32]] u32 {}[
+    if[==[n 0] {}[
+        ret[push_char[chr[0] dst]]]]
+
+    var[d u32 1000000000]
+    while[>[d n] {}[/=[d 10]]]
+
+    while[>[d 0] {}[
+         =[dst push_char[()[+[chr[0] %[()[/[n d]] 10]]] dst]]
+        /=[d 10]]]
+
+    ret[dst]]]
+
+def[push_char istr["push "$[ch u32]" into "$[dst u32]] u32 {}[
+    store_u8[ch dst]
+    ret[+[dst 1]]]]
+
+def_wasm[() istr["("$[expr u32]")"] u32]
+def_wasm[() istr["("$[expr i32]")"] i32]
+def_wasm[() istr["("$[expr f32]")"] f32]
+def_wasm[() istr["("$[expr u64]")"] u64]
+def_wasm[() istr["("$[expr i64]")"] i64]
+def_wasm[() istr["("$[expr f64]")"] f64]
+
+def[mem_copy istr["copy "$[src u32]" "$[count u32]" into "$[dst u32]] void {}[
+    emit_local_get[dst]
+    emit_local_get[src]
+    emit_local_get[count]
+    op_memory_copy[0 0]]]
+
+def[store_u8 istr["store "$[ch u32]" at "$[dst u32]] void {}[
+    emit_local_get[dst]
+    emit_local_get[ch]
+    op_i32_store8[0 0]]]
 
 
+//////////////////////
 // Enum example
 // enum[enum_item[op_i32_add 0x6a]]
 

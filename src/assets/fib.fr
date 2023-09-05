@@ -1,4 +1,4 @@
-print[fib_at[40]]
+print[    fib_at[40]]
 print[rec_fib_at[12]]
 
 /////////////////////
@@ -13,7 +13,7 @@ def[fib_at istr["fib at "$[n u32]] u32 {}[
         var[t u32 v1]
          +=[v1 v0]
           =[v0 t ]
-         +=[i  1]]]
+         +=[i  1 ]]]
 
     ret[v1]]]
 

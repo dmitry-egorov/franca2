@@ -2,8 +2,8 @@ print[0]
 print[42]
 print["Hello, World!"]
 
-var[a   u32 122]
-var[b   u32   3]
+var[a u32 122]
+var[b u32   3]
 
 print[+[a b]]
 

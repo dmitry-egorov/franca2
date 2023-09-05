@@ -12,7 +12,7 @@ namespace strings {
     using namespace arenas;
 
     typedef arrays::arr_view<char> string;
-    typedef arr_dyn<char> dstring;
+    typedef arr_dyn<char> str_dyn;
 
     inline bool operator==(const string& a, const string& b) {
         return a.count == b.count && memcmp(a.data, b.data, a.count) == 0;
@@ -30,11 +30,11 @@ namespace strings {
         return {.data = (char*)s, .count = strlen(s)};
     }
 
-    void print(const string& s) {
-        printf("%.*s", (int)s.count, s.data);
+    void printf(const string& s) {
+        std::printf("%.*s", (int)s.count, s.data);
     }
 
-    dstring make_string_builder(size_t initial_capacity, arena& arena) {
+    str_dyn make_string_builder(size_t initial_capacity, arena& arena) {
         return make_arr_dyn<char>(initial_capacity, arena, 1);
     }
 }

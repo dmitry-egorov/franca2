@@ -17,6 +17,7 @@ namespace wasm_emit {
 
 #define using_emitter ref [arena, wasm, section] =
 
+    void init();
     wasm_emitter make_emitter(arena& arena = gta);
 
     enum struct wasm_section_id: u8 {
@@ -83,244 +84,259 @@ namespace wasm_emit {
         uint obj_index;
     };
 
-    enum struct wasm_opcode: u8 {
-        op_unreachable      = 0x00,
-        op_nop              = 0x01,
-        op_block            = 0x02,
-        op_loop             = 0x03,
-        op_if               = 0x04,
-        op_else             = 0x05,
+#define WASM_OPCODES \
+    OP(op_unreachable        , 0x0000) \
+    OP(op_nop                , 0x0001) \
+    OP(op_block              , 0x0002) \
+    OP(op_loop               , 0x0003) \
+    OP(op_if                 , 0x0004) \
+    OP(op_else               , 0x0005) \
+                                       \
+    OP(op_end                , 0x000b) \
+    OP(op_br                 , 0x000c) \
+    OP(op_br_if              , 0x000d) \
+    OP(op_br_table           , 0x000e) \
+    OP(op_return             , 0x000f) \
+    OP(op_call               , 0x0010) \
+    OP(op_call_indirect      , 0x0011) \
+                                       \
+    OP(op_drop               , 0x001a) \
+    OP(op_select             , 0x001b) \
+    OP(op_select_t           , 0x001c) \
+                                       \
+    OP(op_local_get          , 0x0020) \
+    OP(op_local_set          , 0x0021) \
+    OP(op_local_tee          , 0x0022) \
+    OP(op_global_get         , 0x0023) \
+    OP(op_global_set         , 0x0024) \
+    OP(op_table_get          , 0x0025) \
+    OP(op_table_set          , 0x0026) \
+                                       \
+    OP(op_i32_load           , 0x0028) \
+    OP(op_i64_load           , 0x0029) \
+    OP(op_f32_load           , 0x002a) \
+    OP(op_f64_load           , 0x002b) \
+                                       \
+    OP(op_i32_load_8_s       , 0x002c) \
+    OP(op_i32_load_8_u       , 0x002d) \
+    OP(op_i32_load_16_s      , 0x002e) \
+    OP(op_i32_load_16_u      , 0x002f) \
+                                       \
+    OP(op_i64_load_8_s       , 0x0030) \
+    OP(op_i64_load_8_u       , 0x0031) \
+    OP(op_i64_load_16_s      , 0x0032) \
+    OP(op_i64_load_16_u      , 0x0033) \
+    OP(op_i64_load_32_s      , 0x0034) \
+    OP(op_i64_load_32_u      , 0x0035) \
+                                       \
+    OP(op_i32_store          , 0x0036) \
+    OP(op_i64_store          , 0x0037) \
+    OP(op_f32_store          , 0x0038) \
+    OP(op_f64_store          , 0x0039) \
+                                       \
+    OP(op_i32_store8         , 0x003a) \
+    OP(op_i32_store16        , 0x003b) \
+    OP(op_i64_store8         , 0x003c) \
+    OP(op_i64_store16        , 0x003d) \
+    OP(op_i64_store32        , 0x003e) \
+                                       \
+    OP(op_memory_size        , 0x003f) \
+    OP(op_memory_grow        , 0x0040) \
+                                       \
+    OP(op_i32_const          , 0x0041) \
+    OP(op_i64_const          , 0x0042) \
+    OP(op_f32_const          , 0x0043) \
+    OP(op_f64_const          , 0x0044) \
+                                       \
+    OP(op_i32_eqz            , 0x0045) \
+    OP(op_i32_eq             , 0x0046) \
+    OP(op_i32_ne             , 0x0047) \
+    OP(op_i32_lt_s           , 0x0048) \
+    OP(op_i32_lt_u           , 0x0049) \
+    OP(op_i32_gt_s           , 0x004a) \
+    OP(op_i32_gt_u           , 0x004b) \
+    OP(op_i32_le_s           , 0x004c) \
+    OP(op_i32_le_u           , 0x004d) \
+    OP(op_i32_ge_s           , 0x004e) \
+    OP(op_i32_ge_u           , 0x004f) \
+                                       \
+    OP(op_i64_eqz            , 0x0050) \
+    OP(op_i64_eq             , 0x0051) \
+    OP(op_i64_ne             , 0x0052) \
+    OP(op_i64_lt_s           , 0x0053) \
+    OP(op_i64_lt_u           , 0x0054) \
+    OP(op_i64_gt_s           , 0x0055) \
+    OP(op_i64_gt_u           , 0x0056) \
+    OP(op_i64_le_s           , 0x0057) \
+    OP(op_i64_le_u           , 0x0058) \
+    OP(op_i64_ge_s           , 0x0059) \
+    OP(op_i64_ge_u           , 0x005a) \
+                                       \
+    OP(op_f32_eq             , 0x005b) \
+    OP(op_f32_ne             , 0x005c) \
+    OP(op_f32_lt             , 0x005d) \
+    OP(op_f32_gt             , 0x005e) \
+    OP(op_f32_le             , 0x005f) \
+    OP(op_f32_ge             , 0x0060) \
+                                       \
+    OP(op_f64_eq             , 0x0061) \
+    OP(op_f64_ne             , 0x0062) \
+    OP(op_f64_lt             , 0x0063) \
+    OP(op_f64_gt             , 0x0064) \
+    OP(op_f64_le             , 0x0065) \
+    OP(op_f64_ge             , 0x0066) \
+                                       \
+    OP(op_i32_clz            , 0x0067) \
+    OP(op_i32_ctz            , 0x0068) \
+    OP(op_i32_popcnt         , 0x0069) \
+    OP(op_i32_add            , 0x006a) \
+    OP(op_i32_sub            , 0x006b) \
+    OP(op_i32_mul            , 0x006c) \
+    OP(op_i32_div_s          , 0x006d) \
+    OP(op_i32_div_u          , 0x006e) \
+    OP(op_i32_rem_s          , 0x006f) \
+    OP(op_i32_rem_u          , 0x0070) \
+    OP(op_i32_and            , 0x0071) \
+    OP(op_i32_or             , 0x0072) \
+    OP(op_i32_xor            , 0x0073) \
+    OP(op_i32_shl            , 0x0074) \
+    OP(op_i32_shr_s          , 0x0075) \
+    OP(op_i32_shr_u          , 0x0076) \
+    OP(op_i32_rotl           , 0x0077) \
+    OP(op_i32_rotr           , 0x0078) \
+                                       \
+    OP(op_i64_clz            , 0x0079) \
+    OP(op_i64_ctz            , 0x007a) \
+    OP(op_i64_popcnt         , 0x007b) \
+    OP(op_i64_add            , 0x007c) \
+    OP(op_i64_sub            , 0x007d) \
+    OP(op_i64_mul            , 0x007e) \
+    OP(op_i64_div_s          , 0x007f) \
+    OP(op_i64_div_u          , 0x0080) \
+    OP(op_i64_rem_s          , 0x0081) \
+    OP(op_i64_rem_u          , 0x0082) \
+    OP(op_i64_and            , 0x0083) \
+    OP(op_i64_or             , 0x0084) \
+    OP(op_i64_xor            , 0x0085) \
+    OP(op_i64_shl            , 0x0086) \
+    OP(op_i64_shr_s          , 0x0087) \
+    OP(op_i64_shr_u          , 0x0088) \
+    OP(op_i64_rotl           , 0x0089) \
+    OP(op_i64_rotr           , 0x008a) \
+                                       \
+    OP(op_f32_abs            , 0x008b) \
+    OP(op_f32_neg            , 0x008c) \
+    OP(op_f32_ceil           , 0x008d) \
+    OP(op_f32_floor          , 0x008e) \
+    OP(op_f32_trunc          , 0x008f) \
+    OP(op_f32_nearest        , 0x0090) \
+    OP(op_f32_sqrt           , 0x0091) \
+    OP(op_f32_add            , 0x0092) \
+    OP(op_f32_sub            , 0x0093) \
+    OP(op_f32_mul            , 0x0094) \
+    OP(op_f32_div            , 0x0095) \
+    OP(op_f32_min            , 0x0096) \
+    OP(op_f32_max            , 0x0097) \
+    OP(op_f32_copysign       , 0x0098) \
+                                       \
+    OP(op_f64_abs            , 0x0099) \
+    OP(op_f64_neg            , 0x009a) \
+    OP(op_f64_ceil           , 0x009b) \
+    OP(op_f64_floor          , 0x009c) \
+    OP(op_f64_trunc          , 0x009d) \
+    OP(op_f64_nearest        , 0x009e) \
+    OP(op_f64_sqrt           , 0x009f) \
+    OP(op_f64_add            , 0x00a0) \
+    OP(op_f64_sub            , 0x00a1) \
+    OP(op_f64_mul            , 0x00a2) \
+    OP(op_f64_div            , 0x00a3) \
+    OP(op_f64_min            , 0x00a4) \
+    OP(op_f64_max            , 0x00a5) \
+    OP(op_f64_copysign       , 0x00a6) \
+                                       \
+    OP(op_i32_wrap_i64       , 0x00a7) \
+    OP(op_i32_trunc_f32_s    , 0x00a8) \
+    OP(op_i32_trunc_f32_u    , 0x00a9) \
+    OP(op_i32_trunc_f64_s    , 0x00aa) \
+    OP(op_i32_trunc_f64_u    , 0x00ab) \
+                                       \
+    OP(op_i64_extend_i32_s   , 0x00ac) \
+    OP(op_i64_extend_i32_u   , 0x00ad) \
+    OP(op_i64_trunc_f32_s    , 0x00ae) \
+    OP(op_i64_trunc_f32_u    , 0x00af) \
+    OP(op_i64_trunc_f64_s    , 0x00b0) \
+    OP(op_i64_trunc_f64_u    , 0x00b1) \
+                                       \
+    OP(op_f32_convert_i32_s  , 0x00b2) \
+    OP(op_f32_convert_i32_u  , 0x00b3) \
+    OP(op_f32_convert_i64_s  , 0x00b4) \
+    OP(op_f32_convert_i64_u  , 0x00b5) \
+    OP(op_f32_demote_f64     , 0x00b6) \
+                                       \
+    OP(op_f64_convert_i32_s  , 0x00b7) \
+    OP(op_f64_convert_i32_u  , 0x00b8) \
+    OP(op_f64_convert_i64_s  , 0x00b9) \
+    OP(op_f64_convert_i64_u  , 0x00ba) \
+    OP(op_f64_promote_f32    , 0x00bb) \
+                                       \
+    OP(op_i32_reinterpret_f32, 0x00bc) \
+    OP(op_i64_reinterpret_f64, 0x00bd) \
+    OP(op_f32_reinterpret_i32, 0x00be) \
+    OP(op_f64_reinterpret_i64, 0x00bf) \
+                                       \
+    OP(op_i32_extend8_s      , 0x00c0) \
+    OP(op_i32_extend16_s     , 0x00c1) \
+    OP(op_i64_extend8_s      , 0x00c2) \
+    OP(op_i64_extend16_s     , 0x00c3) \
+    OP(op_i64_extend32_s     , 0x00c4) \
+                                       \
+    OP(op_ref_null           , 0x00d0) \
+    OP(op_ref_is_null        , 0x00d1) \
+    OP(op_ref_func           , 0x00d2)
 
-        op_end              = 0x0b,
-        op_br               = 0x0c,
-        op_br_if            = 0x0d,
-        op_br_table         = 0x0e,
-        op_return           = 0x0f,
-        op_call             = 0x10,
-        op_call_indirect    = 0x11,
+#define WASM_OPCODES_FC                \
+    OP(op_i32_trunc_sat_f32_s, 0xfc00) \
+    OP(op_i32_trunc_sat_f32_u, 0xfc01) \
+    OP(op_i32_trunc_sat_f64_s, 0xfc02) \
+    OP(op_i32_trunc_sat_f64_u, 0xfc03) \
+    OP(op_i64_trunc_sat_f32_s, 0xfc04) \
+    OP(op_i64_trunc_sat_f32_u, 0xfc05) \
+    OP(op_i64_trunc_sat_f64_s, 0xfc06) \
+    OP(op_i64_trunc_sat_f64_u, 0xfc07) \
+                                       \
+    OP(op_memory_init        , 0xfc08) \
+    OP(op_data_drop          , 0xfc09) \
+    OP(op_memory_copy        , 0xfc0a) \
+    OP(op_memory_fill        , 0xfc0b) \
+    OP(op_table_init         , 0xfc0c) \
+    OP(op_elem_drop          , 0xfc0d) \
+    OP(op_table_copy         , 0xfc0e) \
+    OP(op_table_grow         , 0xfc0f) \
+    OP(op_table_size         , 0xfc10) \
+    OP(op_table_fill         , 0xfc11)
 
-        op_drop             = 0x1a,
-        op_select           = 0x1b,
-        op_select_t         = 0x1c,
-
-        op_local_get        = 0x20,
-        op_local_set        = 0x21,
-        op_local_tee        = 0x22,
-        op_global_get       = 0x23,
-        op_global_set       = 0x24,
-        op_table_get        = 0x25,
-        op_table_set        = 0x26,
-
-        op_i32_load         = 0x28,
-        op_i64_load         = 0x29,
-        op_f32_load         = 0x2a,
-        op_f64_load         = 0x2b,
-
-        op_i32_load_8_s     = 0x2c,
-        op_i32_load_8_u     = 0x2d,
-        op_i32_load_16_s    = 0x2e,
-        op_i32_load_16_u    = 0x2f,
-
-        op_i64_load_8_s     = 0x30,
-        op_i64_load_8_u     = 0x31,
-        op_i64_load_16_s    = 0x32,
-        op_i64_load_16_u    = 0x33,
-        op_i64_load_32_s    = 0x34,
-        op_i64_load_32_u    = 0x35,
-
-        op_i32_store        = 0x36,
-        op_i64_store        = 0x37,
-        op_f32_store        = 0x38,
-        op_f64_store        = 0x39,
-
-        op_i32_store_8      = 0x3a,
-        op_i32_store_16     = 0x3b,
-        op_i64_store_8      = 0x3c,
-        op_i64_store_16     = 0x3d,
-        op_i64_store_32     = 0x3e,
-
-        op_memory_size      = 0x3f,
-        op_memory_grow      = 0x40,
-
-        op_i32_const        = 0x41,
-        op_i64_const        = 0x42,
-        op_f32_const        = 0x43,
-        op_f64_const        = 0x44,
-
-        op_i32_eqz          = 0x45,
-        op_i32_eq           = 0x46,
-        op_i32_ne           = 0x47,
-        op_i32_lt_s         = 0x48,
-        op_i32_lt_u         = 0x49,
-        op_i32_gt_s         = 0x4a,
-        op_i32_gt_u         = 0x4b,
-        op_i32_le_s         = 0x4c,
-        op_i32_le_u         = 0x4d,
-        op_i32_ge_s         = 0x4e,
-        op_i32_ge_u         = 0x4f,
-
-        op_i64_eqz          = 0x50,
-        op_i64_eq           = 0x51,
-        op_i64_ne           = 0x52,
-        op_i64_lt_s         = 0x53,
-        op_i64_lt_u         = 0x54,
-        op_i64_gt_s         = 0x55,
-        op_i64_gt_u         = 0x56,
-        op_i64_le_s         = 0x57,
-        op_i64_le_u         = 0x58,
-        op_i64_ge_s         = 0x59,
-        op_i64_ge_u         = 0x5a,
-
-        op_f32_eq           = 0x5b,
-        op_f32_ne           = 0x5c,
-        op_f32_lt           = 0x5d,
-        op_f32_gt           = 0x5e,
-        op_f32_le           = 0x5f,
-        op_f32_ge           = 0x60,
-
-        op_f64_eq           = 0x61,
-        op_f64_ne           = 0x62,
-        op_f64_lt           = 0x63,
-        op_f64_gt           = 0x64,
-        op_f64_le           = 0x65,
-        op_f64_ge           = 0x66,
-
-        op_i32_clz          = 0x67,
-        op_i32_ctz          = 0x68,
-        op_i32_popcnt       = 0x69,
-        op_i32_add          = 0x6a,
-        op_i32_sub          = 0x6b,
-        op_i32_mul          = 0x6c,
-        op_i32_div_s        = 0x6d,
-        op_i32_div_u        = 0x6e,
-        op_i32_rem_s        = 0x6f,
-        op_i32_rem_u        = 0x70,
-        op_i32_and          = 0x71,
-        op_i32_or           = 0x72,
-        op_i32_xor          = 0x73,
-        op_i32_shl          = 0x74,
-        op_i32_shr_s        = 0x75,
-        op_i32_shr_u        = 0x76,
-        op_i32_rotl         = 0x77,
-        op_i32_rotr         = 0x78,
-
-        op_i64_clz          = 0x79,
-        op_i64_ctz          = 0x7a,
-        op_i64_popcnt       = 0x7b,
-        op_i64_add          = 0x7c,
-        op_i64_sub          = 0x7d,
-        op_i64_mul          = 0x7e,
-        op_i64_div_s        = 0x7f,
-        op_i64_div_u        = 0x80,
-        op_i64_rem_s        = 0x81,
-        op_i64_rem_u        = 0x82,
-        op_i64_and          = 0x83,
-        op_i64_or           = 0x84,
-        op_i64_xor          = 0x85,
-        op_i64_shl          = 0x86,
-        op_i64_shr_s        = 0x87,
-        op_i64_shr_u        = 0x88,
-        op_i64_rotl         = 0x89,
-        op_i64_rotr         = 0x8a,
-
-        op_f32_abs          = 0x8b,
-        op_f32_neg          = 0x8c,
-        op_f32_ceil         = 0x8d,
-        op_f32_floor        = 0x8e,
-        op_f32_trunc        = 0x8f,
-        op_f32_nearest      = 0x90,
-        op_f32_sqrt         = 0x91,
-        op_f32_add          = 0x92,
-        op_f32_sub          = 0x93,
-        op_f32_mul          = 0x94,
-        op_f32_div          = 0x95,
-        op_f32_min          = 0x96,
-        op_f32_max          = 0x97,
-        op_f32_copysign     = 0x98,
-
-        op_f64_abs          = 0x99,
-        op_f64_neg          = 0x9a,
-        op_f64_ceil         = 0x9b,
-        op_f64_floor        = 0x9c,
-        op_f64_trunc        = 0x9d,
-        op_f64_nearest      = 0x9e,
-        op_f64_sqrt         = 0x9f,
-        op_f64_add          = 0xa0,
-        op_f64_sub          = 0xa1,
-        op_f64_mul          = 0xa2,
-        op_f64_div          = 0xa3,
-        op_f64_min          = 0xa4,
-        op_f64_max          = 0xa5,
-        op_f64_copysign     = 0xa6,
-
-        op_i32_wrap_i64     = 0xa7,
-        op_i32_trunc_f32_s  = 0xa8,
-        op_i32_trunc_f32_u  = 0xa9,
-        op_i32_trunc_f64_s  = 0xaa,
-        op_i32_trunc_f64_u  = 0xab,
-
-        op_i64_extend_i32_s = 0xac,
-        op_i64_extend_i32_u = 0xad,
-        op_i64_trunc_f32_s  = 0xae,
-        op_i64_trunc_f32_u  = 0xaf,
-        op_i64_trunc_f64_s  = 0xb0,
-        op_i64_trunc_f64_u  = 0xb1,
-
-        op_f32_convert_i32_s = 0xb2,
-        op_f32_convert_i32_u = 0xb3,
-        op_f32_convert_i64_s = 0xb4,
-        op_f32_convert_i64_u = 0xb5,
-        op_f32_demote_f64    = 0xb6,
-
-        op_f64_convert_i32_s = 0xb7,
-        op_f64_convert_i32_u = 0xb8,
-        op_f64_convert_i64_s = 0xb9,
-        op_f64_convert_i64_u = 0xba,
-        op_f64_promote_f32   = 0xbb,
-
-        op_i32_reinterpret_f32 = 0xbc,
-        op_i64_reinterpret_f64 = 0xbd,
-        op_f32_reinterpret_i32 = 0xbe,
-        op_f64_reinterpret_i64 = 0xbf,
-
-        op_i32_extend8_s    = 0xc0,
-        op_i32_extend16_s   = 0xc1,
-        op_i64_extend8_s    = 0xc2,
-        op_i64_extend16_s   = 0xc3,
-        op_i64_extend32_s   = 0xc4,
-
-        op_ref_null    = 0xd0,
-        op_ref_is_null = 0xd1,
-        op_ref_func    = 0xd2,
+#define OP(name, value) name = value,
+    enum struct wasm_opcode: u16 {
+        WASM_OPCODES
+        WASM_OPCODES_FC
     };
-
-    enum struct wasm_opcode_ex {
-        op_fc_i32_trunc_sat_f32_s = 0xfc00,
-        op_fc_i32_trunc_sat_f32_u = 0xfc01,
-        op_fc_i32_trunc_sat_f64_s = 0xfc02,
-        op_fc_i32_trunc_sat_f64_u = 0xfc03,
-        op_fc_i64_trunc_sat_f32_s = 0xfc04,
-        op_fc_i64_trunc_sat_f32_u = 0xfc05,
-        op_fc_i64_trunc_sat_f64_s = 0xfc06,
-        op_fc_i64_trunc_sat_f64_u = 0xfc07,
-
-        op_memory_init = 0xfc08,
-        op_data_drop   = 0xfc09,
-        op_memory_copy = 0xfc0a,
-        op_memory_fill = 0xfc0b,
-        op_table_init  = 0xfc0c,
-        op_elem_drop   = 0xfc0d,
-        op_table_copy  = 0xfc0e,
-        op_table_grow  = 0xfc0f,
-        op_table_size  = 0xfc10,
-        op_table_fill  = 0xfc11,
-    };
-
+#undef OP
 
     using enum wasm_opcode;
-    using enum wasm_opcode_ex;
     using enum wasm_section_id;
     using enum wasm_export_kind;
+
+    string opcode_map   [(size_t)0xff];
+    string opcode_fc_map[(size_t)0x12];
+
+    void init() {
+        #define OP(name, value) opcode_map[value] = view(#name);
+            WASM_OPCODES
+        #undef OP
+        #define OP(name, value) opcode_fc_map[value & 0x00ff] = view(#name);
+            WASM_OPCODES_FC
+        #undef OP
+    }
 
     wasm_emitter make_emitter(arena& arena) { return wasm_emit::wasm_emitter {
         .arena   = arena,
@@ -328,7 +344,31 @@ namespace wasm_emit {
         .section = make_stream(1024, arena),
     };}
 
-    void emit(u8 byte, stream& dst) { push(dst, byte); }
+    void emit(u8  byte, stream& dst) { push(dst, byte); }
+    void emit(u16 byte, stream& dst) { emit((u8)(byte >> 8), dst); emit((u8)byte, dst); }
+    void emit(wasm_opcode op, stream& dst) {
+        if ((u16)op < 0x00ff) emit((u8)op, dst); else emit((u16)op, dst);
+    }
+
+    wasm_opcode find_op(string op_name) {
+        for (u8 i = 0; i < (u8)0xff; ++i)
+            if (op_name == opcode_map[i])
+                return (wasm_opcode)i;
+
+        for (u8 i = 0; i < (u8)0x12; ++i) {
+            if (op_name == opcode_fc_map[i])
+                return (wasm_opcode)(i + 0xfc00);
+        }
+
+        return op_unreachable;
+    }
+
+    void emit_op(string op_name, stream& dst) {
+        let op = find_op(op_name);
+        if (op != op_unreachable); else { printf("Unknown opcode: %.*s\n", (int)op_name.count, op_name.data); dbg_fail_return;}
+
+        emit(op, dst);
+    }
 
     void emit(uint n, stream& dst) {
         do {
@@ -361,45 +401,37 @@ namespace wasm_emit {
     void emit(wasm_export_kind kind, stream& dst) { push(dst, (u8)kind); }
     void emit(wasm_section_id    id, stream& dst) { push(dst, (u8)id); }
     void emit(wasm_value_type  type, stream& dst) { push(dst, (u8)type); }
-    void emit(wasm_opcode        op, stream& dst) { push(dst, (u8)op); }
-    void emit(wasm_opcode_ex     op, stream& dst) { push(dst, (u8)((u16)op >> 8)); push(dst, (u8)((u16)op & 0xff)); }
 
     void emit(wasm_opcode op, uint value, stream& dst) {
-        emit((u8)op, dst);
+        emit(op, dst);
         emit(value, dst);
     }
 
     void emit(wasm_opcode op, int value, stream& dst) {
-        emit((u8)op, dst);
+        emit(op, dst);
         emit(value, dst);
     }
 
     void emit(wasm_opcode op, u8 value, stream& dst) {
-        emit((u8)op, dst);
+        emit(op, dst);
         emit(value, dst);
     }
 
     void emit(wasm_opcode op, float value, stream& dst) {
-        emit((u8)op, dst);
+        emit(op, dst);
         emit(value, dst);
     }
 
     void emit(wasm_opcode op, uint value0, uint value1, stream& dst) {
-        emit((u8)op, dst);
+        emit(op, dst);
         emit(value0, dst);
         emit(value1, dst);
     }
 
     void emit(wasm_opcode op, int v0, int v1, stream& dst) {
-        emit((u8)op, dst);
+        emit(op, dst);
         emit(v0, dst);
         emit(v1, dst);
-    }
-
-    void emit(wasm_opcode_ex op, u8 v0, u8 v1, stream& dst) {
-        emit(op, dst);
-        emit(v0, dst); // memory.copy
-        emit(v1, dst); // memory.copy dst mem idx
     }
 
     void emit_const(int value, stream& dst) {
@@ -416,10 +448,6 @@ namespace wasm_emit {
 
     void emit_const(size_t value, stream& dst) {
         emit_const((int)value, dst);
-    }
-
-    void emit_memcpy(stream& dst) {
-        emit(op_memory_copy, 0x00, 0x00, dst); // op, src mem, dst mem
     }
 
     void emit_while(stream& dst) {
@@ -481,10 +509,6 @@ namespace wasm_emit {
         emit_function_type_id(dst);
         emit_type_list(params, dst); // params
         emit_type_list(returns, dst); // returns
-    }
-
-    void emit_func_sig(std::initializer_list<wasm_value_type> params, std::initializer_list<wasm_value_type> returns, stream& dst) {
-        emit_func_sig(view(params), view(returns), dst);
     }
 
     void emit_type_section(const arr_view<wasm_func_type>& types, wasm_emitter& emitter) {
@@ -569,7 +593,7 @@ namespace wasm_emit {
             let body_wasm = func.body;
 
             //TODO: wrong if locals size is > 127!!!
-            emit(body_wasm.count + 1 + 2 * locals.count, section); // size of the section
+            emit(body_wasm.count + 2 + 2 * locals.count, section); // size of the section
             emit(locals.count, section); // num locals
             for (var local_i = 0u; local_i < locals.count; ++local_i) {
                 let local = locals[local_i];
@@ -578,6 +602,7 @@ namespace wasm_emit {
                 emit((u8)local, section); // local type
             }
             push(section, body_wasm);
+            push(section, (u8)op_end);
         }
 
         emit_section(sec_code, emitter);

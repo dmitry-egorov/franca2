@@ -1,0 +1,4 @@
+- display function can potentially show parameters in a different order, then the execution order
+    - disallow different order
+    - that means no need for a separate list of arguments
+    - what about several alternative displays for the same function?

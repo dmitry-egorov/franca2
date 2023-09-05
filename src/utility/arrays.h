@@ -20,7 +20,6 @@ namespace arrays {
     tt size_t count(const arr_view<t>& view, const t& item);
     tt arr_view<t> sub(const arr_view<t>& view, size_t count);
     tt arr_view<t> sub_past_last(const arr_view<t>& view, const t& item);
-    tt arr_view<t> view(const std::initializer_list<t>& list);
 
 
     tt struct array {
@@ -45,9 +44,15 @@ namespace arrays {
     tt void enlarge_by(arr_view<t>& v, const size_t count) { v.count += count; }
 
     tt void advance(arr_view<t>& v) {
-        assert(v.count > 0);
+        assert(v.count >= 1);
         v.count -= 1;
         v.data  += 1;
+    }
+
+    tt void advance(arr_view<t>& v, size_t count) {
+        assert(v.count >= count);
+        v.count -= count;
+        v.data  += count;
     }
 
     tt bool contains(const arr_view<t>& view, const t &item) {
@@ -79,6 +84,10 @@ namespace arrays {
 
     tt arr_view<t> view(const std::initializer_list<t>& list) {
         return {(t*)list.begin(), list.size()};
+    }
+
+    tt arr_view<t> view(t& item) {
+        return {&item, 1};
     }
 
     tt void push(array<t>& s, const t& value) {

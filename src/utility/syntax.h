@@ -40,7 +40,7 @@ public:
 
 #define tmp(name, initializer) var name = (initializer); defer_release(name)
 
-#define dbg_fail_return assert(false); return
+#define dbg_fail_return printf("Failed!\n"); assert(false); return
 #define dbg_fail_continue assert(false); continue
 #define dbg_fail_break assert(false); break
 

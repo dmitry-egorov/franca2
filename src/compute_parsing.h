@@ -1,5 +1,6 @@
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "misc-no-recursion"
+#pragma clang diagnostic ignored "-Wunused-function"
 
 #ifndef FRANCA2_COMPUTE_PARSER_H
 #define FRANCA2_COMPUTE_PARSER_H

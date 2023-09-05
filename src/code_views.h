@@ -36,11 +36,12 @@ namespace code_views {
 
     struct code_view_iterator {
         code_view& view;
+        str_dyn builder;
         uint2 cell_idx;
         uint indent;
     };
 
-#define using_cv_iterator(code_view_iterator) ref [view, cell_idx, indent] = code_view_iterator; ref [arena, glyphs, colors, inlays, size, line_count] = view; ref [x, y] = cell_idx
+#define using_cv_iterator(code_view_iterator) ref [view, builder, cell_idx, indent] = code_view_iterator; ref [arena, glyphs, colors, inlays, size, line_count] = view; ref [x, y] = cell_idx
 #define tmp_indent(it) it.indent += 1; defer { it.indent -= 1; }
     code_view make_code_vew(const usize2& size, arena& arena = arenas::gta) { return {
         .scratch_arena = arena,
@@ -50,11 +51,13 @@ namespace code_views {
         .size = size
     };}
 
-    code_view_iterator iterate(code_view& cv) { return { .view = cv }; }
+    code_view_iterator iterate(code_view& cv) { return { .view = cv, .builder = make_string_builder(1024, cv.scratch_arena) }; }
 
     bool finished (const code_view_iterator& it) { using_cv_iterator(it); return y >= size.h; }
     void next_line(code_view_iterator &it) {
         using_cv_iterator(it);
+        if (finished(it)) return;
+
         x  = indent * 4; //TODO: make the indent size configurable configurable
         y += 1;
     }
@@ -83,7 +86,7 @@ namespace code_views {
     }
 
     void put_float(code_view_iterator &it, palette_color color, float value) {
-        put_text(it, color, "%f", value);
+        put_text(it, color, "%.2f", value);
     }
 
     void put_uint(code_view_iterator &it, palette_color color, uint value) {
@@ -106,24 +109,28 @@ namespace code_views {
     }
 
     void put_text(code_view_iterator &it, palette_color color, const string& text) {
-        printf("%.*s", (int)text.count, text.data);
         var text_it = text;
-        while(!is_empty(text_it) && !finished(it)) {
-            if_var1 (c, take(text_it)); else break;
+        while(!is_empty(text_it)) {
+            var c = take(text_it).v0;
             if (c == '\n') {
+                push(it.builder, c);
+                for (var i = 0u; i < it.indent; ++i)
+                    push(it.builder, view("    "));
                 next_line(it);
                 continue;
             }
 
             if (c >= ' ' && c <= '~'); else continue;
 
+            push(it.builder, c);
             set_glyph(it, c - ' ');
             set_color(it, color);
 
             if_var1 (skipped_line, next_cell(it)); else break;
 
             if (skipped_line) {
-                if(skip_past(text_it, '\n')); else break;
+                let s = take_past(text_it, '\n');
+                push(it.builder, s);
             }
         }
     }

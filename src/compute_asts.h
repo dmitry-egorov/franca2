@@ -34,6 +34,7 @@ namespace compute_asts {
         pt_f32,
         pt_f64,
         pt_str,
+        pt_num_literal,
         pt_enum_size
     };
     using enum primitive_type;
@@ -79,6 +80,9 @@ namespace compute_asts {
         };
     };
 
+    struct func;
+    struct node;
+
     struct node {
         string text;
         bool text_is_quoted;
@@ -88,6 +92,8 @@ namespace compute_asts {
         int     int_value;
         uint   uint_value;
         float float_value;
+
+        func* func;
 
         enum struct type_t {
             literal,
@@ -104,6 +110,31 @@ namespace compute_asts {
         node* first_child;
         node*  last_child;
         node* next;
+    };
+
+    struct variable {
+        string id;
+        uint index;
+        primitive_type type;
+    };
+
+    struct func {
+        string id;
+        uint index;
+
+        node* body_node;
+
+        bool is_inline_wasm;
+
+        arr_dyn<variable> params ;
+        arr_dyn<variable> locals ;
+        arr_dyn<primitive_type> results;
+        stream body_wasm;
+
+        bool   imported;
+        string import_module;
+
+        bool exported;
     };
 
 #define loop_over_chain(name, first_node) for (var name = first_node; name; name = name->next)
@@ -143,9 +174,11 @@ namespace compute_asts {
         macro_show_as = 300,
     };
 
+    static let emit_local_get_id = view("emit_local_get");
     static let  decl_local_id = view("var");
     static let  decl_param_id = view("$");
     static let         def_id = view("def");
+    static let    def_wasm_id = view("def_wasm");
     static let       block_id = view("{}");
     static let         ret_id = view("ret");
     static let          as_id = view("as");
@@ -153,7 +186,6 @@ namespace compute_asts {
     static let       while_id = view("while");
     static let        istr_id = view("istr");
     static let         chr_id = view("chr");
-    static let    store_u8_id = view("store_u8");
     static let      assign_id = view("=");
     static let         add_id = view("+");
     static let         sub_id = view("-");
@@ -171,10 +203,8 @@ namespace compute_asts {
     static let          ge_id = view(">=");
     static let          lt_id = view("<");
     static let          gt_id = view(">");
-    static let      memcpy_id = view("memcpy");
     static let       print_id = view("print");
     static let        show_id = view("show");
-    static let       round_id = view("round");
 
     ast_storage make_ast_storage() {
         return {
@@ -199,7 +229,6 @@ namespace compute_asts {
     inline auto get_str (const node& node   ) -> ret1<string> { return ret1_ok(node.text); }
 
     inline auto get_fn_id(const node& n) -> ret1<string>   { if (is_func(n)) return ret1_ok(n.text); else return ret1_fail; }
-
 
     inline bool is_func(const node& node, string id) {
         if     (is_func(node)); else return false;
