@@ -7,6 +7,11 @@ var[ai i32 -1]
 var[bi i32  1]
 print["i32: a = "ai", b = "bi", a + b = "+[ai bi]", a - b = "-[ai bi]", a * b = "*[ai bi]", a / b = "/[ai bi]]
 
+print["-b = "-[bi]]
+
 var[af f32 -1.5]
 var[bf f32  1.5]
 print["f32: a = "af", b = "bf", a + b = "+[af bf]", a - b = "-[af bf]", a * b = "*[af bf]", a / b = "/[af bf]]
+
+var[x f32 0.51]
+print["round "x" = "round[x]]

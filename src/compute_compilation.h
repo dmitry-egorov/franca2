@@ -109,8 +109,7 @@ namespace compute_asts {
         auto add_param(string id, primitive_type, func&) -> uint;
         void add_result(primitive_type, func&);
 
-        auto primitive_type_by(string name   ) -> primitive_type;
-        auto wasm_type_of     (primitive_type) -> wasm_value_type;
+        auto wasm_type_of(primitive_type) -> wasm_value_type;
 
         void fill_bop_to_wasm();
         auto get_bop_to_wasm(binary_op, primitive_type) -> wasm_opcode;
@@ -164,8 +163,6 @@ namespace compute_asts {
                 assert(func.body_wasm.data.count == 0);
                 continue;
             }
-
-            //TODO: skip inline functions
 
             var wasm_func = wasm_emit::wasm_func {
                 .type_index = func_i,
@@ -240,7 +237,9 @@ namespace compute_asts {
                     if (is_func(param_node, decl_param_id)); else continue;
                     if_var2(prm_id_node, prm_type_node, deref2(param_node.first_child)); else { dbg_fail_return; }
 
-                    add_param(prm_id_node.text, primitive_type_by(prm_type_node.text), func);
+                    let type = primitive_type_by(prm_type_node.text);
+                    add_param(prm_id_node.text, type, func);
+                    param_node.value_type = type;
                 }
 
                 let res_type = primitive_type_by(type_node.text);
@@ -298,9 +297,10 @@ namespace compute_asts {
             var arg_p = args;
             while (arg_p) {
                 ref arg = *arg_p;
-                if_var1(val, get_uint(arg)); else { dbg_fail_return; }
-                emit(val, body);
-
+                if_var1(vu, get_uint(arg)) { emit(vu, body); }
+                else { if_var1(vi, get_int(arg)) { emit(vi, body); }
+                else { if_var1(vf, get_float(arg)) { emit(vf, body); }
+                else { dbg_fail_return; }}}
                 arg_p = arg.next;
             }
         }
@@ -443,22 +443,13 @@ namespace compute_asts {
                 return;
             }
 
-            //Note: requires inline
-            if (fn_id == ret_id) {
-                if_ref(arg, args_node_p); else { dbg_fail_return; }
-                emit_node(arg, ctx);
-                emit(op_return, body);
-                node.value_type = pt_void; //TODO: maybe some other type?
-                return;
-            }
-
             if (fn_id == decl_local_id) {
                 if_var2(id_node, type_node, deref2(args_node_p)); else { dbg_fail_return; }
                 ref local = add_local(id_node.text, primitive_type_by(type_node.text), ctx);
                 if_ref(init_node, type_node.next) {
                     emit_node(init_node, ctx);
                     emit(op_local_set, local.index, body);
-                    node.value_type = local.type; // TODO: check compatible and cast
+                    node.value_type = pt_void; // TODO: check compatible and cast
                 }
                 return;
             }
@@ -476,18 +467,6 @@ namespace compute_asts {
                 return;
             }
 
-            //Note: requires overloads and inline
-            if (fn_id ==       eq_id) { emit_bop  (bop_eq , node, ctx); return; }
-            if (fn_id ==       ne_id) { emit_bop  (bop_ne , node, ctx); return; }
-            if (fn_id ==       le_id) { emit_bop  (bop_le , node, ctx); return; }
-            if (fn_id ==       ge_id) { emit_bop  (bop_ge , node, ctx); return; }
-            if (fn_id ==       lt_id) { emit_bop  (bop_lt , node, ctx); return; }
-            if (fn_id ==       gt_id) { emit_bop  (bop_gt , node, ctx); return; }
-            if (fn_id ==      add_id) { emit_bop  (bop_add, node, ctx); return; }
-            if (fn_id ==      sub_id) { emit_minus         (node, ctx); return; }
-            if (fn_id ==      mul_id) { emit_bop  (bop_mul, node, ctx); return; }
-            if (fn_id ==      div_id) { emit_bop  (bop_div, node, ctx); return; }
-            if (fn_id ==      rem_id) { emit_bop  (bop_rem, node, ctx); return; }
             if (fn_id ==    add_a_id) { emit_bop_a(bop_add, node, ctx); return; }
             if (fn_id ==    sub_a_id) { emit_bop_a(bop_sub, node, ctx); return; }
             if (fn_id ==    mul_a_id) { emit_bop_a(bop_mul, node, ctx); return; }
@@ -713,12 +692,6 @@ namespace compute_asts {
         }
 
         func* find_func(string id, const arr_view<primitive_type>& params, context& ctx) {
-            printf("find_func: %.*s", (int)id.count, id.data);
-            for (var i = 0u; i < params.count; ++i)
-                printf(" %u", (uint)params[i]);
-            printf("\n");
-
-            //TODO: compare params
             for (var i = (int)ctx.funcs_in_scope.data.count - 1; i >= 0; i--) {
                 if_ref(v, ctx.funcs_in_scope.data[i]); else { dbg_fail_return nullptr; }
                 if (v.id == id); else continue;
@@ -863,23 +836,6 @@ namespace compute_asts {
 
         void add_result(primitive_type type, func& func) {
             push(func.results, type);
-        }
-
-        primitive_type primitive_type_by(string name){
-            if (name == view("void")) return pt_void ;
-            if (name == view("i8"  )) return pt_i8 ;
-            if (name == view("i16" )) return pt_i16;
-            if (name == view("i32" )) return pt_i32;
-            if (name == view("u8 " )) return pt_u8 ;
-            if (name == view("u16" )) return pt_u16;
-            if (name == view("u32" )) return pt_u32;
-            if (name == view("i64" )) return pt_i64;
-            if (name == view("u64" )) return pt_u64;
-            if (name == view("f32" )) return pt_f32;
-            if (name == view("f64" )) return pt_f64;
-
-            printf("Type %.*s not found.\n", (int)name.count, name.data);
-            dbg_fail_return pt_invalid;
         }
 
         wasm_value_type wasm_type_of(primitive_type type) {

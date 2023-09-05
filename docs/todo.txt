@@ -1,5 +1,5 @@
-- [ ] wasm_def return (need overriding)
-- [ ] wasm_def binary ops
+- [ ] assign op
+- [ ] mod color of custom functions
 - [ ] strings as compound types? that means a primitive can be expanded as multiple wasm consts
 - [ ] inline by creating a new var at the call site or reusing a var if it's passed directly
 - [ ] fix referencing locals outside a function
@@ -52,6 +52,8 @@
 - [ ] wasm jit?
 
 done
+- [+] wasm_def return (need overriding)
+- [+] wasm_def binary ops
 - [+] override functions
 - [+] single emit function, polymorphic over parameter count
 - [+] wasm_def

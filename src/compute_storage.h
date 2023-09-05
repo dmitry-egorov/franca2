@@ -29,6 +29,8 @@ namespace compute_asts {
         string id;
         node* display;
         node* type;
+
+        arr_view<primitive_type> params;
     };
 
     struct st_scope {
@@ -40,23 +42,26 @@ namespace compute_asts {
         arr_dyn<st_scope   > scopes;
         arr_dyn<st_variable> vars  ;
         arr_dyn<st_func    > funcs ;
+
+        arena& arena;
     };
 
-#define using_storage ref [scopes, vars, funcs] = storage
+#define using_storage ref [scopes, vars, funcs, arena] = storage
 
     static storage make_storage(arena& arena = gta);
 
     void push_var  (storage &, const st_variable&);
     void push_scope(storage&);
     void  pop_scope(storage&);
-    variable* find_var (storage&, uint id);
-    func*     find_func(storage&, uint id);
+    auto find_var  (storage& storage, string id) -> st_variable*;
+    auto find_func (storage& storage, string id, arr_view<primitive_type> params) -> st_func*;
 
     static storage make_storage(arena& arena) {
         return {
             make_arr_dyn<st_scope   >(1024, arena, 8),
             make_arr_dyn<st_variable>(1024, arena, 8),
             make_arr_dyn<st_func    >(1024, arena, 8),
+            arena
         };
     }
 
@@ -95,12 +100,26 @@ namespace compute_asts {
         return nullptr;
     }
 
-    st_func* find_func(storage& storage, const string id) {
+    st_func* find_func(storage& storage, const string id, const arr_view<primitive_type> params) {
         using_storage;
         var funcs_view = funcs.data;
         for (var i = (int)funcs_view.count - 1; i >= 0; --i) {
             ref v = funcs_view[i];
-            if (v.id == id) return &v;
+
+            if (v.id == id); else continue;
+            let f_params = v.params;
+            if (f_params.count == params.count); else continue;
+
+            var found = true;
+            for (var prm_i = 0u; prm_i < params.count; ++prm_i)
+                if (f_params[prm_i] != params[prm_i]) {
+                    found = false;
+                    break;
+                }
+
+            if (found); else continue;
+
+            return &v;
         }
 
         return nullptr;

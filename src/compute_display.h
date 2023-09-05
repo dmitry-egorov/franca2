@@ -46,9 +46,8 @@ namespace compute_asts {
 
         void gather_definitions(node&, context&);
 
-        void display_func(node&         , node* args, context&);
-        void display_func(string fn_id  , node* args, context&);
-        void display_func(const st_func&, node* args, context&);
+        void display_func_call(node&         , node* args, context&);
+        void display_func_call(const st_func&, node* args, context&);
 
         void display_inactive  (node*, context&);
         void display_local_get (node*, context&);
@@ -58,7 +57,6 @@ namespace compute_asts {
         void display_decl_param(node*, context&);
         void display_decl_func (node*, context&);
         void display_def_wasm  (node*, context&);
-        void display_return    (node*, context&);
         void display_as        (node*, context&);
         void display_if        (node*, context&);
         void display_loop      (node*, context&);
@@ -129,7 +127,7 @@ namespace compute_asts {
 
             //TODO: support strings as fn id
             if (is_func(node)) {
-                display_func(node, node.first_child, ctx);
+                display_func_call(node, node.first_child, ctx);
                 return;
             }
 
@@ -143,25 +141,38 @@ namespace compute_asts {
             var arg_p = node.first_child;
             while (arg_p) {
                 ref arg = *arg_p;
-                if_var1(val, get_uint(arg)); else { dbg_fail_return; }
 
                 put_text(regulars, view(" "), ctx);
-                put_uint(constants, val, ctx);
+                       if_var1(vu, get_uint (arg)) { put_uint (constants, vu, ctx); }
+                else { if_var1(vi, get_int  (arg)) { put_int  (constants, vi, ctx); }
+                else { if_var1(vf, get_float(arg)) { put_float(constants, vf, ctx); }
+                else { dbg_fail_return; }}}
 
                 arg_p = arg.next;
             }
         }
 
         void gather_definitions(node& node, context& context) {
+            using enum node::type_t;
             if (is_func(node, def_id) || is_func(node, def_wasm_id)); else return;
 
             if_var3(id_node, disp_node, type_node, deref3(node.first_child)); else { dbg_fail_return; }
             var id = id_node.text;
 
-            push_func(context.storage, { id, &disp_node, &type_node });
+            var params = make_arr_dyn<primitive_type>(8, context.storage.arena);
+            var param_node_p = disp_node.first_child;
+            while (param_node_p) {
+                ref param_node = *param_node_p;
+                if (param_node.type == func)
+                    push(params, param_node.value_type);
+
+                param_node_p = param_node.next;
+            }
+
+            push_func(context.storage, st_func { id, &disp_node, &type_node, params.data});
         }
 
-        void display_func(node& n, node* args, context& ctx) {
+        void display_func_call(node& n, node* args, context& ctx) {
             let fn_id = n.text;
 
             //if (fn_id == "(uint)inactive"     ) { display_inactive     (args_node_p, ctx); return; } //TODO: parse comments as inactive node?
@@ -171,46 +182,38 @@ namespace compute_asts {
             if (fn_id ==     decl_param_id) { display_decl_param(args, ctx); return; }
             if (fn_id ==            def_id) { display_decl_func (args, ctx); return; }
             if (fn_id ==       def_wasm_id) { display_def_wasm  (args, ctx); return; }
-            if (fn_id ==            ret_id) { display_return    (args, ctx); return; }
             if (fn_id ==             as_id) { display_as        (args, ctx); return; }
             if (fn_id ==             if_id) { display_if        (args, ctx); return; }
             if (fn_id ==          while_id) { display_loop      (args, ctx); return; }
             if (fn_id ==           istr_id) { display_istr      (args, ctx); return; }
             if (fn_id ==            chr_id) { display_chr       (args, ctx); return; }
             if (fn_id ==         assign_id) { display_op_assign (args, ctx); return; }
-            if (fn_id ==            sub_id) { display_minus     (args, ctx); return; }
-            if (fn_id ==            add_id) { display_bop       (args, view(" + " ), ctx); return; }
-            if (fn_id ==            mul_id) { display_bop       (args, view(" * " ), ctx); return; }
-            if (fn_id ==            div_id) { display_bop       (args, view(" / " ), ctx); return; }
-            if (fn_id ==            rem_id) { display_bop       (args, view(" % " ), ctx); return; }
             if (fn_id ==          add_a_id) { display_bop_a     (args, view(" += "), ctx); return; }
             if (fn_id ==          sub_a_id) { display_bop_a     (args, view(" -= "), ctx); return; }
             if (fn_id ==          mul_a_id) { display_bop_a     (args, view(" *= "), ctx); return; }
             if (fn_id ==          div_a_id) { display_bop_a     (args, view(" /= "), ctx); return; }
             if (fn_id ==          rem_a_id) { display_bop_a     (args, view(" %= "), ctx); return; }
-            if (fn_id ==             eq_id) { display_bop       (args, view(" == "), ctx); return; }
-            if (fn_id ==             ne_id) { display_bop       (args, view(" != "), ctx); return; }
-            if (fn_id ==             le_id) { display_bop       (args, view(" <= "), ctx); return; }
-            if (fn_id ==             ge_id) { display_bop       (args, view(" >= "), ctx); return; }
-            if (fn_id ==             lt_id) { display_bop       (args, view(" < " ), ctx); return; }
-            if (fn_id ==             gt_id) { display_bop       (args, view(" > " ), ctx); return; }
             if (fn_id ==          print_id) { display_fn_print  (args, ctx); return; }
             if (fn_id ==           show_id) { display_macro_show(args, ctx); return; }
 
-            display_func(fn_id, args, ctx);
-        }
+            var params = make_arr_dyn<primitive_type>(8, ctx.storage.arena);
+            var arg_p = args;
+            while (arg_p) {
+                ref arg = *arg_p;
+                push(params, arg.value_type);
+                arg_p = arg.next;
+            }
 
-        void display_func(string fn_id, node* args, context& ctx) {
-            if_ref(fn, find_func(ctx.storage, fn_id)); else {
+            if_ref(fn, find_func(ctx.storage, fn_id, params.data)); else {
                 put_text_in_brackets(inlays, view(" "), ctx);
                 printf("unknown function: %.*s\n", (int)fn_id.count, fn_id.data);
                 dbg_fail_return;
             }
 
-            display_func(fn, args, ctx);
+            display_func_call(fn, args, ctx);
         }
 
-        void display_func(const st_func& fn, node* args, context& ctx) {
+        void display_func_call(const st_func& fn, node* args, context& ctx) {
             using enum node::type_t;
 
             var disp_node_p = fn.display->first_child;
@@ -347,16 +350,17 @@ namespace compute_asts {
             put_text_in_brackets(definitions, type_name, ctx);
             if_ref(body_node, type_node.next); else return;
             put_text(regulars, view(" -> "), ctx);
+
+            if (is_func(body_node, block_id)) {
+                tmp_scope(storage);
+                for (var node_p = body_node.first_child; node_p; node_p = node_p->next) {
+                    display_wasm_node(*node_p, ctx);
+                    put_text(inlays, sub_past_last(node_p->suffix, '\n'), ctx);
+                }
+                return;
+            }
+
             display_wasm_node(body_node, ctx);
-        }
-
-        void display_return(node* args, context& ctx) {
-            using_display_ctx;
-
-            put_text(controls, view("return "), ctx);
-
-            if_ref (value_node, args); else { return; }
-            display_node(value_node, ctx);
         }
 
         void display_as(node* args, context& ctx) {

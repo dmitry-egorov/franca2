@@ -180,14 +180,12 @@ namespace compute_asts {
     static let         def_id = view("def");
     static let    def_wasm_id = view("def_wasm");
     static let       block_id = view("{}");
-    static let         ret_id = view("ret");
     static let          as_id = view("as");
     static let          if_id = view("if");
     static let       while_id = view("while");
     static let        istr_id = view("istr");
     static let         chr_id = view("chr");
     static let      assign_id = view("=");
-    static let         add_id = view("+");
     static let         sub_id = view("-");
     static let         mul_id = view("*");
     static let         div_id = view("/");
@@ -197,12 +195,6 @@ namespace compute_asts {
     static let       mul_a_id = view("*=");
     static let       div_a_id = view("/=");
     static let       rem_a_id = view("%=");
-    static let          eq_id = view("==");
-    static let          ne_id = view("!=");
-    static let          le_id = view("<=");
-    static let          ge_id = view(">=");
-    static let          lt_id = view("<");
-    static let          gt_id = view(">");
     static let       print_id = view("print");
     static let        show_id = view("show");
 
@@ -222,11 +214,12 @@ namespace compute_asts {
     inline auto is_float_literal(const node& node) -> bool { return node.type == node::type_t::literal && node.can_be_float && !node.text_is_quoted; }
     inline auto is_str_literal  (const node& node) -> bool { return node.type == node::type_t::literal && node.text_is_quoted; }
 
-    inline auto get_uint(const poly_value& v) -> ret1<uint>   { if (v.type == pt_u32) return ret1_ok(v.u32  ); else return ret1_fail; }
-    inline auto get_str (const poly_value& v) -> ret1<string> { if (v.type == pt_str) return ret1_ok(v.str); else return ret1_fail; }
-    inline auto get_int (const node& node   ) -> ret1<int >   { if (is_int_literal (node)) return ret1_ok(node. int_value); else return ret1_fail; }
-    inline auto get_uint(const node& node   ) -> ret1<uint>   { if (is_uint_literal(node)) return ret1_ok(node.uint_value); else return ret1_fail; }
-    inline auto get_str (const node& node   ) -> ret1<string> { return ret1_ok(node.text); }
+    inline auto get_uint (const poly_value& v) -> ret1<uint>   { if (v.type == pt_u32) return ret1_ok(v.u32  ); else return ret1_fail; }
+    inline auto get_str  (const poly_value& v) -> ret1<string> { if (v.type == pt_str) return ret1_ok(v.str); else return ret1_fail; }
+    inline auto get_int  (const node& node   ) -> ret1<int  >  { if (is_int_literal  (node)) return ret1_ok(node.  int_value); else return ret1_fail; }
+    inline auto get_uint (const node& node   ) -> ret1<uint >  { if (is_uint_literal (node)) return ret1_ok(node. uint_value); else return ret1_fail; }
+    inline auto get_float(const node& node   ) -> ret1<float>  { if (is_float_literal(node)) return ret1_ok(node.float_value); else return ret1_fail; }
+    inline auto get_str  (const node& node   ) -> ret1<string> { return ret1_ok(node.text); }
 
     inline auto get_fn_id(const node& n) -> ret1<string>   { if (is_func(n)) return ret1_ok(n.text); else return ret1_fail; }
 
@@ -289,6 +282,23 @@ namespace compute_asts {
     inline void release(ast& ast) {
         release(ast.storage);
         ast.root = nullptr;
+    }
+
+    primitive_type primitive_type_by(string name) {
+        if (name == view("void")) return pt_void ;
+        if (name == view("i8"  )) return pt_i8 ;
+        if (name == view("i16" )) return pt_i16;
+        if (name == view("i32" )) return pt_i32;
+        if (name == view("u8 " )) return pt_u8 ;
+        if (name == view("u16" )) return pt_u16;
+        if (name == view("u32" )) return pt_u32;
+        if (name == view("i64" )) return pt_i64;
+        if (name == view("u64" )) return pt_u64;
+        if (name == view("f32" )) return pt_f32;
+        if (name == view("f64" )) return pt_f64;
+
+        printf("Type %.*s not found.\n", (int)name.count, name.data);
+        dbg_fail_return pt_invalid;
     }
 }
 

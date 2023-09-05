@@ -150,19 +150,12 @@ static bool init() {
     //print_ast(&ast);
     //display(ast, cv_it);
 
-    //let source_files = arrays::view({
-    //    //"embedded/hello_world.fr",
-    //    //"embedded/test0.fr",
-    //    //"embedded/primitives_test.fr",
-    //    //"embedded/fib.fr",
-    //    "embedded/prelude.fr",
-    //});
     var source_files = make_arr_dyn<const char*>(16);
-    //push(source_files, (const char*)"embedded/scope_vars_test.fr");
-    //push(source_files, (const char*)"embedded/hello_world.fr");
-    //push(source_files, (const char*)"embedded/test0.fr");
-    //push(source_files, (const char*)"embedded/primitives_test.fr");
-    //push(source_files, (const char*)"embedded/fib.fr");
+    push(source_files, (const char*)"embedded/scope_vars_test.fr");
+    push(source_files, (const char*)"embedded/hello_world.fr");
+    push(source_files, (const char*)"embedded/test0.fr");
+    push(source_files, (const char*)"embedded/primitives_test.fr");
+    push(source_files, (const char*)"embedded/fib.fr");
     push(source_files, (const char*)"embedded/prelude.fr");
 
     wasm_emit::init();
@@ -171,6 +164,11 @@ static bool init() {
     printf("\nAST:\n");
     compute_asts::print_ast(compute_ast);
     printf("AST parsed. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+
+    let compile_start = std::chrono::high_resolution_clock::now();
+    printf("\n(WASM) Compiling...\n");
+    let wasm = compile(compute_ast);
+    printf("(WASM) Compiled in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     printf("\nGenerating code view...\n");
     compute_asts::display(compute_ast, cv_it);
@@ -229,10 +227,6 @@ static bool init() {
 
     printf("WGPU ready. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
-    let compile_start = std::chrono::high_resolution_clock::now();
-    printf("\n(WASM) Compiling...\n");
-    let wasm = compile(compute_ast);
-    printf("(WASM) Compiled in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     let wasm_start = std::chrono::high_resolution_clock::now();
     printf("\n(WASM) Running...\n");
