@@ -37,6 +37,7 @@ namespace wasm_emit {
     };
 
     enum wasm_value_type: u8 {
+        vt_unknown = 0x00,
         vt_void = 0x40,
         vt_f64  = 0x7c,
         vt_f32  = 0x7d,
@@ -484,7 +485,7 @@ namespace wasm_emit {
         push(dst, {(u8*)data.data, data.count});
     }
 
-    void emit(const char* str, stream& dst) {
+    void emit(cstr str, stream& dst) {
         emit(view(str), dst);
     }
 

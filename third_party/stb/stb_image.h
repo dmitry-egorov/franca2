@@ -159,7 +159,7 @@ RECENT REVISION HISTORY:
 // *channels_in_file otherwise. If desired_channels is non-zero,
 // *channels_in_file has the number of components that _would_ have been
 // output otherwise. E.g. if you set desired_channels to 4, you will always
-// get RGBA output, but you can check *channels_in_file to see if it's trivially
+// get RGBA output, but you can analyze *channels_in_file to see if it's trivially
 // opaque because e.g. there were only 3 channels in the source image.
 //
 // An output image with N components has the following components interleaved
@@ -5768,7 +5768,7 @@ static int stbi__tga_info(stbi__context *s, int *x, int *y, int *comp)
             return 0;
         }
         stbi__skip(s,4);       // skip index of first colormap entry and number of entries
-        sz = stbi__get8(s);    //   check bits per palette color entry
+        sz = stbi__get8(s);    //   analyze bits per palette color entry
         if ( (sz != 8) && (sz != 15) && (sz != 16) && (sz != 24) && (sz != 32) ) {
             stbi__rewind(s);
             return 0;
@@ -7938,7 +7938,7 @@ STBIDEF int stbi_is_16_bit_from_callbacks(stbi_io_callbacks const *c, void *user
       0.53    fix bug in png 3->4; speedup png decoding
       0.52    png handles req_comp=3,4 directly; minor cleanup; jpeg comments
       0.51    obey req_comp requests, 1-component jpegs return as 1-component,
-              on 'test' only check type, not whether we support this variant
+              on 'test' only analyze type, not whether we support this variant
       0.50  (2006-11-19)
               first released version
 */

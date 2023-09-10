@@ -1,4 +1,23 @@
-- [ ] assign op
+- [ ] defs are macros by default
+    - [ ] $: temp local
+    - [ ] #: embedded code
+    - [ ] support locals within inlined functions
+- [ ] var with init as macro
+    - [ ] 'identifier' parameter kind
+    - [ ] pass name and kind
+    - [ ] local builtin
+- [ ] emit a function and a call when needed
+- [ ] line and column numbers for nodes
+- [ ] breakable scope for loops
+- [ ] +=, -=, *=, /=, %= ...
+- [ ] fix display of wasm nodes (no space between ops)
+- [ ] generalize funcs
+    - [ ] a new param type: on stack?
+    - [ ] if func is inline add external var ref
+    - [ ] if func is called pass value and set var after return
+- [ ] inline store_u8
+    - [ ] separate display and param list
+- [ ] $ -> in
 - [ ] mod color of custom functions
 - [ ] strings as compound types? that means a primitive can be expanded as multiple wasm consts
 - [ ] inline by creating a new var at the call site or reusing a var if it's passed directly
@@ -52,6 +71,26 @@
 - [ ] wasm jit?
 
 done
+- [~] defs are macros by default
+    - emit a function and a call when needed
+    - [+] remap locals
+    - [+] &: reference
+        - [+] remap params
+- [+] determine types beforehand
+    - [+] gather types for each node
+    - [+] gather definitions
+        - [+] macro
+        - [+] scope
+        - [+] funcs
+    - [+] gather scopes
+- [+] discriminated union of node types
+
+- [+] node parameter #
+    - [+] emit parameter explicitly in the macro
+- [+] assign op
+    - [+] pass variable by reference (local index)
+    - [+] explicit reference to variable
+    - [+] wasm ops can accept local index
 - [+] wasm_def return (need overriding)
 - [+] wasm_def binary ops
 - [+] override functions

@@ -1,0 +1,12 @@
+References
+
+- can resolve this by requiring references call (&[x]) to be explicit
+
+name of the local can be a reference or a value
+
+if it's a reference, we don't emit code, but pass local id to the called function
+if it's a value, we emit the code
+
+the behaviour depends on the context, specifically the function being called
+
+everything is more complicated, since the functions are polymorphic

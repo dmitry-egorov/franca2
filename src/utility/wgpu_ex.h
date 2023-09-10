@@ -6,10 +6,12 @@
 #include "results.h"
 #include "arrays.h"
 #include "mem_ex.h"
+#include "strings.h"
 #include "files.h"
 
 namespace wgpu_ex {
     using namespace arenas;
+    using namespace strings;
 
     inline WGPUInstance make_instance(const WGPUInstanceDescriptor& descriptor) { return wgpuCreateInstance(&descriptor); }
     inline WGPUProc     get_proc_address(WGPUDevice device, char const * proc_name);
@@ -276,12 +278,12 @@ namespace wgpu_ex {
         .writeMask = WGPUColorWriteMask_All,
     };}
 
-    inline WGPUVertexState make_vertex_state(WGPUShaderModule shader_module, const char* entry_point) { return {
+    inline WGPUVertexState make_vertex_state(WGPUShaderModule shader_module, cstr entry_point) { return {
         .module = shader_module,
         .entryPoint = entry_point
     };}
 
-    inline WGPUFragmentState make_fragment_state(WGPUShaderModule shader_module, const char* entry_point, const WGPUBlendState& blend, arena& arena = gta) { return {
+    inline WGPUFragmentState make_fragment_state(WGPUShaderModule shader_module, cstr entry_point, const WGPUBlendState& blend, arena& arena = gta) { return {
         .module      = shader_module, .entryPoint  = entry_point,
         .targetCount = 1,
         .targets     = alloc_one(arena, make_target(blend, arena)),
@@ -312,7 +314,7 @@ namespace wgpu_ex {
         WGPUTextureView texture_view;
     };
 
-    inline WGPUBindGroup make_bind_group(WGPUDevice device, WGPUBindGroupLayout layout, std::initializer_list<BindGroupEntry> entries) {
+    inline WGPUBindGroup make_bind_group(WGPUDevice device, WGPUBindGroupLayout layout, init_list<BindGroupEntry> entries) {
         let count    = entries.size();
         var iterator = entries.begin();
         var wgpu_entries = stackalloc(count, WGPUBindGroupEntry);
@@ -353,11 +355,11 @@ namespace wgpu_ex {
         });
     }
 
-    inline WGPUBindGroup make_bind_group(WGPUDevice device, WGPURenderPipeline pipeline, std::initializer_list<BindGroupEntry> entries) {
+    inline WGPUBindGroup make_bind_group(WGPUDevice device, WGPURenderPipeline pipeline, init_list<BindGroupEntry> entries) {
         return make_bind_group(device, get_bind_group_layout(pipeline, 0), entries);
     }
 
-    inline WGPUBindGroup make_bind_group(WGPUDevice device, WGPUComputePipeline pipeline, std::initializer_list<BindGroupEntry> entries) {
+    inline WGPUBindGroup make_bind_group(WGPUDevice device, WGPUComputePipeline pipeline, init_list<BindGroupEntry> entries) {
         return make_bind_group(device, get_bind_group_layout(pipeline, 0), entries);
     }
 
@@ -368,7 +370,7 @@ namespace wgpu_ex {
         });
     }
 
-    inline WGPUShaderModule make_spirv_shader(WGPUDevice device, const uint32_t* code, uint32_t size, const char* label = nullptr) {
+    inline WGPUShaderModule make_spirv_shader(WGPUDevice device, const uint32_t* code, uint32_t size, cstr label = nullptr) {
         let desc = WGPUShaderModuleSPIRVDescriptor {
             .chain    = { .sType = WGPUSType_ShaderModuleSPIRVDescriptor },
             .codeSize = size / sizeof(uint32_t),
@@ -388,7 +390,7 @@ namespace wgpu_ex {
         });
     }
 
-    inline WGPUShaderModule make_wgsl_shader_module(WGPUDevice device, const char* const code, const char* label = nullptr) {
+    inline WGPUShaderModule make_wgsl_shader_module(WGPUDevice device, cstr const code, cstr label = nullptr) {
         let wgsl = WGPUShaderModuleWGSLDescriptor {
             .chain = { .sType = WGPUSType_ShaderModuleWGSLDescriptor },
             .code = code,
@@ -399,7 +401,7 @@ namespace wgpu_ex {
         });
     }
 
-    inline WGPUShaderModule make_wgsl_shader_module_from_file(WGPUDevice device, const char* const path, const char* label = nullptr, arena& arena = gta) {
+    inline WGPUShaderModule make_wgsl_shader_module_from_file(WGPUDevice device, cstr const path, cstr label = nullptr, arena& arena = gta) {
         let code = files::read_file_as_string(path, arena);
         let wgsl = WGPUShaderModuleWGSLDescriptor {
             .chain = { .sType = WGPUSType_ShaderModuleWGSLDescriptor },

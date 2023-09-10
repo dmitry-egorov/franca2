@@ -11,6 +11,7 @@ namespace strings {
     using namespace arrays;
     using namespace arenas;
 
+    typedef const char* cstr;
     typedef arrays::arr_view<char> string;
     typedef arr_dyn<char> str_dyn;
 
@@ -18,7 +19,7 @@ namespace strings {
         return a.count == b.count && memcmp(a.data, b.data, a.count) == 0;
     }
 
-    template<typename... Args> string make_string(arena& arena, const char* format, Args... args) {
+    template<typename... Args> string make_string(arena& arena, cstr format, Args... args) {
         let [data, free_count] = arenas::free_space_of<char>(arena, 1);
         let count  = snprintf(data, free_count - 1, format, args...) + 1;
         var result = arenas::alloc_g<char>(arena, count, 1);
@@ -26,7 +27,7 @@ namespace strings {
         return result;
     }
 
-    inline string view(const char* s) {
+    inline string view(cstr s) {
         return {.data = (char*)s, .count = strlen(s)};
     }
 

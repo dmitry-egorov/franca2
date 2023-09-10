@@ -34,7 +34,7 @@ namespace arenas {
 
     inline void*     alloc(arena&, size_t size_bytes, uint align = sizeof(size_t));
     tt arr_view<t> alloc(arena&, size_t count, uint align = sizeof(size_t));
-    tt arr_view<t> alloc(arena& arena, std::initializer_list<t> list, uint align = sizeof(size_t));
+    tt arr_view<t> alloc(arena& arena, init_list<t> list, uint align = sizeof(size_t));
 
     tt t* alloc_one(arena& arena, const t& item, uint align = sizeof(size_t));
 
@@ -47,7 +47,7 @@ namespace arenas {
 
     inline void*     gta_alloc(size_t size_bytes, uint align = sizeof(size_t));
     tt arr_view<t> gta_alloc(size_t count, uint align = sizeof(size_t));
-    tt arr_view<t> gta_alloc(std::initializer_list<t> list, uint align = sizeof(size_t));
+    tt arr_view<t> gta_alloc(init_list<t> list, uint align = sizeof(size_t));
 
     tt t* gta_one(const t& item, uint align = sizeof(size_t));
 
@@ -118,7 +118,7 @@ namespace arenas {
         return { (t*)alloc(arena, count * sizeof(t), align), (uint)count };
     }
 
-    tt arr_view<t> alloc(arena& arena, const std::initializer_list<t> list, const uint align) {
+    tt arr_view<t> alloc(arena& arena, const init_list<t> list, const uint align) {
         let count = list.size();
         if(count > 0); else return { 0, 0 };
 
@@ -152,7 +152,7 @@ namespace arenas {
 
     void* gta_alloc(const size_t size_bytes, const uint align) { return alloc(gta, size_bytes, align); }
     tt arr_view<t> gta_alloc(const size_t count, const uint align) { return alloc<t>(gta, count, align); }
-    tt arr_view<t> gta_alloc(const std::initializer_list<t> list, const uint align) { return alloc<t>(gta, list, align); }
+    tt arr_view<t> gta_alloc(const init_list<t> list, const uint align) { return alloc<t>(gta, list, align); }
 
     tt t* gta_one(const t& item, const uint align) { return alloc_one<t>(gta, item, align); }
 }

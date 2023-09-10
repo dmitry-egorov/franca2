@@ -14,7 +14,6 @@
 #include "utility/syntax.h"
 #include "utility/transforms.h"
 #include "utility/arrays.h"
-#define FRANCA2_ARENAS_IMPL
 #include "utility/arenas.h"
 
 #include "utility/wgpu_ex.h"
@@ -37,12 +36,14 @@
 #include "visual_display.h"
 #include "line_view_gen.h"
 
-#include "compute_asts.h"
-#include "compute_parsing.h"
-#include "compute_printing.h"
-#include "compute_storage.h"
-#include "compute_compilation.h"
-#include "compute_display.h"
+#include "asts.h"
+#include "asts_parsing.h"
+#include "asts_printing.h"
+#include "asts_storage.h"
+#include "asts_analysis.h"
+#include "asts_codegen.h"
+#include "asts_compilation.h"
+#include "asts_display.h"
 
 using namespace arenas;
 using namespace wgpu_ex;
@@ -119,6 +120,7 @@ EM_JS(int, run_wasm, (u8* ptr, size_t size), {
 });
 
 static bool init() {
+    using namespace compute_asts;
     using namespace std::chrono;
 
     gta_init(8 * 1024 * 1024); // 16 MB of global temp storage
@@ -150,32 +152,48 @@ static bool init() {
     //print_ast(&ast);
     //display(ast, cv_it);
 
-    var source_files = make_arr_dyn<const char*>(16);
-    push(source_files, (const char*)"embedded/scope_vars_test.fr");
-    push(source_files, (const char*)"embedded/hello_world.fr");
-    push(source_files, (const char*)"embedded/test0.fr");
-    push(source_files, (const char*)"embedded/primitives_test.fr");
-    push(source_files, (const char*)"embedded/fib.fr");
-    push(source_files, (const char*)"embedded/prelude.fr");
+    var source_files = make_arr_dyn<cstr>(16);
+
+    //push(source_files, (cstr)"embedded/hello_world.fr");
+    //push(source_files, (cstr)"embedded/test0.fr");
+    //push(source_files, (cstr)"embedded/primitives_test.fr");
+    //push(source_files, (cstr)"embedded/fib.fr");
+    //push(source_files, (cstr)"embedded/prelude.fr");
+
+    //push(source_files, (cstr)"embedded/scope_vars_test.fr");
+    //push(source_files, (cstr)"embedded/ref_test.fr");
+    push(source_files, (cstr)"embedded/macro_test.fr");
 
     wasm_emit::init();
 
-    if_var1(compute_ast, compute_asts::parse_files(source_files.data)); else return false;
+    var ast_data_arena = arenas::make(4 * 1024 * 1024);
+    var ast = make_ast(ast_data_arena);
+    parse_files(source_files.data, ast);
     printf("\nAST:\n");
-    compute_asts::print_ast(compute_ast);
+    print_ast(ast);
     printf("AST parsed. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     let compile_start = std::chrono::high_resolution_clock::now();
-    printf("\n(WASM) Compiling...\n");
-    let wasm = compile(compute_ast);
-    printf("(WASM) Compiled in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+    printf("\nAnalyzing...\n");
+    analyze(ast);
+    printf("Analyzing in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
-    printf("\nGenerating code view...\n");
-    compute_asts::display(compute_ast, cv_it);
-    printf(cv_it.builder.data);
-    printf("Code view generated. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+    let generate_start = std::chrono::high_resolution_clock::now();
+    printf("\nGenerating WASM...\n");
+    var wasm2 = emit_wasm(ast);
+    printf("Generated in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - generate_start).count(), wasm2.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
-    code_view.line_count = cv_it.cell_idx.y + 1;
+    //let compile_start = std::chrono::high_resolution_clock::now();
+    //printf("\n(WASM) Compiling...\n");
+    //let wasm = compile(ast);
+    //printf("(WASM) Compiled in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+    //let view_start = std::chrono::high_resolution_clock::now();
+    //
+    //printf("\nGenerating code view...\n");
+    //display(ast, cv_it);
+    //code_view.line_count = cv_it.cell_idx.y + 1;
+    //printf(cv_it.builder.data);
+    //printf("Code view generated in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     if_var1(line_view, generate_line_view(code_view.line_count, line_view_size)); else return false;
 
@@ -228,9 +246,15 @@ static bool init() {
     printf("WGPU ready. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
 
+    //let wasm_start = std::chrono::high_resolution_clock::now();
+    //printf("\n(WASM) Running...\n");
+    //var wasm_result = run_wasm(wasm.data, wasm.count);
+    //printf("(WASM) Exited with code: %d\n", wasm_result);
+    //printf("(WASM) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - wasm_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+
     let wasm_start = std::chrono::high_resolution_clock::now();
     printf("\n(WASM) Running...\n");
-    var wasm_result = run_wasm(wasm.data, wasm.count);
+    var wasm_result = run_wasm(wasm2.data, wasm2.count);
     printf("(WASM) Exited with code: %d\n", wasm_result);
     printf("(WASM) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - wasm_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 

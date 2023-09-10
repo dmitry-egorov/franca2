@@ -1,0 +1,10 @@
+universal var types
+
+- get & var by default?
+    - builtin '&' macro (emit var index)
+
+$ -- immutable value
+& -- mutable value
+# -- embedded code
+
+same in body as in the parameter list

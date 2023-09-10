@@ -1,32 +1,29 @@
 // Prelude:
 
-def_wasm[round istr["round "$[f f32]] f32 op_f32_nearest]
-def_wasm[round istr["round "$[f f64]] f64 op_f64_nearest]
-
 def[push istr["push "$[src u32]" "$[n u32]" into "$[dst u32]] u32 {}[
     mem_copy[src n dst]
     ret[+[dst n]]]]
 
 def[push istr["push "$[f f32]" into "$[dst u32]] u32 {}[
     if[<[f 0.0] {}[
-        =[dst push_char[chr[-] dst]]
-        =[f -[f]]]]
+        =[&[dst] push_char[chr[-] dst]]
+        =[&[f] -[f]]]]
 
-    =[dst push[as[f u32] dst]]
-    =[dst push_char[chr[.] dst]]
+    =[&[dst] push[as[f u32] dst]]
+    =[&[dst] push_char[chr[.] dst]]
 
     var[n_x_100 u32 as[*[f 100.0] u32] "n x 100"]
     var[d u32 10]
     while[>[d 0] {}[
-        =[dst push_char[()[+[chr[0] %[()[/[n_x_100 d]] 10]]] dst]]
+        =[&[dst] push_char[()[+[chr[0] %[()[/[n_x_100 d]] 10]]] dst]]
         /=[d 10]]]
 
     ret[dst]]]
 
 def[push istr["push "$[n i32]" into "$[dst u32]] u32 {}[
     if[<[n as[0 i32]] {}[
-        =[dst push_char[chr[-] dst]]
-        =[n -[n]]]]
+        =[&[dst] push_char[chr[-] dst]]
+        =[&[n] -[n]]]]
 
     ret[push[as[n u32] dst]]]]
 
@@ -38,7 +35,7 @@ def[push istr["push "$[n u32]" into "$[dst u32]] u32 {}[
     while[>[d n] {}[/=[d 10]]]
 
     while[>[d 0] {}[
-         =[dst push_char[()[+[chr[0] %[()[/[n d]] 10]]] dst]]
+         =[&[dst] push_char[()[+[chr[0] %[()[/[n d]] 10]]] dst]]
         /=[d 10]]]
 
     ret[dst]]]
@@ -55,19 +52,33 @@ def[mem_copy istr["copy "$[src u32]" "$[count u32]" into "$[dst u32]] void {}[
 
 def[store_u8 istr["store "$[ch u32]" at "$[dst u32]] void {}[
     emit_local_get[dst]
-    emit_local_get[ch]
-    op_i32_store8[0 0]]]
+    emit_local_get[ch ]
+    op_i32_store8 [0 0]]]
 
-//def_wasm[= istr[&[a u32]" = "$[b u32]] u32 set_local[a b]]
+def_wasm[round istr["round "$[f f32]] f32 op_f32_nearest]
+def_wasm[round istr["round "$[f f64]] f64 op_f64_nearest]
 
-//def[+= istr[&[a u32]" += "$[b u32]] u32 =[a +[a b]]]
+//TODO: return value
+//def_wasm[= istr[&[a u32]" = "#[b u32]] void {}[b op_local_set[a]]]
+def_wasm[= istr[&[a u32]" = "$[b u32]] void op_local_set[a]]
+def_wasm[= istr[&[a i32]" = "$[b i32]] void op_local_set[a]]
+def_wasm[= istr[&[a f32]" = "$[b f32]] void op_local_set[a]]
 
-def_wasm[- istr["-"$[a u32]] u32 {}[op_i32_const[-1] op_i32_xor op_i32_const[1] op_i32_add]]
-def_wasm[- istr["-"$[a i32]] i32 {}[op_i32_const[-1] op_i32_xor op_i32_const[1] op_i32_add]]
-def_wasm[- istr["-"$[a f32]] f32 op_f32_neg]
-def_wasm[- istr["-"$[a u64]] u64 {}[op_i64_const[-1] op_i64_xor op_i64_const[1] op_i64_add]]
-def_wasm[- istr["-"$[a i64]] i64 {}[op_i64_const[-1] op_i64_xor op_i64_const[1] op_i64_add]]
-def_wasm[- istr["-"$[a f64]] f64 op_f64_neg]
+def_wasm[+= istr[&[a u32]" += "$[b u32]] void op_local_get[a] op_i32_add op_local_set[a]]
+def_wasm[+= istr[&[a i32]" += "$[b i32]] void op_local_get[a] op_i32_add op_local_set[a]]
+def_wasm[+= istr[&[a f32]" += "$[b f32]] void op_local_get[a] op_f32_add op_local_set[a]]
+def_wasm[+= istr[&[a u64]" += "$[b u64]] void op_local_get[a] op_i64_add op_local_set[a]]
+def_wasm[+= istr[&[a i64]" += "$[b i64]] void op_local_get[a] op_i64_add op_local_set[a]]
+def_wasm[+= istr[&[a f64]" += "$[b f64]] void op_local_get[a] op_f64_add op_local_set[a]]
+
+//def_wasm[-= istr[&[a u32]" -= "$[b u32]] u32 op_local_get[a] emit[b] op_i32_sub op_local_set[a]]
+
+//def_wasm[-= istr[&[a u32]" -= "$[b u32]] u32 op_local_get[a] op_i32_sub op_local_set[a]]
+//def_wasm[-= istr[&[a i32]" -= "$[b i32]] i32 op_local_get[a] op_i32_sub op_local_set[a]]
+//def_wasm[-= istr[&[a f32]" -= "$[b f32]] f32 op_local_get[a] op_f32_sub op_local_set[a]]
+//def_wasm[-= istr[&[a u64]" -= "$[b u64]] u64 op_local_get[a] op_i64_sub op_local_set[a]]
+//def_wasm[-= istr[&[a i64]" -= "$[b i64]] i64 op_local_get[a] op_i64_sub op_local_set[a]]
+//def_wasm[-= istr[&[a f64]" -= "$[b f64]] f64 op_local_get[a] op_f64_sub op_local_set[a]]
 
 def_wasm[+ istr[$[a u32]" + "$[b u32]] u32 op_i32_add]
 def_wasm[+ istr[$[a i32]" + "$[b i32]] i32 op_i32_add]
@@ -92,10 +103,10 @@ def_wasm[* istr[$[a f64]" * "$[b f64]] f64 op_f64_mul]
 
 def_wasm[/ istr[$[a u32]" / "$[b u32]] u32 op_i32_div_u]
 def_wasm[/ istr[$[a i32]" / "$[b i32]] i32 op_i32_div_s]
-def_wasm[/ istr[$[a f32]" / "$[b f32]] f32 op_f32_div]
+def_wasm[/ istr[$[a f32]" / "$[b f32]] f32 op_f32_div  ]
 def_wasm[/ istr[$[a u64]" / "$[b u64]] u64 op_i64_div_u]
 def_wasm[/ istr[$[a i64]" / "$[b i64]] i64 op_i64_div_s]
-def_wasm[/ istr[$[a f64]" / "$[b f64]] f64 op_f64_div]
+def_wasm[/ istr[$[a f64]" / "$[b f64]] f64 op_f64_div  ]
 
 def_wasm[% istr[$[a u32]" % "$[b u32]] u32 op_i32_rem_u]
 def_wasm[% istr[$[a i32]" % "$[b i32]] i32 op_i32_rem_s]
@@ -118,31 +129,38 @@ def_wasm[!= istr[$[a f64]" != "$[b f64]] f64 op_f64_ne]
 
 def_wasm[< istr[$[a u32]" < "$[b u32]] u32 op_i32_lt_u]
 def_wasm[< istr[$[a i32]" < "$[b i32]] i32 op_i32_lt_s]
-def_wasm[< istr[$[a f32]" < "$[b f32]] f32 op_f32_lt]
+def_wasm[< istr[$[a f32]" < "$[b f32]] f32 op_f32_lt  ]
 def_wasm[< istr[$[a u64]" < "$[b u64]] u64 op_i64_lt_u]
 def_wasm[< istr[$[a i64]" < "$[b i64]] i64 op_i64_lt_s]
-def_wasm[< istr[$[a f64]" < "$[b f64]] f64 op_f64_lt]
+def_wasm[< istr[$[a f64]" < "$[b f64]] f64 op_f64_lt  ]
 
 def_wasm[> istr[$[a u32]" > "$[b u32]] u32 op_i32_gt_u]
 def_wasm[> istr[$[a i32]" > "$[b i32]] i32 op_i32_gt_s]
-def_wasm[> istr[$[a f32]" > "$[b f32]] f32 op_f32_gt]
+def_wasm[> istr[$[a f32]" > "$[b f32]] f32 op_f32_gt  ]
 def_wasm[> istr[$[a u64]" > "$[b u64]] u64 op_i64_gt_u]
 def_wasm[> istr[$[a i64]" > "$[b i64]] i64 op_i64_gt_s]
-def_wasm[> istr[$[a f64]" > "$[b f64]] f64 op_f64_gt]
+def_wasm[> istr[$[a f64]" > "$[b f64]] f64 op_f64_gt  ]
 
 def_wasm[<= istr[$[a u32]" <= "$[b u32]] u32 op_i32_le_u]
 def_wasm[<= istr[$[a i32]" <= "$[b i32]] i32 op_i32_le_s]
-def_wasm[<= istr[$[a f32]" <= "$[b f32]] f32 op_f32_le]
+def_wasm[<= istr[$[a f32]" <= "$[b f32]] f32 op_f32_le  ]
 def_wasm[<= istr[$[a u64]" <= "$[b u64]] u64 op_i64_le_u]
 def_wasm[<= istr[$[a i64]" <= "$[b i64]] i64 op_i64_le_s]
-def_wasm[<= istr[$[a f64]" <= "$[b f64]] f64 op_f64_le]
+def_wasm[<= istr[$[a f64]" <= "$[b f64]] f64 op_f64_le  ]
 
 def_wasm[>= istr[$[a u32]" >= "$[b u32]] u32 op_i32_ge_u]
 def_wasm[>= istr[$[a i32]" >= "$[b i32]] i32 op_i32_ge_s]
-def_wasm[>= istr[$[a f32]" >= "$[b f32]] f32 op_f32_ge]
+def_wasm[>= istr[$[a f32]" >= "$[b f32]] f32 op_f32_ge  ]
 def_wasm[>= istr[$[a u64]" >= "$[b u64]] u64 op_i64_ge_u]
 def_wasm[>= istr[$[a i64]" >= "$[b i64]] i64 op_i64_ge_s]
-def_wasm[>= istr[$[a f64]" >= "$[b f64]] f64 op_f64_ge]
+def_wasm[>= istr[$[a f64]" >= "$[b f64]] f64 op_f64_ge  ]
+
+def_wasm[- istr["-"$[a u32]] u32 {}[op_i32_const[-1] op_i32_xor op_i32_const[1] op_i32_add]]
+def_wasm[- istr["-"$[a i32]] i32 {}[op_i32_const[-1] op_i32_xor op_i32_const[1] op_i32_add]]
+def_wasm[- istr["-"$[a f32]] f32    op_f32_neg]
+def_wasm[- istr["-"$[a u64]] u64 {}[op_i64_const[-1] op_i64_xor op_i64_const[1] op_i64_add]]
+def_wasm[- istr["-"$[a i64]] i64 {}[op_i64_const[-1] op_i64_xor op_i64_const[1] op_i64_add]]
+def_wasm[- istr["-"$[a f64]] f64    op_f64_neg]
 
 def_wasm[() istr["("$[expr u32]")"] u32]
 def_wasm[() istr["("$[expr i32]")"] i32]
@@ -162,11 +180,62 @@ def_wasm[ret istr["return "$[expr f64]] void op_return]
 // Enum example
 // enum[enum_item[op_i32_add 0x6a]]
 
-// Inline wasm example:
-// wasm[+ istr[$[a]" + "$[b]]
-//    opcode[op_i32_add]]
+// def[store_u8 istr["store "$[ch u32]" at "$[dst u32]] void {}[]]
+// def[store_u8 ..[$[dst u32] $[ch u32]] ..[void] istr["store " ch " at " dst] {}[]]
+// def[id:store_u8 params:..[$[dst u32] $[ch u32]] result:..[void] display:istr["store " ch " at " dst] {}[]]
 
-// This requires comptime execution
-// Local variable wasm example:
-// wasm[= istr[$[local_id]" + "$[b]]
-//     opcode[op_local_set local_id]]
+// def_wasm[= ..[out[a u32] in[b u32]] istr[a " = " b] void op_local_set[a]]
+
+//////////////////
+// macro wasm:
+// def_wasm[+   istr[#[a u32]" + " #[b u32]] u32  {}[a b op_i32_add]]
+// def_wasm[+=  istr[&[a u32]" += "#[b u32]] void {}[=[a +[a b]]]]
+// def_wasm[()  istr["("#[a u32]")"] u32 a]
+// def_wasm[ret istr["return "#[a u32]] void a op_return]
+//
+// def_wasm[if istr["if "#[a u32]" then "#[b void]] void {}[
+//     a
+//     op_if[0x40]
+//     scope[b]
+//     op_end]]
+//
+// def_wasm[while istr["while "#[a u32]" then "#[b void]] void {}[
+//     op_block
+//         op_loop
+//             a
+//             op_i32_eqz
+//             op_br_if[1]
+//             scope[b]
+//             op_br[0]
+//         op_end
+//     op_end]]
+
+// def_wasm[while2 istr["while "#[a u32]" then "#[b void]] void {}[
+//     op_loop
+//         op_block
+//             a
+//             op_i32_eqz
+//             op_br_if[0]
+//             scope[b]
+//             op_br[1]
+//         op_end
+//     op_end]]
+
+//////////////////
+// generics:
+// def_wasm[+ istr[#[a #[t]]" + "#[b t]] t {}[a b op_add[t]]]
+
+//////////////////
+// comptime:
+// #run[for[t types {}[
+//     def_wasm[+ istr[#[a t]" + "#[b t]] t {}[a b op_add[t]]]
+//     ...
+// ]]]
+// #run[for[bop bops {}[
+//     def_wasm[name_of[bop] istr[#[a #[t]]" "name[bop]" "#[b t]] t {}[a b op_bops[bop t]]]
+// ]]]
+// def_wasm[#[bop bops] istr[#[a #[t]]" "name[bop]" "#[b t]] t {}[a b op_bops[bop t]]]
+// #run[
+//     for[t   types {}[
+//     for[bop bops  {}[
+//         def_wasm[name[bop] istr[#[a t]" "name[bop]" "#[b t]] t {}[a b op_bops[bop t]]]]]]]]

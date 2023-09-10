@@ -6,6 +6,8 @@
 #include "primitives.h"
 #include "syntax.h"
 
+template <typename t> using init_list = std::initializer_list<t>;
+
 namespace arrays {
     tt struct arr_view {
         t*     data;
@@ -27,7 +29,11 @@ namespace arrays {
         size_t capacity;
     };
 
-    tt void push(array<t>& s, const t& value);
+    tt array<t> malloc_array(size_t capacity) {
+        return { { (t*)malloc(capacity * sizeof(t)), 0}, capacity};
+    }
+
+    tt t& push(array<t>& s, const t& value);
     tt t    pop (array<t>& s);
     tt t    peek(const array<t>& s);
 }
@@ -82,7 +88,7 @@ namespace arrays {
         return {view.data, last};
     }
 
-    tt arr_view<t> view(const std::initializer_list<t>& list) {
+    tt arr_view<t> view(std::initializer_list<t> list) {
         return {(t*)list.begin(), list.size()};
     }
 
@@ -90,15 +96,22 @@ namespace arrays {
         return {&item, 1};
     }
 
-    tt void push(array<t>& s, const t& value) {
+    tt t& push(array<t>& s, const t& value) {
         assert(s.data.count < s.capacity);
-        s.data[s.data.count] = value;
         enlarge(s.data);
+        s.data[s.data.count - 1] = value;
+        return s.data[s.data.count - 1];
     }
 
     tt t pop(array<t>& s) {
         assert(s.data.count > 0);
         return s.data[--s.data.count];
+    }
+
+    tt arr_view<t> pop(array<t>& s, size_t count) {
+        assert(s.data.count >= count);
+        s.data.count -= count;
+        return {s.data.data + s.data.count, count};
     }
 
     tt t peek(const array<t>& s) {

@@ -13,69 +13,76 @@
 #include "utility/parsing.h"
 #include "out/utility/files.h"
 
-#include "compute_asts.h"
+#include "asts.h"
 
 namespace compute_asts {
-    static auto parse_file(const char* path) -> ret1<ast>;
-    static auto parse_files(const arr_view<char*> paths) -> ret1<ast>;
-    static auto parse_code(const string& code, ast_storage& storage) -> ret1<ast>;
+    static bool parse_file (cstr path, ast&);
+    static void parse_files(arr_view<cstr> paths, ast&);
+    static auto parse_code (string code, ast&) -> bool;
 
     namespace parser {
         using namespace iterators;
         using namespace parsing;
 
-        auto parse_chain(string&, ast_storage&) -> ret2<node*, node*>;
-        auto parse_node (string&, ast_storage&) -> node*;
+        auto parse_file_chain(cstr path, ast&) -> ret2<node*, node*>;
+        auto parse_chain(string&, string file_path, ast&) -> ret2<node*, node*>;
+        auto parse_node (string&, string file_path, ast&) -> node*;
 
         void set_parent_to_chain(node* first_child, node* parent);
 
         auto take_whitespaces_and_comments(string&) -> string;
     }
 
-    static auto parse_file(const char* path) -> ret1<ast> {
-        var storage = make_ast_storage();
-
-        if_var1(ast, parse_code(files::read_file_as_string(path, storage.text_arena), storage)); else {
+    static auto parse_file(cstr path, ast& ast) -> bool {
+        if(parse_code(files::read_file_as_string(path, ast.data_arena), ast)); else {
             printf("Parsing %s failed\n", path);
-            release(storage);
-            return ret1_fail;
+            return false;
         }
-        return ret1_ok(ast);
+        return true;
     }
 
-    static auto parse_files(const arr_view<const char*> paths) -> ret1<ast> {
-        var storage = make_ast_storage();
-        let code = files::read_files_as_string(paths, view("\n\n"), storage.text_arena);
-        printf("Source:\n%.*s\n", (int)code.count, code.data);
-        if_var1(ast, parse_code(code, storage)); else {
-            printf("Parsing failed\n");
-            release(storage);
-            return ret1_fail;
+    static void parse_files(arr_view<cstr> paths, ast& ast) {
+        var first_node = (node*)nullptr;
+        var  last_node = (node*)nullptr;
+        for(var i = 0u; i < paths.count; ++i) {
+            let path = paths[i];
+            if_var2(first, last, parser::parse_file_chain(path, ast)); else { printf("Parsing %s failed\n", paths[i]); }
+
+            if (!first_node) first_node       = first;
+            if (  last_node)  last_node->next = first;
+            last_node = last;
         }
 
-        return ret1_ok(ast);
+        ast.root = first_node;
     }
 
-    static ret1<ast> parse_code(const string& code, ast_storage& storage) {
+    static bool parse_code(string code, ast& ast) {
         using namespace parser;
 
         var iterator = code;
-        if_var2(first_child, last_child, parse_chain(iterator, storage)); else { dbg_fail_return ret1_fail;}
-        if(is_empty(iterator)); else { dbg_fail_return ret1_fail; }
+        if_var2(first_child, last_child, parse_chain(iterator, view(""), ast)); else { dbg_fail_return false;}
+        if(is_empty(iterator)); else { dbg_fail_return false; }
 
-        let a = ast { first_child, storage };
-        return ret1_ok(a);
+        ast.root = first_child;
+
+        return true;
     }
 
     namespace parser {
-        ret2<node*, node*> parse_chain(string& it, ast_storage& storage) {
+        ret2<node*, node*> parse_file_chain(cstr path, ast& ast) {
+            var code = files::read_file_as_string(path, ast.data_arena);
+            var path_str = make_string(ast.data_arena, "%s", path);
+            return parser::parse_chain(code, path_str, ast);
+        }
+
+        ret2<node*, node*> parse_chain(string& it, string file_path, ast& ast) {
             var first_child = (node*)nullptr;
             var  last_child = (node*)nullptr;
 
             var prefix = take_whitespaces_and_comments(it);
 
             while(!is_empty(it) && !peek(it, ']')) {
-                if_ref(node, parse_node(it, storage)); else break;
+                if_ref(node, parse_node(it, file_path, ast)); else break;
 
                 node.prefix = prefix;
                 prefix = node.suffix;
@@ -89,7 +96,7 @@ namespace compute_asts {
             return ret2_ok(first_child, last_child);
         }
 
-        node* parse_node(string& it, ast_storage& storage) {
+        node* parse_node(string& it, string file_path, ast& ast) {
             var text = string {};
             var text_is_quoted = true;
             if_set1(text, take_str(it)); else {
@@ -104,21 +111,25 @@ namespace compute_asts {
             text_copy = text;
             var [float_value, can_be_float] = take_float(text_copy);
 
-            ref result = make_node(storage, node {
+            // TODO: record line and column
+            // a clean way to do that is to make a separate iterator
+            ref result = make_node(ast, node {
                 .text           = text,
                 .text_is_quoted = text_is_quoted,
                 .can_be_int     = can_be_int,
                 .can_be_uint    = can_be_uint,
                 .can_be_float   = can_be_float,
-                . int_value     =  int_value,
-                .uint_value     = uint_value,
-                .float_value    = float_value,
+                .file_path      = file_path
             });
+
+            if (can_be_int  ) result.  int_value =   int_value;
+            if (can_be_uint ) result. uint_value =  uint_value;
+            if (can_be_float) result.float_value = float_value;
 
             let next_text = take_whitespaces_and_comments(it);
 
             if(take(it, '[')) {
-                if_var2(first_child, last_child, parse_chain(it, storage)); else { dbg_fail_return nullptr; }
+                if_var2(first_child, last_child, parse_chain(it, file_path, ast)); else { dbg_fail_return nullptr; }
                 if(take(it, ']')); else { dbg_fail_return nullptr; } //TODO: free nodes?
                 set_parent_to_chain(first_child, &result);
                 result.type = node::type_t::func;

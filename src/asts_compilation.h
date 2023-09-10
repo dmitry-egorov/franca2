@@ -9,21 +9,15 @@
 #include "utility/hex_ex.h"
 #include "utility/wasm_emit.h"
 
-#include "compute_asts.h"
+#include "asts.h"
 
 namespace compute_asts {
-    arr_view<u8> compile(const ast&, arena& = gta);
+    arr_view<u8> compile(const ast&);
 
     namespace compilation {
         using namespace wasm_emit;
-        using enum primitive_type;
+        using enum prim_type;
         using enum binary_op;
-
-        struct scope {
-            arr_dyn<variable> locals;
-            arr_dyn<func> funcs ;
-            scope* parent;
-        };
 
         struct scope_old {
             uint prev_locals_in_scope_count;
@@ -32,16 +26,13 @@ namespace compute_asts {
 
         struct context {
             size_t non_inline_func_count;
-            arr_dyn<func >   funcs;
-            arr_dyn<func*>   func_stack;
+            arr_dyn<func >      funcs;
+            arr_dyn<func*>      func_stack;
             arr_dyn<scope_old> scope_stack;
-            arr_dyn<func*>  funcs_in_scope;
+            arr_dyn<func*>     funcs_in_scope;
             arr_dyn<variable> locals_in_scope;
 
             stream data;
-
-            wasm_memory  mem;
-            string exported_memory_id;
 
             wasm_emitter emitter;
             arena& arena;
@@ -56,8 +47,7 @@ namespace compute_asts {
         void gather_defs(node*, context&);
         void type_check (node*, context&);
 
-        void emit_wasm            (wasm_opcode, node* args, context&);
-        void emit_wasm_chain      (node*, context&);
+        void emit_wasm_op(wasm_opcode, node * args, context &);
         void emit_wasm_node       (node&, context&);
         void emit_wasm_body       (node*, context&);
 
@@ -65,27 +55,24 @@ namespace compute_asts {
         void emit_node            (node&, context&);
         void emit_body            (node&, context&);
         void emit_func_def        (node&, context&);
-        void emit_func_call       (node&, context&);
         void emit_istr            (node&, context&);
         void emit_chr             (node&, context&);
-        void emit_minus           (node&, context&);
-        void emit_bop  (binary_op, node&, context&);
         void emit_bop_a(binary_op, node&, context&);
 
-        void emit_func_call(const string& id, const arr_view<primitive_type>& params, context&);
+        void emit_func_call(const string& id, arr_view<prim_type> params, context&);
 
         void push_scope(context&);
         void  pop_scope(context&);
         #define tmp_compilation_scope(ctx) push_scope(ctx); defer { pop_scope(ctx); }
 
         auto find_local     (string id, context&) -> variable*;
-        auto find_func      (string id, const arr_view<primitive_type>& params, context&) -> func*;
-        auto find_func_index(string id, const arr_view<primitive_type>& params, context&) -> ret1<uint>;
+        auto find_func      (string id, arr_view<prim_type> params, context&) -> func*;
+        auto find_func_index(string id, arr_view<prim_type> params, context&) -> ret1<uint>;
 
-        func& declare_import(const char* module_id, const char* id, const std::initializer_list<primitive_type>& params, const std::initializer_list<primitive_type>& results, context& ctx);
-        func& declare_import(string module_id, string id, const arr_view<primitive_type>& params, const arr_view<primitive_type>& results, context& ctx);
+        func& declare_import(cstr module_id, cstr id, const init_list<prim_type>& params, const init_list<prim_type>& results, context& ctx);
+        func& declare_import(string module_id, string id, arr_view<prim_type> params, arr_view<prim_type> results, context& ctx);
 
-        func& declare_func(const char* id, node* body_node, bool is_inline_wasm, context&);
+        func& declare_func(cstr id, node* body_node, bool is_inline_wasm, context&);
         func& declare_func(string id, node* body_node, bool is_inline_wasm, context&);
 
         void begin_func_definition(func& func, context&);
@@ -94,52 +81,45 @@ namespace compute_asts {
 
         auto curr_func_of(context &) -> func&;
 
-        void set_mem(const char* export_name, uint min, uint max, context&);
-        void set_mem(string export_name, uint min, uint max, context&);
-
-        void add_data(const char*   text, context&);
         auto add_data(const string& text, context&) -> uint;
 
-        auto get_or_add_local(string id, primitive_type, context&) -> variable&;
-        auto add_local       (string id, primitive_type, context&) -> variable&;
+        auto get_or_add_local(string id, prim_type, context&) -> variable&;
+        auto add_local       (string id, prim_type, context&) -> variable&;
 
         void error_local_not_found(string id);
         void error_func_not_found (string id);
 
-        auto add_param(string id, primitive_type, func&) -> uint;
-        void add_result(primitive_type, func&);
-
-        auto wasm_type_of(primitive_type) -> wasm_value_type;
+        auto add_param(string id, node*, prim_type, variable::kind_t, func&) -> uint;
+        void add_result(prim_type, func&);
 
         void fill_bop_to_wasm();
-        auto get_bop_to_wasm(binary_op, primitive_type) -> wasm_opcode;
-        void set_bop_to_wasm(binary_op, primitive_type, wasm_opcode);
+        auto get_bop_to_wasm(binary_op, prim_type) -> wasm_opcode;
+        void set_bop_to_wasm(binary_op, prim_type, wasm_opcode);
+
+        void print_node_error(node& node);
     }
 
-    arr_view<u8> compile(const ast& ast, arena& arena) {
+    arr_view<u8> compile(const ast& ast) {
         using namespace compilation;
         using namespace wasm_emit;
         using enum wasm_export_kind;
 
         fill_bop_to_wasm(); //TODO: do only once
 
-        var ctx = make_context(arena);
+        var ctx = make_context(ast.temp_arena);
 
         declare_import("env", "print_str", {pt_u32, pt_u32}, {   }, ctx);
-
-        set_mem("memory", 1, 1, ctx);
-
         compile_fn_main(ast.root, ctx);
 
         // emit wasm
         ref emitter = ctx.emitter;
 
-        var func_types = alloc<wasm_func_type>(arena, ctx.funcs.data.count);
-        var imports    = make_arr_dyn<wasm_func_import>( 32, arena);
-        var exports    = make_arr_dyn<wasm_export     >( 32, arena);
-        var func_specs = make_arr_dyn<wasm_func       >(256, arena);
+        var func_types = alloc<wasm_func_type>(ast.temp_arena, ctx.funcs.data.count);
+        var imports    = make_arr_dyn<wasm_func_import>( 32, ast.temp_arena);
+        var exports    = make_arr_dyn<wasm_export     >( 32, ast.temp_arena);
+        var func_specs = make_arr_dyn<wasm_func       >(256, ast.temp_arena);
 
-        push(exports, wasm_export {.name = ctx.exported_memory_id, .kind = ek_mem, .obj_index = 0});
+        push(exports, wasm_export {.name = view("memory"), .kind = ek_mem, .obj_index = 0});
 
         var func_i = 0u;
         for (var i = 0u; i < ctx.funcs.data.count; ++i) {
@@ -148,12 +128,12 @@ namespace compute_asts {
             defer { func_i += 1; };
 
             func_types[func_i] = { // TODO: distinct
-                .params  = alloc_g<wasm_value_type>(arena, func.params .data.count),
-                .results = alloc_g<wasm_value_type>(arena, func.results.data.count),
+                .params  = alloc_g<wasm_value_type>(ast.temp_arena, func.params .data.count),
+                .results = alloc_g<wasm_value_type>(ast.temp_arena, func.results.data.count),
             };
 
             for (var pi = 0u; pi < func.params.data.count; pi += 1)
-                func_types[func_i].params[pi] = wasm_type_of(func.params.data[pi].type);
+                func_types[func_i].params[pi] = wasm_type_of(func.params.data[pi].value_type);
 
             for (var ri = 0u; ri < func.results.data.count; ri += 1)
                 func_types[func_i].results[ri] = wasm_type_of(func.results.data[ri]);
@@ -166,18 +146,20 @@ namespace compute_asts {
 
             var wasm_func = wasm_emit::wasm_func {
                 .type_index = func_i,
-                .locals     = alloc_g<wasm_value_type>(arena, func.locals.data.count),
+                .locals     = alloc_g<wasm_value_type>(ast.temp_arena, func.locals.data.count),
                 .body       = func.body_wasm.data,
             };
 
             for (var li = 0u; li < func.locals.data.count; li += 1)
-                wasm_func.locals[li] = wasm_type_of(func.locals.data[li].type);
+                wasm_func.locals[li] = wasm_type_of(func.locals.data[li].value_type);
 
             push(func_specs, wasm_func);
 
             if (func.exported)
                 push(exports, wasm_export {.name = func.id, .kind = ek_func, .obj_index = func.index});
         }
+
+        var mem = wasm_memory {1,1};
 
         var data  = wasm_data{ctx.data.data};
         var datas = view(data);
@@ -192,7 +174,7 @@ namespace compute_asts {
         emit_type_section  (func_types     , emitter);
         emit_import_section(imports   .data, emitter);
         emit_func_section  (func_specs.data, emitter);
-        emit_memory_section(ctx.mem        , emitter);
+        emit_memory_section(mem            , emitter);
         emit_export_section(exports   .data, emitter);
         emit_code_section  (func_specs.data, emitter);
         emit_data_section  (datas          , emitter);
@@ -203,9 +185,9 @@ namespace compute_asts {
     }
 
     namespace compilation {
-        void compile_fn_main(node* root, context & ctx) {
-            using enum primitive_type;
+#define node_failed_return(node) print_node_error(node); assert(false); return
 
+        void compile_fn_main(node* root, context & ctx) {
             ref func = declare_func("main", root, false, ctx);
             add_result(pt_u32, func);
             func.exported = true;
@@ -229,28 +211,30 @@ namespace compute_asts {
                 let id_text = id_node.text;
                 ref func = declare_func(id_text, body_node, is_wasm_func, ctx);
 
-                node.func = &func;
+                node.declared_func = &func;
                 func.is_inline_wasm = is_wasm_func;
 
-                for (var param_node_p = disp_node.first_child; param_node_p; param_node_p = param_node_p->next) {
-                    ref param_node = *param_node_p;
-                    if (is_func(param_node, decl_param_id)); else continue;
-                    if_var2(prm_id_node, prm_type_node, deref2(param_node.first_child)); else { dbg_fail_return; }
+                for (var prm_node_p = disp_node.first_child; prm_node_p; prm_node_p = prm_node_p->next) {
+                    ref prm_node = *prm_node_p;
+                    let is_in   = is_func(prm_node,   in_id);
+                    let is_ref  = is_func(prm_node,  ref_id);
+                    let is_code = is_func(prm_node, code_id);
+
+                    if (is_ref  && !is_wasm_func) { printf("Ref parameters only supported in wasm functions!\n"); dbg_fail_return; }
+                    if (is_code && !is_wasm_func) { printf("Code parameters only supported in wasm functions!\n"); dbg_fail_return; }
+                    if (is_in || is_ref || is_code); else continue;
+                    if_var2(prm_id_node, prm_type_node, deref2(prm_node.first_child)); else { dbg_fail_return; }
 
                     let type = primitive_type_by(prm_type_node.text);
-                    add_param(prm_id_node.text, type, func);
-                    param_node.value_type = type;
+                    using enum variable::kind_t;
+                    var kind = is_in ? vk_param_value : is_ref ? vk_param_ref : vk_param_code;
+                    add_param(prm_id_node.text, prm_node_p, type, kind, func);
+                    prm_node.value_type = type;
                 }
 
                 let res_type = primitive_type_by(type_node.text);
                 if (res_type != pt_void)
                     add_result(res_type, func);
-
-                if (is_wasm_func) {
-                    tmp_func_definition_scope(func, ctx);
-                    emit_wasm_body(body_node, ctx);
-                    node.value_type = res_type;
-                }
 
                 //TODO: recurse to allow for function definitions inside expressions
             }
@@ -263,8 +247,8 @@ namespace compute_asts {
             // for (var node_p = chain; node_p; node_p = node_p->next) {
             //     ref node = *node_p;
             //     if (node.type == literal) {
-            //         if (node.text_is_quoted) { node.value_type = pt_str; continue; }
-            //         node.value_type = pt_num_literal;
+            //         if (node.text_is_quoted) { node.type = pt_str; continue; }
+            //         node.type = pt_num_literal;
             //         continue;
             //     }
             //
@@ -275,7 +259,7 @@ namespace compute_asts {
             //         //TODO: need to define locals
             //         // For that, need to store scopes, because we will reuse them on the emit stage
             //         if_ref(local, find_local(node.text, ctx)); else { error_local_not_found(node.text); return; }
-            //         node.value_type = local.type;
+            //         node.type = local.type;
             //     }
             // }
         }
@@ -283,36 +267,29 @@ namespace compute_asts {
         void emit_scoped_chain(node* chain, context& ctx) {
             //TODO: maybe need to rethink this and gather definitions when creating a new scope?
             gather_defs(chain, ctx); // TODO: comptime here?
-            //type_check (chain, ctx);
+            //type_check_chain (chain, ctx);
 
             for(var node = chain; node; node = node->next)
                 emit_node(*node, ctx);
         }
 
-        void emit_wasm(wasm_opcode op, node* args, context& ctx) {
-            ref curr_func = curr_func_of(ctx);
-            ref body = curr_func.body_wasm;
+        void emit_wasm_op(wasm_opcode op, node* args, context& ctx) {
+            ref body = curr_func_of(ctx).body_wasm;
             emit(op, body);
 
-            var arg_p = args;
-            while (arg_p) {
+            for (var arg_p = args; arg_p; arg_p = arg_p->next) {
                 ref arg = *arg_p;
-                if_var1(vu, get_uint(arg)) { emit(vu, body); }
-                else { if_var1(vi, get_int(arg)) { emit(vi, body); }
-                else { if_var1(vf, get_float(arg)) { emit(vf, body); }
-                else { dbg_fail_return; }}}
-                arg_p = arg.next;
+                if_var1(vu, get_uint (arg)) { emit(vu, body); continue; }
+                if_var1(vi, get_int  (arg)) { emit(vi, body); continue; }
+                if_var1(vf, get_float(arg)) { emit(vf, body); continue; }
+                if_ref (local, find_local(arg.text, ctx)) { emit(local.index, body); continue; }
             }
-        }
-
-        void emit_wasm_chain(node* chain, context& ctx) {
-            for(var node = chain; node; node = node->next)
-                emit_wasm_node(*node, ctx);
         }
 
         void emit_node(node& node, context& ctx) {
             using namespace wasm_emit;
             using enum wasm_opcode;
+            using enum variable::kind_t;
 
             ref curr_func = curr_func_of(ctx);
             ref body = curr_func.body_wasm;
@@ -346,37 +323,196 @@ namespace compute_asts {
 
             var op = find_op(node.text);
             if (op != op_unreachable) {
-                emit_wasm(op, node.first_child, ctx);
+                emit_wasm_op(op, node.first_child, ctx);
                 return;
             }
 
             if (is_func(node)) {
-                emit_func_call(node, ctx);
+                if_var1(node_id, get_id(node)); else { dbg_fail_return; }
+                var args_node_p = node.first_child;
+
+                if (node_id == emit_local_get_id) {
+                    if_ref(id_node, args_node_p); else { dbg_fail_return; }
+                    let id = id_node.text;
+                    if_ref(v, find_local(id, ctx)); else { error_local_not_found(id); return; }
+                    emit(op_local_get, v.index, body);
+                    node.value_type = v.value_type;
+                    return;
+                }
+
+                if (node_id == ref_id) {
+                    if_ref(id_node, args_node_p); else { dbg_fail_return; }
+                    let id = id_node.text;
+                    if_ref(v, find_local(id, ctx)); else { error_local_not_found(id); return; }
+                    node.value_type = v.value_type;
+                    return;
+                }
+
+                if (node_id == code_id) {
+                    if_ref(id_node, args_node_p); else { dbg_fail_return; }
+                    let id = id_node.text;
+                    if_ref(v, find_local(id, ctx)); else { error_local_not_found(id); return; }
+                    node.value_type = v.value_type;
+                    return;
+                }
+
+                if (node_id == as_id) {
+                    if_var2(arg_node, type_node, deref2(args_node_p)); else { dbg_fail_return; }
+                    emit_node(arg_node, ctx);
+                    var src_type = arg_node.value_type;
+                    var dst_type = primitive_type_by(type_node.text);
+                    if (src_type == pt_f32 && dst_type == pt_u32)
+                        emit(op_i32_trunc_f32_u, body);
+                    if (src_type == pt_f32 && dst_type == pt_i32)
+                        emit(op_i32_trunc_f32_s, body);
+
+                    node.value_type = dst_type;
+                    return;
+                }
+
+                if (node_id == decl_local_id) {
+                    if_var2(id_node, type_node, deref2(args_node_p)); else { dbg_fail_return; }
+                    ref local = add_local(id_node.text, primitive_type_by(type_node.text), ctx);
+                    if_ref(init_node, type_node.next) {
+                        emit_node(init_node, ctx);
+                        emit(op_local_set, local.index, body);
+                        node.value_type = pt_void; // TODO: analyze compatible and cast
+                    }
+                    return;
+                }
+
+                //if (node_id ==    add_a_id) { emit_bop_a(bop_add, node, ctx); return; }
+                if (node_id ==    sub_a_id) { emit_bop_a(bop_sub, node, ctx); return; }
+                if (node_id ==    mul_a_id) { emit_bop_a(bop_mul, node, ctx); return; }
+                if (node_id ==    div_a_id) { emit_bop_a(bop_div, node, ctx); return; }
+                if (node_id ==    rem_a_id) { emit_bop_a(bop_rem, node, ctx); return; }
+                if (node_id ==     istr_id) { emit_istr          (node, ctx); return; }
+                if (node_id ==      chr_id) { emit_chr           (node, ctx); return; }
+                if (node_id ==      def_id) { emit_func_def      (node, ctx); return; }
+                if (node_id == def_wasm_id) { return; }
+
+                if (node_id == block_id) {
+                    tmp_compilation_scope(ctx);
+
+                    emit(op_block, vt_void, body);
+                    emit_scoped_chain(args_node_p, ctx);
+                    emit(op_end, body);
+                    node.value_type = pt_void; // TODO: allow returning values from blocks
+                    return;
+                }
+
+                if (node_id == if_id) {
+                    if_var2(cond_node, then_node, deref2(args_node_p)); else { dbg_fail_return; }
+                    emit_node(cond_node, ctx);
+
+                    emit(op_if, (u8)0x40, body);
+                    tmp_compilation_scope(ctx);
+                    emit_body(then_node, ctx);
+                    emit(op_end, body);
+
+                    node.value_type = pt_void; // TODO: allow returning from ifs
+                    return;
+                }
+
+                if (node_id == while_id) {
+                    emit_while_scope(body);
+                    if_var2(cond_node, body_node, deref2(args_node_p)); else { dbg_fail_return; }
+
+                    emit_node(cond_node, ctx);
+                    emit(op_i32_eqz  , body);
+                    emit(op_br_if, 1u, body);
+
+                    tmp_compilation_scope(ctx);
+                    emit_body(body_node, ctx);
+                    node.value_type = pt_void; // TODO: allow returning from loops
+                    return;
+                }
+
+                if (node_id == print_id) {
+                    emit_istr(node, ctx);
+                    emit_func_call(view("print_str"), view({pt_u32, pt_u32}), ctx);
+                    node.value_type = pt_void; // TODO: allow returning from prints
+                    return;
+                }
+
+                tmp_compilation_scope(ctx);
+
+                var args = make_arr_dyn<prim_type>(4, ctx.arena);
+                var arg_node_p = args_node_p;
+                for (; arg_node_p; arg_node_p = arg_node_p->next) {
+                    ref arg = *arg_node_p;
+                    emit_node(arg, ctx);
+                    push(args, arg.value_type);
+                }
+
+                if_ref(func, find_func(node_id, args.data, ctx)); else { error_func_not_found(node_id); return; }
+                node.value_type = func.results.data.count == 0 ? pt_void : func.results.data[0]; //TODO: support multiple return values
+
+                arg_node_p = args_node_p;
+                let params = func.params.data;
+                for (var i = 0u; i < params.count; ++i, arg_node_p = arg_node_p->next) {
+                    ref arg_node = *arg_node_p;
+                    let param = params[i];
+                    if (param.kind == vk_param_ref) {
+                        if (is_func(arg_node, ref_id)); else { dbg_fail_return; }
+                        if_ref(name_node, arg_node.first_child); else { dbg_fail_return; }
+                        if_ref(local, find_local(name_node.text, ctx)); else { error_local_not_found(name_node.text); return; }
+                        push(ctx.locals_in_scope, {.id = param.id, .index = local.index, .value_type = param.value_type, .kind = vk_param_ref});
+                    }
+                    else if (param.kind == vk_param_code) {
+                        if (is_func(arg_node, code_id)); else { node_failed_return(arg_node); }
+                        push(ctx.locals_in_scope, {.id = param.id, .index = i, .code_node = arg_node.first_child, .value_type = param.value_type, .kind = vk_param_code});
+                    }
+                }
+
+                if (func.is_inline_wasm) {
+                    emit_wasm_body(func.body_node, ctx);
+                    return;
+                }
+
+                emit(op_call, func.index, curr_func.body_wasm);
                 return;
             }
 
-            if_ref(local, find_local(node.text, ctx)); else { error_local_not_found(node.text); return; }
-            emit(op_local_get, local.index, curr_func.body_wasm);
-            node.value_type = local.type;
+            if_ref(local, find_local(node.text, ctx)) {
+                emit(op_local_get, local.index, body);
+                node.value_type = local.value_type;
+                return;
+            }
         }
 
         void emit_wasm_node(node& node, context& ctx) {
             using namespace wasm_emit;
             using enum wasm_opcode;
+            using enum variable::kind_t;
+
+            if_ref(v, find_local(node.text, ctx)) {
+                if (v.kind == vk_param_value) {
+                    emit(op_local_get, v.index, curr_func_of(ctx).body_wasm);
+                    return;
+                }
+                if (v.kind == vk_param_code) {
+                    if_ref(code, v.code_node); else { dbg_fail_return; }
+                    emit_node(code, ctx);
+                    return;
+                }
+
+                dbg_fail_return;
+            }
 
             let op = find_op(node.text);
-            if (op != op_unreachable); else { printf("Wasm opcode not found: %.*s", (int)node.text.count, node.text.data); dbg_fail_return; }
-            emit_wasm(op, node.first_child, ctx);
+            if (op != op_unreachable); else { printf("Wasm opcode not found: %.*s\n", (int)node.text.count, node.text.data); dbg_fail_return; }
+            emit_wasm_op(op, node.first_child, ctx);
         }
 
         void emit_wasm_body(node* node, context& ctx) {
             if_ref(body, node); else return;
 
-            if (is_func(body, block_id)) {
-                emit_wasm_chain(body.first_child, ctx);
-            } else {
-                emit_wasm_node(body, ctx);
-            }
+            if (is_func(body, block_id))
+                node = node->first_child;
+
+            for (; node; node = node->next)
+                emit_wasm_node(*node, ctx);
         }
 
         void emit_body(node& node, context& ctx) {
@@ -390,153 +526,31 @@ namespace compute_asts {
         void emit_func_def(node& node, context& ctx) {
             using namespace wasm_emit;
             using enum wasm_value_type;
+            using enum variable::kind_t;
 
             if_var4(id_node, disp_node, type_node, body_node, deref4(node.first_child)); else { dbg_fail_return; }
-            if_ref (func, node.func); else { dbg_fail_return; }
+            if_ref (func, node.declared_func); else { dbg_fail_return; }
 
             tmp_func_definition_scope(func, ctx);
 
             var param_index = 0u;
             for (var param_node_p = disp_node.first_child; param_node_p; param_node_p = param_node_p->next) {
                 ref param_node = *param_node_p;
-                if (is_func(param_node, decl_param_id)); else continue;
+                if (is_func(param_node, in_id)); else continue;
 
                 if_var2(param_id_node, param_type_node, deref2(param_node.first_child)); else { dbg_fail_return; }
                 push(ctx.locals_in_scope, {
                     .id    = param_id_node.text,
                     .index = param_index,
-                    .type  = primitive_type_by(param_type_node.text)
+                    .code_node  = param_node_p,
+                    .value_type = primitive_type_by(param_type_node.text),
+                    .kind  = vk_param_value,
                 });
                 param_index++;
             }
 
             emit_body(body_node, ctx);
             node.value_type = pt_void;
-        }
-
-        void emit_func_call(node& node, context& ctx) {
-            ref curr_func = curr_func_of(ctx);
-            ref body = curr_func.body_wasm;
-
-            if_var1(fn_id, get_fn_id(node)); else { dbg_fail_return; }
-            var args_node_p = node.first_child;
-
-            if (fn_id == emit_local_get_id) {
-                if_ref(id_node, args_node_p); else { dbg_fail_return; }
-                let id = id_node.text;
-                if_ref(v, find_local(id, ctx)); else { error_local_not_found(id); return; }
-                emit(op_local_get, v.index, body);
-                return;
-            }
-
-            if (fn_id == as_id) {
-                if_var2(arg_node, type_node, deref2(args_node_p)); else { dbg_fail_return; }
-                emit_node(arg_node, ctx);
-                var src_type = arg_node.value_type;
-                var dst_type = primitive_type_by(type_node.text);
-                if (src_type == pt_f32 && dst_type == pt_u32)
-                    emit(op_i32_trunc_f32_u, body);
-                if (src_type == pt_f32 && dst_type == pt_i32)
-                    emit(op_i32_trunc_f32_s, body);
-
-                node.value_type = dst_type;
-                return;
-            }
-
-            if (fn_id == decl_local_id) {
-                if_var2(id_node, type_node, deref2(args_node_p)); else { dbg_fail_return; }
-                ref local = add_local(id_node.text, primitive_type_by(type_node.text), ctx);
-                if_ref(init_node, type_node.next) {
-                    emit_node(init_node, ctx);
-                    emit(op_local_set, local.index, body);
-                    node.value_type = pt_void; // TODO: check compatible and cast
-                }
-                return;
-            }
-
-            // Note: to def in source, requires compile-time execution, specifically, to be able to get the local variable id
-            if (fn_id == assign_id) {
-                if_var2(var_id_node, value_node, deref2(args_node_p)); else { dbg_fail_return; }
-                let var_id = var_id_node.text;
-                if_ref (local, find_local(var_id, ctx)); else { error_local_not_found(var_id); return; }
-                emit_node(value_node, ctx);
-                //TODO: return the value, but discard when used as statement
-                //TODO: use op_local_tee for that and change the return type to the type of the local
-                emit(op_local_set, local.index, body);
-                node.value_type = pt_void;
-                return;
-            }
-
-            if (fn_id ==    add_a_id) { emit_bop_a(bop_add, node, ctx); return; }
-            if (fn_id ==    sub_a_id) { emit_bop_a(bop_sub, node, ctx); return; }
-            if (fn_id ==    mul_a_id) { emit_bop_a(bop_mul, node, ctx); return; }
-            if (fn_id ==    div_a_id) { emit_bop_a(bop_div, node, ctx); return; }
-            if (fn_id ==    rem_a_id) { emit_bop_a(bop_rem, node, ctx); return; }
-            if (fn_id ==     istr_id) { emit_istr          (node, ctx); return; }
-            if (fn_id ==      chr_id) { emit_chr           (node, ctx); return; }
-            if (fn_id ==      def_id) { emit_func_def      (node, ctx); return; }
-            if (fn_id == def_wasm_id) { return; }
-
-            if (fn_id == block_id) {
-                tmp_compilation_scope(ctx);
-
-                emit(op_block, vt_void, body);
-                emit_scoped_chain(args_node_p, ctx);
-                emit(op_end, body);
-                node.value_type = pt_void; // TODO: allow returning values from blocks
-                return;
-            }
-
-            if (fn_id == if_id) {
-                if_var2(cond_node, then_node, deref2(args_node_p)); else { dbg_fail_return; }
-                emit_node(cond_node, ctx);
-
-                emit(op_if, (u8)0x40, body);
-                tmp_compilation_scope(ctx);
-                emit_body(then_node, ctx);
-                emit(op_end, body);
-
-                node.value_type = pt_void; // TODO: allow returning from ifs
-                return;
-            }
-
-            if (fn_id == while_id) {
-                emit_while_scope(body);
-                if_var2(cond_node, body_node, deref2(args_node_p)); else { dbg_fail_return; }
-
-                emit_node(cond_node, ctx);
-                emit(op_i32_eqz  , body);
-                emit(op_br_if, 1u, body);
-
-                tmp_compilation_scope(ctx);
-                emit_body(body_node, ctx);
-                node.value_type = pt_void; // TODO: allow returning from loops
-                return;
-            }
-
-            if (fn_id == print_id) {
-                emit_istr(node, ctx);
-                emit_func_call(view("print_str"), view({pt_u32, pt_u32}), ctx);
-                node.value_type = pt_void; // TODO: allow returning from prints
-                return;
-            }
-
-            var params = make_arr_dyn<primitive_type>(4, ctx.arena);
-            for (var arg_node_p = args_node_p; arg_node_p; arg_node_p = arg_node_p->next) {
-                ref arg_node = *arg_node_p;
-                emit_node(arg_node, ctx);
-                push(params, arg_node.value_type);
-            }
-
-            if_ref(func, find_func(fn_id, params.data, ctx)); else { error_func_not_found(fn_id); return; }
-            node.value_type = func.results.data.count == 0 ? pt_void : func.results.data[0];
-
-            if (func.is_inline_wasm) {
-                push(curr_func.body_wasm, func.body_wasm.data);
-                return;
-            }
-
-            emit(op_call, func.index, curr_func.body_wasm);
         }
 
         void emit_istr(node& node, context& ctx) {
@@ -589,49 +603,6 @@ namespace compute_asts {
             node.value_type = pt_u32; // TODO: pt_u8
         }
 
-        void emit_minus(node& node, context& ctx) {
-            ref curr_func = curr_func_of(ctx);
-            ref body      = curr_func.body_wasm;
-
-            if_ref(a_node, node.first_child); else { dbg_fail_return; }
-            if (a_node.next); else {
-                //TODO: need to determine the type before emitting the node for this
-                //if (a_node.value_type == pt_f32)
-                //    emit_const(0.0f, body);
-                //else
-                //    emit_const(0, body);
-
-                emit_const(     0, body);
-                emit_node (a_node, ctx );
-                let vt = a_node.value_type;
-                emit(get_bop_to_wasm(bop_sub, vt), body);
-                node.value_type = vt; // TODO: check compatible and proper cast
-                return;
-            }
-
-            emit_bop(bop_sub, node, ctx);
-        }
-
-        void emit_bop(binary_op op, node& node, context& ctx) {
-            ref curr_func = curr_func_of(ctx);
-
-            if_var2(a_node, b_node, deref2(node.first_child)); else { dbg_fail_return; }
-
-            emit_node(a_node, ctx);
-            emit_node(b_node, ctx);
-
-            let vt = a_node.value_type;
-            if (b_node.value_type == vt); else {
-                printf("Type mismatch %u, %u\n", (uint)a_node.value_type, (uint)b_node.value_type);
-                print_node(node);
-                printf("\n");
-                dbg_fail_return;
-            }
-
-            emit(get_bop_to_wasm(op, vt), curr_func.body_wasm);
-            node.value_type = vt;
-        }
-
         void emit_bop_a(binary_op bop, node& node, context& ctx) {
             ref curr_func = curr_func_of(ctx);
             ref body      = curr_func.body_wasm;
@@ -642,32 +613,31 @@ namespace compute_asts {
             if_ref   (v, find_local(var_id, ctx)); else { error_local_not_found(var_id); return; }
             emit     (op_local_get, v.index, body);
             emit_node(value_node           , ctx );
-            if(v.type == value_node.value_type); else {
-                printf("Type mismatch %u, %u\n", (uint)v.type, (uint)value_node.value_type);
+            if(v.value_type == value_node.value_type); else {
+                printf("Type mismatch %u, %u\n", (uint)v.value_type, (uint)value_node.value_type);
                 print_node(node);
                 printf("\n");
                 dbg_fail_return;
             }
-            emit(get_bop_to_wasm(bop, v.type), body);
+            emit(get_bop_to_wasm(bop, v.value_type), body);
             emit(op_local_set,        v.index, body);
-            node.value_type = v.type;
+            node.value_type = v.value_type;
         }
 
         context make_context(arena& arena) {
-            using namespace wasm_emit;
             return {
                 .funcs           = make_arr_dyn<func>     ( 256, arena),
                 .func_stack      = make_arr_dyn<func*>    (  16, arena),
-                .scope_stack     = make_arr_dyn<scope_old>(32, arena),
+                .scope_stack     = make_arr_dyn<scope_old>(  32, arena),
                 . funcs_in_scope = make_arr_dyn<func*>    ( 128, arena),
-                .locals_in_scope = make_arr_dyn<variable> (  64, arena),
-                .data            = make_stream        (1024, arena),
-                .emitter         = make_emitter             (arena),
-                .arena           =                           arena ,
+                .locals_in_scope = make_arr_dyn<variable> (64, arena),
+                .data            = make_stream            (1024, arena),
+                .emitter         = make_emitter           (      arena),
+                .arena           =                               arena ,
             };
         }
 
-        void emit_func_call(const string& id, const arr_view<primitive_type>& params, context& ctx) {
+        void emit_func_call(const string& id, arr_view<prim_type> params, context& ctx) {
             ref curr_func = curr_func_of(ctx);
             if_ref(func, find_func(id, params, ctx)); else { dbg_fail_return; }
             emit(op_call, func.index, curr_func.body_wasm);
@@ -691,42 +661,42 @@ namespace compute_asts {
             return nullptr;
         }
 
-        func* find_func(string id, const arr_view<primitive_type>& params, context& ctx) {
+        func* find_func(string id, arr_view<prim_type> params, context& ctx) {
             for (var i = (int)ctx.funcs_in_scope.data.count - 1; i >= 0; i--) {
-                if_ref(v, ctx.funcs_in_scope.data[i]); else { dbg_fail_return nullptr; }
-                if (v.id == id); else continue;
-                let f_params = v.params.data;
+                if_ref(func, ctx.funcs_in_scope.data[i]); else { dbg_fail_return nullptr; }
+                if (func.id == id); else continue;
+                let f_params = func.params.data;
                 if (f_params.count == params.count); else continue;
 
                 var found = true;
                 for (var prm_i = 0u; prm_i < params.count; ++prm_i)
-                    if (f_params[prm_i].type != params[prm_i]) {
+                    if (f_params[prm_i].value_type != params[prm_i]) {
                         found = false;
                         break;
                     }
 
                 if (found); else continue;
 
-                return &v;
+                return &func;
             }
 
             return nullptr;
         }
 
-        ret1<uint> find_func_index(string id, const arr_view<primitive_type>& params, context& ctx) {
+        ret1<uint> find_func_index(string id, arr_view<prim_type> params, context& ctx) {
             if_ref(func, find_func(id, params, ctx)); else { dbg_fail_return {}; }
             return ret1_ok(func.index);
         }
 
-        func& declare_import(const char* module_id, const char* id, const std::initializer_list<primitive_type>& params, const std::initializer_list<primitive_type>& results, context& ctx) {
+        func& declare_import(cstr module_id, cstr id, const init_list<prim_type>& params, const init_list<prim_type>& results, context& ctx) {
             return declare_import(view(module_id), view(id), view(params), view(results), ctx);
         }
 
-        func& declare_import(string module_id, string id, const arr_view<primitive_type>& params, const arr_view<primitive_type>& results, context& ctx) {
+        func& declare_import(string module_id, string id, arr_view<prim_type> params, arr_view<prim_type> results, context& ctx) {
             let index = ctx.funcs.data.count;
             var prms = make_arr_dyn<variable>(params.count, ctx.arena);
             for (var prm_i = 0u; prm_i < params.count; ++prm_i)
-                push(prms, {.id = view(""), .index = prm_i, .type = params[prm_i]});
+                push(prms, {.id = view(""), .index = prm_i, .value_type = params[prm_i], .kind = variable::kind_t::vk_param_value});
 
             ref func  = push(ctx.funcs, compute_asts::func {
                 .id      = id,
@@ -743,7 +713,7 @@ namespace compute_asts {
             return func;
         }
 
-        func& declare_func(const char* id, node* body_node, bool is_inline_wasm, context& ctx) {
+        func& declare_func(cstr id, node* body_node, bool is_inline_wasm, context& ctx) {
             return declare_func(view(id), body_node, is_inline_wasm, ctx);
         }
 
@@ -753,11 +723,13 @@ namespace compute_asts {
                 .id        = id,
                 .index     = index,
                 .body_node = body_node,
-                .is_inline_wasm = is_inline_wasm,
-                .params    = make_arr_dyn<variable>( 4, ctx.arena),
-                .locals    = make_arr_dyn<variable>(32, ctx.arena),
-                .results   = make_arr_dyn<primitive_type>( 2, ctx.arena),
                 .body_wasm = make_stream(32, ctx.arena),
+
+                .is_inline_wasm = is_inline_wasm,
+
+                .params    = make_arr_dyn<variable      >(4, ctx.arena),
+                .results   = make_arr_dyn<prim_type>(2, ctx.arena),
+                .locals    = make_arr_dyn<variable>(32, ctx.arena),
             });
 
             push(ctx.funcs_in_scope, &func);
@@ -777,25 +749,11 @@ namespace compute_asts {
             pop(ctx.func_stack);
         }
 
-        func& curr_func_of(context & ctx) {
+        func& curr_func_of(context& ctx) {
             var f_pp = last_of(ctx.func_stack);
             if_ref(f_p, f_pp); else { assert(false); }
             if_ref(f  , f_p ); else { assert(false); }
             return f;
-        }
-
-        void set_mem(const char* export_name, uint min, uint max, context& ctx) {
-            set_mem(view(export_name), min, max, ctx);
-        }
-
-        void set_mem(string export_name, uint min, uint max, context& ctx) {
-            ctx.mem.min = min;
-            ctx.mem.max = max;
-            ctx.exported_memory_id = export_name;
-        }
-
-        void add_data(const char* text, context& ctx) {
-            add_data(view(text), ctx);
         }
 
         uint add_data(const string& text, context& ctx) {
@@ -804,15 +762,15 @@ namespace compute_asts {
             return offset;
         }
 
-        variable& get_or_add_local(string id, primitive_type type, context& ctx) {
+        variable& get_or_add_local(string id, prim_type type, context& ctx) {
             if_ref(v, find_local(id, ctx)) return v;
             return add_local(id, type, ctx);
         }
 
-        variable& add_local(string id, primitive_type type, context& ctx) {
+        variable& add_local(string id, prim_type type, context& ctx) {
             ref curr_func = curr_func_of(ctx);
             var index = curr_func.params.data.count + curr_func.locals.data.count;
-            ref v = push(curr_func.locals, {.id = id, .index = index, .type = type} );
+            ref v = push(curr_func.locals, {.id = id, .index = index, .value_type = type, .kind = variable::kind_t::vk_local} );
             push(ctx.locals_in_scope, v);
             return v;
         }
@@ -827,42 +785,24 @@ namespace compute_asts {
             dbg_fail_return;
         }
 
-        uint add_param(string id, primitive_type type, func& func) {
+        uint add_param(string id, node* node, prim_type type, variable::kind_t kind, func& func) {
             assert(func.locals.data.count == 0); // add params before locals
             let index = func.params.data.count;
-            push(func.params, {id, index, type});
+            push(func.params, {id, index, node, type, kind});
             return index;
         }
 
-        void add_result(primitive_type type, func& func) {
+        void add_result(prim_type type, func& func) {
             push(func.results, type);
         }
 
-        wasm_value_type wasm_type_of(primitive_type type) {
-            switch (type) {
-                case pt_void: return vt_void;
-                case pt_i8 :
-                case pt_i16:
-                case pt_i32:
-                case pt_u8 :
-                case pt_u16:
-                case pt_u32: return vt_i32;
-                case pt_i64:
-                case pt_u64: return vt_i64;
-                case pt_f32: return vt_f32;
-                case pt_f64: return vt_f64;
-
-                default: dbg_fail_return wasm_value_type::vt_void;
-            }
-        }
-
-        wasm_opcode get_bop_to_wasm(binary_op bop, primitive_type pt) {
+        wasm_opcode get_bop_to_wasm(binary_op bop, prim_type pt) {
             var result = bop_to_wasm_op[(u32)bop * (u32)pt_enum_size + (u32)pt];
             if (result != op_unreachable); else { printf("Unsupported combination of op %u and type %u\n", (uint)bop, (uint)pt); dbg_fail_return result; }
             return result;
         }
 
-        void set_bop_to_wasm(binary_op bop, primitive_type pt, wasm_opcode op) {
+        void set_bop_to_wasm(binary_op bop, prim_type pt, wasm_opcode op) {
             bop_to_wasm_op[(u32)bop * (u32)pt_enum_size + (u32)pt] = op;
         }
 
@@ -965,6 +905,13 @@ namespace compute_asts {
             set_bop_to_wasm(bop_mul , pt_f64, op_f64_mul);
             set_bop_to_wasm(bop_div , pt_f64, op_f64_div);
         }
+
+
+        void print_node_error(node& node) {
+            printf("%.*s: Failed to compile node %.*s\n", (int)node.file_path.count, node.file_path.data, (int)node.text.count, node.text.data);
+        }
+
+#undef node_failed_return
     }
 }
 

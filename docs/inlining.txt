@@ -1,5 +1,13 @@
 Inlining
 
+- maybe the proper approach is to go the other way around:
+    - inline is the default, and if we want a func, we wrap it
+
+-- in general:
+    - parameters can be passed as subtrees and emitted by the caller
+    - this is general for if, while etc...
+    - if function is not inlined it is emitted as a call and the 'emit[a]' just loads the local variable
+
 f:b - a
 
 normal:
@@ -12,8 +20,13 @@ f :: (a, b) -> c
 
 inlined:
 // [a b]
-set.local $b0 // [a]
-set.local $a0 // []
-get.local $b0 // [b]
+set.local $b0 // [a  ]
+set.local $a0 // [   ]
+get.local $b0 // [b  ]
 get.local $a0 // [b a]
 i32.sub
+
+how to generalize inline wasm to regular functions?
+how to detect if we need to introduce a var or just use a value on the stack, when inlining?
+
+def[< istr[$[a u32]" < "$[b u32]] u32 {}[op_local_get[a] op_local_get[b] op_i32_lt_u]]

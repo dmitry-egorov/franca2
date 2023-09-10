@@ -16,8 +16,8 @@
 #include "utility/strings.h"
 #include "color_palette.h"
 #include "code_views.h"
-#include "compute_asts.h"
-#include "compute_storage.h"
+#include "asts.h"
+#include "asts_storage.h"
 
 namespace compute_asts {
 
@@ -29,7 +29,6 @@ namespace compute_asts {
         using namespace code_views;
         using enum palette_color;
         using enum inlay_type;
-        using enum builtin_func_id;
 
         struct context {
             code_view_iterator& iterator;
@@ -51,6 +50,8 @@ namespace compute_asts {
 
         void display_inactive  (node*, context&);
         void display_local_get (node*, context&);
+        void display_ref       (node*, context&);
+        void display_code      (node*, context&);
         void display_block     (node*, context&);
         void display_macro_show(node*, context&);
         void display_decl_local(node*, context&);
@@ -62,9 +63,6 @@ namespace compute_asts {
         void display_loop      (node*, context&);
         void display_istr      (node*, context&);
         void display_chr       (node*, context&);
-        void display_op_assign (node*, context&);
-        void display_minus     (node*, context&);
-        void display_bop       (node*, const string&, context&);
         void display_bop_a     (node*, const string&, context&);
         void display_fn_print  (node*, context&);
 
@@ -74,7 +72,7 @@ namespace compute_asts {
         void put_uint (palette_color color,  uint value  , context&);
         void put_float(palette_color color, float value  , context&);
         void put_text (palette_color color, const string&, context&);
-        void put_text (palette_color color, const char*  , context&);
+        void put_text (palette_color color, cstr  , context&);
         void put_text_in_brackets(palette_color color, const string& text, context&);
 
         void put_wasm_op(const string& text, context&);
@@ -136,19 +134,21 @@ namespace compute_asts {
         }
 
         void display_wasm_node(node& node, context& ctx) {
+            if_ref (local, find_var(ctx.storage, node.text)) {
+                put_text_in_brackets(identifiers, local.display_name, ctx);
+                return;
+            }
+
             put_wasm_op(node.text, ctx);
 
-            var arg_p = node.first_child;
-            while (arg_p) {
+            for (var arg_p = node.first_child; arg_p; arg_p = arg_p->next) {
                 ref arg = *arg_p;
 
                 put_text(regulars, view(" "), ctx);
-                       if_var1(vu, get_uint (arg)) { put_uint (constants, vu, ctx); }
-                else { if_var1(vi, get_int  (arg)) { put_int  (constants, vi, ctx); }
-                else { if_var1(vf, get_float(arg)) { put_float(constants, vf, ctx); }
-                else { dbg_fail_return; }}}
-
-                arg_p = arg.next;
+                if_var1(vu, get_uint (arg)) { put_uint (constants, vu, ctx); continue; }
+                if_var1(vi, get_int  (arg)) { put_int  (constants, vi, ctx); continue; }
+                if_var1(vf, get_float(arg)) { put_float(constants, vf, ctx); continue; }
+                if_ref (local_prm, find_var(ctx.storage, arg.text)) { put_text_in_brackets(identifiers, local.display_name, ctx); continue; }
             }
         }
 
@@ -159,7 +159,7 @@ namespace compute_asts {
             if_var3(id_node, disp_node, type_node, deref3(node.first_child)); else { dbg_fail_return; }
             var id = id_node.text;
 
-            var params = make_arr_dyn<primitive_type>(8, context.storage.arena);
+            var params = make_arr_dyn<prim_type>(8, context.storage.arena);
             var param_node_p = disp_node.first_child;
             while (param_node_p) {
                 ref param_node = *param_node_p;
@@ -177,9 +177,11 @@ namespace compute_asts {
 
             //if (fn_id == "(uint)inactive"     ) { display_inactive     (args_node_p, ctx); return; } //TODO: parse comments as inactive node?
             if (fn_id == emit_local_get_id) { display_local_get (args, ctx); return; }
+            if (fn_id ==             in_id) { display_decl_param(args, ctx); return; }
+            if (fn_id ==            ref_id) { display_ref       (args, ctx); return; }
+            if (fn_id ==           code_id) { display_code      (args, ctx); return; }
             if (fn_id ==          block_id) { display_block     (args, ctx); return; }
             if (fn_id ==     decl_local_id) { display_decl_local(args, ctx); return; }
-            if (fn_id ==     decl_param_id) { display_decl_param(args, ctx); return; }
             if (fn_id ==            def_id) { display_decl_func (args, ctx); return; }
             if (fn_id ==       def_wasm_id) { display_def_wasm  (args, ctx); return; }
             if (fn_id ==             as_id) { display_as        (args, ctx); return; }
@@ -187,8 +189,7 @@ namespace compute_asts {
             if (fn_id ==          while_id) { display_loop      (args, ctx); return; }
             if (fn_id ==           istr_id) { display_istr      (args, ctx); return; }
             if (fn_id ==            chr_id) { display_chr       (args, ctx); return; }
-            if (fn_id ==         assign_id) { display_op_assign (args, ctx); return; }
-            if (fn_id ==          add_a_id) { display_bop_a     (args, view(" += "), ctx); return; }
+            //if (fn_id ==          add_a_id) { display_bop_a     (args, view(" += "), ctx); return; }
             if (fn_id ==          sub_a_id) { display_bop_a     (args, view(" -= "), ctx); return; }
             if (fn_id ==          mul_a_id) { display_bop_a     (args, view(" *= "), ctx); return; }
             if (fn_id ==          div_a_id) { display_bop_a     (args, view(" /= "), ctx); return; }
@@ -196,7 +197,7 @@ namespace compute_asts {
             if (fn_id ==          print_id) { display_fn_print  (args, ctx); return; }
             if (fn_id ==           show_id) { display_macro_show(args, ctx); return; }
 
-            var params = make_arr_dyn<primitive_type>(8, ctx.storage.arena);
+            var params = make_arr_dyn<prim_type>(8, ctx.storage.arena);
             var arg_p = args;
             while (arg_p) {
                 ref arg = *arg_p;
@@ -228,7 +229,7 @@ namespace compute_asts {
                         break;
                     }
                     case func: {
-                        if(is_func(disp_node, view("$"))); else {
+                        if(is_func(disp_node, view("$")) || is_func(disp_node, view("&")) || is_func(disp_node, view("#"))); else {
                             printf("Only parameter nodes are supported in display strings: %.*s\n", (int)disp_node.text.count, disp_node.text.data);
                             dbg_fail_return;
                         }
@@ -262,6 +263,27 @@ namespace compute_asts {
             if_ref(v, find_var(ctx.storage, id)); else { printf("Variable not found: %.*s\n", (int) id.count, id.data); put_text(inlays, view(" "), ctx); dbg_fail_return; }
             put_text(regulars, view("local.get "), ctx);
             put_text_in_brackets(identifiers, v.display_name, ctx);
+        }
+
+        void display_ref(node* args, context& ctx) {
+            if_ref(id_node, args); else return;
+            let id = id_node.text;
+            var name = id;
+            if_ref(v, find_var(ctx.storage, id))
+                name = v.display_name;
+
+            put_text_in_brackets(identifiers, name, ctx); //TODO: mark as ref?
+        }
+
+        void display_code(node* args, context& ctx) {
+            if_ref(id_node, args); else return;
+            let id = id_node.text;
+            var name = id;
+            if_ref(v, find_var(ctx.storage, id))
+                name = v.display_name;
+
+            push_var(ctx.storage, {id, name});
+            put_text_in_brackets(identifiers, name, ctx); //TODO: mark as ref?
         }
 
         void display_block(node* args, context& ctx) {
@@ -300,7 +322,7 @@ namespace compute_asts {
                 display_node(init_node, ctx);
             }
 
-            push_var(storage, {id, name, {}});
+            push_var(storage, {id, name});
         }
 
         void display_decl_param(node* args, context& ctx) {
@@ -313,7 +335,7 @@ namespace compute_asts {
             if_ref(name_node, type_node.next)
                 name = name_node.text;
 
-            push_var(storage, {id, name, {}});
+            push_var(storage, {id, name});
 
             put_text_in_brackets(identifiers, name, ctx);
             put_text(regulars, view(": "), ctx);
@@ -409,42 +431,6 @@ namespace compute_asts {
             put_text(strings, "'", ctx);
         }
 
-        void display_op_assign(node* args, context& ctx) {
-            using_display_ctx;
-
-            if_var2(id_node, value_node, deref2(args)); else { dbg_fail_return; }
-            var id = id_node.text;
-            if_ref (v , find_var(storage, id)); else { put_text(inlays, view(" "), ctx); dbg_fail_return; }
-
-            put_text(identifiers, v.display_name, ctx);
-            put_text(regulars, view(" = "), ctx);
-            display_node(value_node, ctx);
-        }
-
-        void display_minus(node* args, context& ctx) {
-            using_display_ctx;
-
-            if_ref(a_node, args); else { dbg_fail_return; }
-            if_ref(b_node, a_node.next); else {
-                put_text(regulars, "-", ctx);
-                display_node(a_node, ctx);
-                return;
-            }
-
-            display_node(a_node, ctx);
-            put_text(regulars, " - ", ctx);
-            display_node(b_node, ctx);
-        }
-
-        void display_bop(node* args, const string& infix_text, context& ctx) {
-            using_display_ctx;
-
-            if_var2(a_node, b_node, deref2(args)); else { dbg_fail_return; }
-            display_node(a_node, ctx);
-            put_text(regulars, infix_text, ctx);
-            display_node(b_node, ctx);
-        }
-
         void display_bop_a(node * args, const string& infix_text, context & ctx) {
             using_display_ctx;
 
@@ -498,7 +484,7 @@ namespace compute_asts {
             put_text(ctx.iterator, ctx.inactive_level > 0 ? inlays : color, text);
         }
 
-        void put_text(palette_color color, const char* text, context& ctx) {
+        void put_text(palette_color color, cstr text, context& ctx) {
             put_text(color, view(text), ctx);
         }
 

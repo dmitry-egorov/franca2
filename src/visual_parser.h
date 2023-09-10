@@ -40,7 +40,7 @@ namespace visual_asts::parser {
         return ret1_ok(a);
     }
 
-    static ret1<ast> parse_file(const char* path) {
+    static ret1<ast> parse_file(cstr path) {
         var storage = ast_storage {
             arenas::make(1024 * sizeof(node)),
             arenas::make(1024 * 1024 * sizeof(char))

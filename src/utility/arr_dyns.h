@@ -17,6 +17,9 @@ namespace arrays {
         size_t capacity;
         arenas::arena* arena;
         uint align;
+
+        t& operator[](size_t index);
+        const t& operator[](size_t index) const;
     };
 
     typedef arr_dyn<u8> stream;
@@ -39,7 +42,6 @@ namespace arrays {
         s.data.data = new_storage.data;
         s.capacity  = new_storage.count;
     }
-
 
     tt arr_dyn<t> make_arr_dyn(const size_t initial_capacity, arenas::arena& arena = arenas::gta, const uint align = sizeof(size_t)) {
         var arr = arr_dyn<t> { .arena = &arena, .align = align };
@@ -66,7 +68,7 @@ namespace arrays {
         s.data.count += values.count;
     }
 
-    tt void push(arr_dyn<t>& s, const std::initializer_list<t>& value) {
+    tt void push(arr_dyn<t>& s, const init_list<t>& value) {
         push(s, arrays::arr_view<t> {(t*)value.begin(), value.size()});
     }
 
@@ -75,6 +77,12 @@ namespace arrays {
         let r = s.data[s.data.count - 1];
         s.data.count -= 1;
         return r;
+    }
+
+    tt arr_view<t> pop(arr_dyn<t>& s, size_t count) {
+        assert(s.data.count >= count);
+        s.data.count -= count;
+        return {s.data.data + s.data.count, count};
     }
 
     tt t peek(const arr_dyn<t>& s) {
@@ -90,6 +98,18 @@ namespace arrays {
         if (s.data.count > 0); else return nullptr;
         return &s.data[s.data.count - 1];
     }
+
+    tt arr_view<t> last_of(arr_dyn<t>& s, size_t count) {
+        if (s.data.count >= count); else return {nullptr, 0};
+        return {s.data.data + s.data.count - count, count};
+    }
+
+    tt size_t count_of(const arr_dyn<t>& s) {
+        return s.data.count;
+    }
+
+    tt const t& arr_dyn<t>::operator[](const size_t index) const { assert(index < data.count); return data[index]; }
+    tt t& arr_dyn<t>::operator[](const size_t index) { assert(index < data.count); return data[index]; }
 }
 
 #endif //FRANCA2_ARENA_ARRAYS_H

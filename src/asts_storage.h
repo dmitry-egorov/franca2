@@ -14,15 +14,12 @@
 #include "utility/iterators.h"
 #include "utility/strings.h"
 #include "code_views.h"
-#include "compute_asts.h"
+#include "asts.h"
 
 namespace compute_asts {
-    using enum builtin_func_id;
-
     struct st_variable {
         string id;
         string display_name;
-        poly_value value;
     };
 
     struct st_func {
@@ -30,7 +27,7 @@ namespace compute_asts {
         node* display;
         node* type;
 
-        arr_view<primitive_type> params;
+        arr_view<prim_type> params;
     };
 
     struct st_scope {
@@ -54,7 +51,7 @@ namespace compute_asts {
     void push_scope(storage&);
     void  pop_scope(storage&);
     auto find_var  (storage& storage, string id) -> st_variable*;
-    auto find_func (storage& storage, string id, arr_view<primitive_type> params) -> st_func*;
+    auto find_func (storage& storage, string id, arr_view<prim_type> params) -> st_func*;
 
     static storage make_storage(arena& arena) {
         return {
@@ -100,7 +97,7 @@ namespace compute_asts {
         return nullptr;
     }
 
-    st_func* find_func(storage& storage, const string id, const arr_view<primitive_type> params) {
+    st_func* find_func(storage& storage, const string id, const arr_view<prim_type> params) {
         using_storage;
         var funcs_view = funcs.data;
         for (var i = (int)funcs_view.count - 1; i >= 0; --i) {

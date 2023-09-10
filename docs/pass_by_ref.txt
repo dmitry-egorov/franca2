@@ -1,0 +1,11 @@
+Passing by reference
+
+a) inline function, stack argument
+    - pass the index of the argument variable
+    - generate function body in place with the given index
+b) regular function, stack argument
+    - pass the value of the variable
+    - return the new value
+    - assign the new value
+c) heap argument
+    - pass the pointer to the variable

@@ -11,15 +11,15 @@ namespace files {
     using namespace strings;
 
     void release(FILE*& f);
-    inline string read_file_as_string(const char* path, arena& arena = gta);
-    inline string read_files_as_string(const arr_view<const char*>& paths, string separator = view(""), arena& arena = gta);
+    inline string read_file_as_string(cstr path, arena& arena = gta);
+    inline string read_files_as_string(const arr_view<cstr>& paths, string separator = view(""), arena& arena = gta);
 
     void release(FILE*& f) {
         if (f) fclose(f);
         f = nullptr;
     }
 
-    string read_file_as_string(const char* path, arena& arena) {
+    string read_file_as_string(cstr path, arena& arena) {
         tmp(f, fopen (path, "rb"));
         if (f); else return {};
 
@@ -33,7 +33,7 @@ namespace files {
         return buffer;
     }
 
-    string read_files_as_string(const arr_view<const char*>& paths, string separator, arena& arena) {
+    string read_files_as_string(const arr_view<cstr>& paths, string separator, arena& arena) {
         var length = (size_t)0;
         for (var i = 0u; i < paths.count; ++i) {
             tmp(f, fopen (paths[i], "rb"));

@@ -5,7 +5,7 @@
 #define FRANCA2_COMPUTE_DEBUG_H
 
 #include "strings.h"
-#include "compute_asts.h"
+#include "asts.h"
 
 namespace compute_asts {
     inline void print_ast (const ast& ast);
@@ -41,7 +41,6 @@ namespace compute_asts {
 
     namespace printing {
         void print_node_chain(const node* first_node) {
-            using enum builtin_func_id;
             var node_p = first_node;
             if (node_p) printf(node_p->prefix);
             while (node_p) {

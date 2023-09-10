@@ -15,7 +15,7 @@ print["The sum of "a" and "b" is "sum]
 print[a" + "b" = "sum]
 print[a" + "b" = "+[a b]]
 
-if[1 =[b 6]]
+if[1 =[&[b] 6]]
 print[a" + "b" = "+[a b]]
 
 print[my_sum[a b]]

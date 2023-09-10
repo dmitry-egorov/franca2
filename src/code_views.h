@@ -73,7 +73,7 @@ namespace code_views {
     }
 
     void put_uint      (code_view_iterator &it, palette_color color, uint value);
-    template<typename... Args> void put_text(code_view_iterator &it, palette_color color, const char* format, Args... args);
+    template<typename... Args> void put_text(code_view_iterator &it, palette_color color, cstr format, Args... args);
     void put_text      (code_view_iterator &it, palette_color color, const string& text);
     void set_glyph     (code_view_iterator &it, u8 glyph);
     void set_color     (code_view_iterator &it, palette_color color);
@@ -97,7 +97,7 @@ namespace code_views {
         put_text(it, color, "%d", value);
     }
 
-    template<typename... Args> void put_text(code_view_iterator &it, palette_color color, const char* format, Args... args) {
+    template<typename... Args> void put_text(code_view_iterator &it, palette_color color, cstr format, Args... args) {
         put_text(it, color, make_string(it.view.scratch_arena, format, args...));
     }
 

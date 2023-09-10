@@ -1,0 +1,56 @@
+var[x u32 1]
+var[y u32 2]
+var[z u32 3]
+var[w u32 4]
+bar[z w]
+w op_return
+
+def[foo disp[&[a u32] &[b u32]] u32 {}[b op_local_set &[a]]]
+def[bar disp[&[a u32] &[b u32]] u32 foo[b a]]
+
+// fn[ret disp["return "#[a u32]] void {}[a op_return]]
+// fn[() disp["("#[expr u32]")"] u32 expr]
+
+// fn[=  disp[&[a u32]" = " #[b u32]] void {}[b op_local_set &[a]]]
+// fn[+  disp[#[a u32]" + " #[b u32]] u32  {}[a b op_i32_add]]
+// fn[-  disp[#[a u32]" - " #[b u32]] u32  {}[a b op_i32_sub]]
+// fn[+= disp[&[a u32]" += "#[b u32]] void  =[a +[a b]]]
+// fn[-= disp[&[a u32]" -= "#[b u32]] void  =[a -[a b]]]
+
+//var[x u32 2]
+//var[y u32 3]
+//=[x +[x y]]
+////+=[x y]
+////print[x]
+//
+//ret[x]
+//
+//fn[ret disp["return "#[a u32]] void {}[a op_return]]
+//fn[()  disp["("#[expr u32]")"] u32 expr]
+//
+//fn[= disp[&[a u32]" = "#[b u32]] void {}[b op_local_set a]]
+//
+//fn[+ disp[#[a u32]" + "#[b u32]] u32 {}[a b op_i32_add]]
+//fn[- disp[#[a u32]" - "#[b u32]] u32 {}[a b op_i32_sub]]
+//
+//fn[+= disp[&[a u32]" += "#[b u32]] void =[a +[a b]]]
+
+// $ -- add var on expansion
+// & -- local reference
+// # -- pass nodes to emit later
+// wasm -- scope that allows emitting
+
+// alt:
+// const[wasm.return    u8 0x0f]
+// const[wasm.local.get u8 0x20]
+// const[wasm.local.set u8 0x21]
+// ...
+
+// def[if   disp["if "  #[a u32] #[b u32]] void wasm[a wasm.if scope[b] wasm.end]]
+// def[loop disp["loop "#[a u32] #[b u32]] void wasm[wasm.loop scope[b wasm.br 1] wasm.end]]
+
+// def[floor disp["floor "#[a u32]] f32 wasm[wasm.f32.nearest]]
+
+//Need 'identifier' parameter kind
+// def[var disp["var "id[name]": "id[type]" = " #[value u32]] void =[local[name type] value]]
+
