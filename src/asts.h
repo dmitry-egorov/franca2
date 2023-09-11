@@ -66,7 +66,7 @@ namespace compute_asts {
     struct node ;
     struct fn   ;
     struct macro;
-    struct vari;
+    struct local;
     struct scope;
 
     struct func ;
@@ -126,8 +126,8 @@ namespace compute_asts {
             sk_local_decl,
             sk_macro_decl,
             sk_macro_invoke,
-            sk_var,
-            sk_var_ref,
+            sk_local_get,
+            sk_local_ref,
         } sem_kind;
 
         union {
@@ -135,7 +135,7 @@ namespace compute_asts {
                 wasm_emit::wasm_opcode wasm_op;
             };
             struct { // sk_local_decl
-                vari* decled_local;
+                local* decled_local;
                 node* init_node; // TODO: remove this when declaration and assignment are separated
             };
             struct { // sk_macro_decl
@@ -144,8 +144,8 @@ namespace compute_asts {
             struct { // sk_macro_invoke
                 macro* refed_macro;
             };
-            struct { // sk_var & sk_var_ref
-                vari* refed_var;
+            struct { // sk_local_get & sk_local_ref
+                local* local;
             };
         };
     };
@@ -191,7 +191,7 @@ namespace compute_asts {
     struct scope {
         macro* parent_macro;
         node*  body_chain;
-        arr_dyn<vari* > locals;
+        arr_dyn<local*> locals;
         arr_dyn<macro*> macros;
 
         scope* parent;
@@ -199,14 +199,15 @@ namespace compute_asts {
         scope* first_child;
     };
 
-    struct vari {
+    struct local {
         string id;
-        uint local_index;
+        uint macro_index;
 
         enum struct kind_t {
             vk_unknown  ,
             vk_value    ,
             vk_ref      ,
+            vk_code     ,
             vk_enum_size,
         } kind;
 
@@ -229,7 +230,7 @@ namespace compute_asts {
 
         union {
             struct { // local and exported
-                arr_dyn<prim_type> locals ;
+                arr_dyn<prim_type> locals;
                 macro* macro;
                 stream body_wasm;
                 bool   exported;
@@ -245,7 +246,7 @@ namespace compute_asts {
 
         uint params_count;
         arr_dyn <prim_type> results;
-        arr_dyn <vari     > locals ; // includes parameters
+        arr_dyn <local    > locals ; // includes parameters
 
         scope* parent_scope;
         scope*   body_scope;
@@ -325,7 +326,7 @@ namespace compute_asts {
         return push(ast.scopes, scope {
             .parent_macro = &parent_macro,
             .body_chain   = body_nodes,
-            .locals = make_arr_dyn<vari*>(16, ast.data_arena),
+            .locals = make_arr_dyn<local*>(16, ast.data_arena),
             .macros = make_arr_dyn<macro*>( 4, ast.data_arena),
             .parent = parent_scope,
         });
@@ -335,7 +336,7 @@ namespace compute_asts {
         ref macro = push(ast.macros, compute_asts::macro {
             .id           = id,
             .results      = make_arr_dyn<prim_type>(2, ast.data_arena),
-            .locals       = make_arr_dyn<vari    >(16, ast.data_arena),
+            .locals       = make_arr_dyn<local    >(16, ast.data_arena),
             .parent_scope = parent_scope,
         });
 
@@ -351,12 +352,12 @@ namespace compute_asts {
         return add_macro(view(id), parent_scope, body_nodes, ast);
     }
 
-    vari& add_local(string id, vari::kind_t kind, prim_type type, scope& scope) {
+    local& add_local(string id, local::kind_t kind, prim_type type, scope& scope) {
         ref macro = *scope.parent_macro;
         var index = macro.locals.data.count;
-        ref local = push(scope.parent_macro->locals, compute_asts::vari {
+        ref local = push(scope.parent_macro->locals, compute_asts::local {
             .id = id,
-            .local_index = index,
+            .macro_index = index,
             .kind = kind,
             .value_type = type
         });
@@ -364,7 +365,7 @@ namespace compute_asts {
         return local;
     }
 
-    inline vari& add_param(string id, vari::kind_t kind, prim_type value_type, macro& macro) {
+    inline local& add_param(string id, local::kind_t kind, prim_type value_type, macro& macro) {
         assert(macro.locals.data.count == macro.params_count); // params must be added before locals
         macro.params_count += 1;
         return add_local(id, kind, value_type, *macro.body_scope);
@@ -374,7 +375,7 @@ namespace compute_asts {
         push(macro.results, type);
     }
 
-    arr_view<vari> params_of(macro& macro) {
+    arr_view<local> params_of(macro& macro) {
         return {macro.locals.data.data, macro.params_count };
     }
 
@@ -456,7 +457,7 @@ namespace compute_asts {
         return nullptr;
     }
 
-    vari* find_local(string id, scope& scope) {
+    local* find_local(string id, scope& scope) {
         for(var scope_p = &scope; scope_p; scope_p = scope_p->parent) {
             var locals = scope_p->locals.data;
             for(var i = 0u; i < locals.count; i++) {

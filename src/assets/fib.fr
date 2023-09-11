@@ -12,8 +12,8 @@ def[fib_at istr["fib at "$[n u32]] u32 {}[
     while[<=[i n] {}[
         var[t u32 v1]
          +=[&[v1] v0]
-          =[&[v0] t]
-         +=[&[i]  1 ]]]
+          =[&[v0] t ]
+         +=[&[i ] 1 ]]]
 
     ret[v1]]]
 

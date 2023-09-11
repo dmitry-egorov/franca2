@@ -47,8 +47,9 @@ namespace compute_asts {
 
     namespace analysis {
         using namespace wasm_emit;
+        using enum node::type_t;
         using enum node::sem_kind_t;
-        using enum vari::kind_t;
+        using enum local::kind_t;
 
         void gather_scopes_and_defs(scope& scope, context& ctx) {
             gather_scopes_and_defs_chain(scope.body_chain, scope, ctx);
@@ -71,17 +72,22 @@ namespace compute_asts {
                 var prm_node_p = disp_node.first_child;
                 for (; prm_node_p; prm_node_p = prm_node_p->next) {
                     ref prm_node = *prm_node_p;
-                    if (is_func(prm_node, ref_id)); else continue;
+                    let is_ref  = is_func(prm_node, ref_id);
+                    let is_val  = is_func(prm_node,  in_id);
+                    let is_code = is_func(prm_node,  in_id);
+                    if (is_ref || is_val || is_code); else { dbg_fail_return; }
+
                     if_var2(prm_id_node, prm_type_node, deref2(prm_node.first_child)); else { dbg_fail_return; }
                     let value_type = primitive_type_by(prm_type_node.text);
                     //TODO: support other kinds
-                    add_param(prm_id_node.text, vk_ref, value_type, macro);
+                    let kind = is_ref ? vk_ref : is_val ? vk_value : vk_code;
+                    add_param(prm_id_node.text, kind, value_type, macro);
                     prm_node.value_type = value_type;
                 }
 
                 add_result(primitive_type_by(type_node.text), macro);
 
-                node.sem_kind  = sk_macro_decl;
+                node.sem_kind     = sk_macro_decl;
                 node.decled_macro = &macro;
 
                 gather_scopes_and_defs_chain(body_chain, *macro.body_scope, ctx);
@@ -101,7 +107,6 @@ namespace compute_asts {
         }
 
         void type_check(node& node, context& ctx) {
-            using enum node::type_t;
             if_ref(scope, node .parent_scope); else { dbg_fail_return; }
             if_ref(macro, scope.parent_macro); else { dbg_fail_return; }
 
@@ -128,18 +133,18 @@ namespace compute_asts {
             }
 
             if_ref(local, find_local(node.text, scope)) {
-                node.sem_kind   = sk_var;
-                node.refed_var  = &local;
+                node.sem_kind   = sk_local_get;
+                node.local      = &local;
                 node.value_type = local.value_type;
                 return;
             }
 
             if (is_func(node)) {
                 if_var1(node_id, get_id(node)); else { dbg_fail_return; }
-                var args_node_p = node.first_child;
+                var args_p = node.first_child;
 
                 if (node_id == decl_local_id) {
-                    if_var2(id_node, type_node, deref2(args_node_p)); else { dbg_fail_return; }
+                    if_var2(id_node, type_node, deref2(args_p)); else { dbg_fail_return; }
                     let type = primitive_type_by(type_node.text);
                     ref loc  = add_local(id_node.text, vk_value, type, scope);
                     if_ref(init_node, type_node.next) {
@@ -155,20 +160,20 @@ namespace compute_asts {
 
                 if (node_id == ref_id) {
                     if_ref (var_id, node.first_child); else { dbg_fail_return; }
-                    if_ref (refed_var, find_local(var_id.text, scope)); else { dbg_fail_return; }
-                    if (refed_var.kind == vk_ref); else { printf("Only mutable variables can be referenced.\n"); node_error(node); return; }
-                    node.sem_kind   = sk_var_ref;
-                    node.refed_var  = &refed_var;
-                    node.value_type =  refed_var.value_type;
+                    if_ref (refed_local, find_local(var_id.text, scope)); else { dbg_fail_return; }
+                    if (refed_local.kind == vk_ref); else { printf("Only mutable variables can be referenced.\n"); node_error(node); return; }
+                    node.sem_kind   = sk_local_ref;
+                    node.local      = &refed_local;
+                    node.value_type =  refed_local.value_type;
                     return;
                 }
 
                 // macro invocation
                 {
                     var arg_types = make_arr_dyn<prim_type>(4, ctx.ast.data_arena);
-                    var arg_node_p = args_node_p;
-                    for (; arg_node_p; arg_node_p = arg_node_p->next) {
-                        ref arg = *arg_node_p;
+                    var arg_p = args_p;
+                    for (; arg_p; arg_p = arg_p->next) {
+                        ref arg = *arg_p;
                         type_check(arg, ctx);
                         push(arg_types, arg.value_type);
                     }

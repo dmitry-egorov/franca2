@@ -1,0 +1,20 @@
+There's can be two types of scopes
+- regular scope, where the results of a previous operation is discarded
+- stack scope, where the results of a previous operation is kept on the stack, mimicking wasm
+
+
+## Regular scope
+var[a u32 1]
+var[b u32 2]
+=[a b]
+etc...
+
+## Stack scope
+local.get
+index_of[b]
+local.set
+index_of[a]
+
+We probably shouldn't mix this two.
+
+The stack scope is probably better imagined as a compiletime execution scope, where we explicitly invoke emit methods?

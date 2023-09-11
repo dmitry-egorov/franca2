@@ -20,41 +20,42 @@ namespace compute_asts {
         using enum prim_type;
         using enum binary_op;
 
-        struct bind {
-            uint local_index;
-            uint bound_index;
+        struct binding {
+            uint fn_index;
         };
 
-        struct bind_scope {
-            size_t bind_count;
+        struct macro_scope {
+            arr_dyn<binding> bindings;
         };
 
         struct context {
             ast& ast;
-            fn* curr_fn;
+            fn*  curr_fn;
 
-            arr_dyn<bind_scope> bind_scope_stack;
-            arr_dyn<bind      > bind_stack;
+            arr_dyn<macro_scope> macro_scope_stack;
 
             stream data;
         };
 
-        void emit      (fn&  , context& ctx);
-        void emit_chain(node*, context& ctx);
-        void emit      (node&, context& ctx);
+        void emit      (fn&  , context&);
+        void emit_chain(node*, context&);
+        void emit      (node&, context&);
 
-        void begin_fn_bind_scope(fn&, context& ctx);
-        void begin_bind_scope   (context&);
-        void   end_bind_scope   (context&);
-        void  add_bind (uint local_index, uint bound_index, context&);
-        auto curr_binds(context&) -> arr_view<bind>;
+        auto begin_macro_scope(context &) -> macro_scope&;
+        void   end_macro_scope(context &);
 
-        uint add_fn_local(vari& loc, context& ctx);
+        auto curr_macro_scope(context &) -> macro_scope*;
+        void bind_fn_params(context&);
+        void bind(uint fn_index, context&);
+        void bind(arr_view<binding>, context&);
 
-        auto add_data(string text, context&) -> uint;
+        uint add_fn_local  (local&, context&);
+        uint add_temp_local(prim_type, context&);
 
-        auto find_bound_index(uint local_index, context&) -> uint;
-        auto find_bound_index(uint local_index, arr_view<bind> binds) -> uint;
+        uint add_data(string text, context&);
+
+        auto find_fn_index(uint macro_index, context&) -> uint;
+        auto find_fn_index(uint macro_index, macro_scope, context&) -> uint;
 
         void print_bindings(context&);
     }
@@ -68,8 +69,7 @@ namespace compute_asts {
 
         var ctx = codegen::context {
             .ast  = ast,
-            .bind_scope_stack = make_arr_dyn<bind_scope>(32, temp_arena),
-            .bind_stack       = make_arr_dyn<bind      >(256, temp_arena),
+            .macro_scope_stack = make_arr_dyn<macro_scope>(32, temp_arena),
             .data = make_stream(1024, temp_arena),
         };
 
@@ -163,7 +163,8 @@ namespace compute_asts {
             if (fn.kind == fk_regular); else return;
 
             ctx.curr_fn = &fn;
-            begin_fn_bind_scope(fn, ctx);
+            begin_macro_scope(ctx); defer { end_macro_scope(ctx); };
+            bind_fn_params(ctx);
 
             if_ref(macro, fn.macro); else { dbg_fail_return; }
             let body_ptr = macro.body_scope;
@@ -177,10 +178,11 @@ namespace compute_asts {
         }
 
         void emit(node& node, context& ctx) {
-            using enum vari::kind_t;
+            using enum local::kind_t;
             using enum node::sem_kind_t;
 
-            printf("BAM!!! Node: %.*s\n", (int)node.text.count, node.text.data);
+            printf("BAM!!! Emitting node: %.*s\n", (int)node.text.count, node.text.data);
+            print_bindings(ctx);
 
             if_ref(scope, node.parent_scope); else { node_error(node); return; }
             if_ref(fn   , ctx .curr_fn     ); else { node_error(node); return; }
@@ -227,49 +229,54 @@ namespace compute_asts {
                 return;
             }
 
-            if (node.sem_kind == sk_var) {
-                if_ref (v, node.refed_var); else { node_error(node); return; }
+            if (node.sem_kind == sk_local_get) {
+                if_ref (v, node.local); else { node_error(node); return; }
 
-                var bound_index = find_bound_index(v.local_index, ctx);
+                var bound_index = find_fn_index(v.macro_index, ctx);
                 emit(op_local_get, bound_index, body);
                 return;
             }
 
-            if (node.sem_kind == sk_var_ref) {
-                if_ref (v, node.refed_var); else { node_error(node); return; }
+            if (node.sem_kind == sk_local_ref) {
+                if_ref (v, node.local); else { node_error(node); return; }
 
-                var bound_index = find_bound_index(v.local_index, ctx);
+                var bound_index = find_fn_index(v.macro_index, ctx);
                 wasm_emit::emit(bound_index, body);
                 return;
             }
 
             if (node.sem_kind == sk_macro_invoke) {
-                // TODO: the stack can reallocate, but we don't free the old memory, so this works. Think of a better approach.
-                let binds = curr_binds(ctx);
-                begin_bind_scope(ctx); defer { end_bind_scope(ctx); };
-
                 // bind arguments and embed the function
+
                 if_ref(refed_macro, node.refed_macro); else { node_error(node); return; }
-                let params     = params_of(refed_macro);
+                let params = params_of(refed_macro);
+                var buffer = alloc<binding>(ctx.ast.temp_arena, params.count);
                 var arg_node_p = node.first_child;
                 for (var i = 0u; i < params.count; ++i, arg_node_p = arg_node_p->next) {
                     let param = params[i];
                     if_ref(arg_node, arg_node_p); else { dbg_fail_return; }
 
-                    if (param.kind == vk_ref) {
-                        if (arg_node.sem_kind == sk_var); else { dbg_fail_return; }
-                        if_ref(refed_local, arg_node.refed_var); else { dbg_fail_return; }
-
-                        let bound_index = find_bound_index(refed_local.local_index, binds);
-                        add_bind(i, bound_index, ctx);
-
+                    if (arg_node.sem_kind == sk_local_get) {
+                        if_ref(refed_local, arg_node.local); else { dbg_fail_return; }
+                        let fn_index = find_fn_index(refed_local.macro_index, ctx);
+                        buffer[i] = {fn_index};
                         continue;
                     }
 
-                    //TODO: support param by value and code
+                    if (arg_node.sem_kind != sk_local_get && param.kind == vk_value) {
+                        emit(arg_node, ctx);
+                        let fn_index = add_temp_local(arg_node.value_type, ctx);
+                        buffer[i] = {fn_index};
+                        emit(op_local_set, fn_index, body);
+                        continue;
+                    }
+
+                    //TODO: support code ref
                     dbg_fail_return;
                 }
 
+                begin_macro_scope(ctx); defer { end_macro_scope(ctx); };
+                bind(buffer, ctx);
                 emit_chain(refed_macro.body_scope->body_chain, ctx);
 
                 return;
@@ -284,76 +291,81 @@ namespace compute_asts {
             return offset;
         }
 
-        void begin_fn_bind_scope(fn & fn, context & ctx) {
+        macro_scope& begin_macro_scope(context & ctx) {
+            return push(ctx.macro_scope_stack, {.bindings = make_arr_dyn<binding>(4, ctx.ast.temp_arena)});
+        }
+
+        void end_macro_scope(context & ctx) {
+            pop(ctx.macro_scope_stack);
+        }
+
+        void bind_fn_params(context& ctx) {
+            if_ref(fn, ctx.curr_fn); else { dbg_fail_return; }
             ref params = fn.params.data;
 
-            begin_bind_scope(ctx);
             for(var i = 0u; i < params.count; ++i)
-                add_bind(i, i, ctx);
+                bind(i, ctx);
         }
 
-        void begin_bind_scope(context & ctx) {
-            push(ctx.bind_scope_stack, {(size_t)0});
-        }
-
-        void end_bind_scope(context & ctx) {
-            let scope = pop(ctx.bind_scope_stack);
-            pop(ctx.bind_stack, scope.bind_count);
-        }
-
-
-        uint add_fn_local(vari& loc, context& ctx) {
+        uint add_fn_local(local& loc, context& ctx) {
             if_ref(fn, ctx.curr_fn); else { dbg_fail_return -1; }
             let index = (uint)fn.locals.data.count;
             push(fn.locals, loc.value_type);
-            add_bind(loc.local_index, index, ctx);
+            bind(index, ctx);
             return index;
         }
 
-        void add_bind(uint local_index, uint bound_index, context& ctx) {
-            push(ctx.bind_stack, {.local_index = local_index, .bound_index = bound_index});
-            if_ref(scope, last_of(ctx.bind_scope_stack)); else { dbg_fail_return; }
-            scope.bind_count += 1;
+        uint add_temp_local(prim_type type, context& ctx) {
+            if_ref(fn, ctx.curr_fn); else { dbg_fail_return -1; }
+            let index = (uint)fn.locals.data.count;
+            push(fn.locals, type);
+            bind(index, ctx);
+            return index;
         }
 
-        auto curr_binds(context& ctx) -> arr_view<bind> {
-            if_ref(scope, last_of(ctx.bind_scope_stack)); else { dbg_fail_return {}; }
-            return last_of(ctx.bind_stack, scope.bind_count);
+        void bind(uint fn_index, context& ctx) {
+            assert(   fn_index != (uint)-1);
+            if_ref(scope, curr_macro_scope(ctx)); else { dbg_fail_return; }
+            push(scope.bindings, {fn_index});
         }
 
-        uint find_bound_index(uint local_index, arr_view<bind> binds) {
-            for (var i = 0u; i < binds.count; i += 1) {
-                let binding = binds[i];
-                if (binding.local_index == local_index)
-                    return binding.bound_index;
-            }
-            return -1;
+        void bind(arr_view<binding> bindings, context& ctx) {
+            if_ref(scope, curr_macro_scope(ctx)); else { dbg_fail_return; }
+            push(scope.bindings, bindings);
         }
 
-        uint find_bound_index(uint local_index, context& ctx) {
-            let bindings = curr_binds(ctx);
-            let index = find_bound_index(local_index, bindings);
-            if (index != (uint)-1); else {
-                printf("Failed to find bound index for local %u\n", local_index);
+        auto curr_macro_scope(context& ctx) -> macro_scope* {
+            return last_of(ctx.macro_scope_stack);
+        }
+
+        uint find_fn_index(uint macro_index, macro_scope scope, context& ctx) {
+            let bindings = scope.bindings.data;
+            if (macro_index < bindings.count); else {
+                printf("Failed to find bound index for macro local %u\n", macro_index);
                 print_bindings(ctx);
                 dbg_fail_return -1;
             }
-            return index;
+
+            return bindings[macro_index].fn_index;
+        }
+
+        uint find_fn_index(uint macro_index, context& ctx) {
+            if_ref(scope, curr_macro_scope(ctx)); else { dbg_fail_return {}; }
+            return find_fn_index(macro_index, scope, ctx);
         }
 
         void print_bindings(context& ctx) {
-            let scopes = ctx.bind_scope_stack.data;
+            let scopes = ctx.macro_scope_stack.data;
             for (var i = 0u; i < scopes.count; i += 1) {
-                let bindings = last_of(ctx.bind_stack, scopes[i].bind_count);
+                let bindings = scopes[i].bindings.data;
                 printf("Binding context %u: %u. ", i, (uint)bindings.count);
                 for (var j = 0u; j < bindings.count; j += 1)
-                    printf("%u -> %u, ", bindings[j].local_index, bindings[j].bound_index);
+                    printf("%u -> %u, ", j, bindings[j].fn_index);
                 printf("\n");
             }
         }
     }
 }
-#undef node_failed_return
 
 #pragma clang diagnostic pop
 

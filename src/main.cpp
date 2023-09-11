@@ -246,17 +246,17 @@ static bool init() {
     printf("WGPU ready. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
 
-    //let wasm_start = std::chrono::high_resolution_clock::now();
-    //printf("\n(WASM) Running...\n");
-    //var wasm_result = run_wasm(wasm.data, wasm.count);
-    //printf("(WASM) Exited with code: %d\n", wasm_result);
-    //printf("(WASM) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - wasm_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
-
     let wasm_start = std::chrono::high_resolution_clock::now();
     printf("\n(WASM) Running...\n");
-    var wasm_result = run_wasm(wasm2.data, wasm2.count);
+    var wasm_result = run_wasm(wasm.data, wasm.count);
     printf("(WASM) Exited with code: %d\n", wasm_result);
     printf("(WASM) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - wasm_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+
+    //let wasm_start = std::chrono::high_resolution_clock::now();
+    //printf("\n(WASM) Running...\n");
+    //var wasm_result = run_wasm(wasm2.data, wasm2.count);
+    //printf("(WASM) Exited with code: %d\n", wasm_result);
+    //printf("(WASM) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - wasm_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     return true;
 }

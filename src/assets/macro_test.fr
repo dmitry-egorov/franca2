@@ -1,39 +1,22 @@
 var[x u32 1]
 var[y u32 2]
 var[z u32 3]
-var[w u32 4]
-bar[z w]
-w op_return
+var[w u32 0]
+=[w +[z +[x y]]]
+=[w +[()[+[4 5]] +[6 7]]]
+ret[w]
 
-def[foo disp[&[a u32] &[b u32]] u32 {}[b op_local_set &[a]]]
-def[bar disp[&[a u32] &[b u32]] u32 foo[b a]]
+def[ret disp["return "$[a u32]] void {}[a op_return]]
+def[()  disp["("$[expr u32]")"] u32 expr]
+def[=   disp[&[a u32]" = "$[b u32]] void {}[b op_local_set &[a]]]
 
-// fn[ret disp["return "#[a u32]] void {}[a op_return]]
-// fn[() disp["("#[expr u32]")"] u32 expr]
+def[+ disp[$[a u32]" + "$[b u32]] u32 {}[a b op_i32_add]]
+def[- disp[$[a u32]" - "$[b u32]] u32 {}[a b op_i32_sub]]
 
-// fn[=  disp[&[a u32]" = " #[b u32]] void {}[b op_local_set &[a]]]
-// fn[+  disp[#[a u32]" + " #[b u32]] u32  {}[a b op_i32_add]]
-// fn[-  disp[#[a u32]" - " #[b u32]] u32  {}[a b op_i32_sub]]
-// fn[+= disp[&[a u32]" += "#[b u32]] void  =[a +[a b]]]
-// fn[-= disp[&[a u32]" -= "#[b u32]] void  =[a -[a b]]]
+def[+= disp[&[a u32]" += "$[b u32]] void =[a +[a b]]]
+def[-= disp[&[a u32]" -= "$[b u32]] void =[a -[a b]]]
 
-//var[x u32 2]
-//var[y u32 3]
-//=[x +[x y]]
-////+=[x y]
-////print[x]
-//
-//ret[x]
-//
-//fn[ret disp["return "#[a u32]] void {}[a op_return]]
-//fn[()  disp["("#[expr u32]")"] u32 expr]
-//
-//fn[= disp[&[a u32]" = "#[b u32]] void {}[b op_local_set a]]
-//
-//fn[+ disp[#[a u32]" + "#[b u32]] u32 {}[a b op_i32_add]]
-//fn[- disp[#[a u32]" - "#[b u32]] u32 {}[a b op_i32_sub]]
-//
-//fn[+= disp[&[a u32]" += "#[b u32]] void =[a +[a b]]]
+def[floor disp["floor "$[a f32]] f32 {}[a op_f32_nearest]]
 
 // $ -- add var on expansion
 // & -- local reference
@@ -47,9 +30,7 @@ def[bar disp[&[a u32] &[b u32]] u32 foo[b a]]
 // ...
 
 // def[if   disp["if "  #[a u32] #[b u32]] void wasm[a wasm.if scope[b] wasm.end]]
-// def[loop disp["loop "#[a u32] #[b u32]] void wasm[wasm.loop scope[b wasm.br 1] wasm.end]]
-
-// def[floor disp["floor "#[a u32]] f32 wasm[wasm.f32.nearest]]
+// def[loop disp["loop "#[b u32]] void wasm[wasm.loop scope[b wasm.br 1] wasm.end]]
 
 //Need 'identifier' parameter kind
 // def[var disp["var "id[name]": "id[type]" = " #[value u32]] void =[local[name type] value]]
