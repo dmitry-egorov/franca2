@@ -128,8 +128,8 @@ namespace compute_asts {
             defer { func_i += 1; };
 
             func_types[func_i] = { // TODO: distinct
-                .params  = alloc_g<wasm_value_type>(ast.temp_arena, func.params .data.count),
-                .results = alloc_g<wasm_value_type>(ast.temp_arena, func.results.data.count),
+                .params  = alloc_g<wasm_type>(ast.temp_arena, func.params .data.count),
+                .results = alloc_g<wasm_type>(ast.temp_arena, func.results.data.count),
             };
 
             for (var pi = 0u; pi < func.params.data.count; pi += 1)
@@ -146,7 +146,7 @@ namespace compute_asts {
 
             var wasm_func = wasm_emit::wasm_func {
                 .type_index = func_i,
-                .locals     = alloc_g<wasm_value_type>(ast.temp_arena, func.locals.data.count),
+                .locals     = alloc_g<wasm_type>(ast.temp_arena, func.locals.data.count),
                 .body       = func.body_wasm.data,
             };
 
@@ -297,32 +297,32 @@ namespace compute_asts {
             if (is_str_literal(node)) {
                 let str    = node.text;
                 let offset = add_data(str, ctx);
-                emit_const(offset   , body);
-                emit_const(str.count, body);
+                emit_const_get(offset, body);
+                emit_const_get(str.count, body);
                 node.value_type = pt_str;
                 return;
             }
 
             if (is_uint_literal(node)) {
-                emit_const(node.uint_value, body);
+                emit_const_get(node.uint_value, body);
                 node.value_type = pt_u32;
                 return;
             }
 
             if (is_int_literal(node)) {
-                emit_const(node.int_value, body);
+                emit_const_get(node.int_value, body);
                 node.value_type = pt_i32;
                 return;
             }
 
             if (is_float_literal(node)) {
-                emit_const(node.float_value, body);
+                emit_const_get(node.float_value, body);
                 node.value_type = pt_f32;
                 return;
             }
 
             var op = find_op(node.text);
-            if (op != op_unreachable) {
+            if (op != op_invalid) {
                 emit_wasm_op(op, node.first_child, ctx);
                 return;
             }
@@ -501,7 +501,7 @@ namespace compute_asts {
             }
 
             let op = find_op(node.text);
-            if (op != op_unreachable); else { printf("Wasm opcode not found: %.*s\n", (int)node.text.count, node.text.data); dbg_fail_return; }
+            if (op != op_invalid); else { printf("Wasm opcode not found: %.*s\n", (int)node.text.count, node.text.data); dbg_fail_return; }
             emit_wasm_op(op, node.first_child, ctx);
         }
 
@@ -525,7 +525,7 @@ namespace compute_asts {
 
         void emit_func_def(node& node, context& ctx) {
             using namespace wasm_emit;
-            using enum wasm_value_type;
+            using enum wasm_type;
             using enum variable::kind_t;
 
             if_var4(id_node, disp_node, type_node, body_node, deref4(node.first_child)); else { dbg_fail_return; }
@@ -568,7 +568,7 @@ namespace compute_asts {
 
             // var mem_offset = 1024;
             var dst = get_or_add_local(view("istr_dst__"), pt_u32, ctx).index;
-            emit_const(       1024, body);
+            emit_const_get(1024, body);
             emit(op_local_set, dst, body);
 
             for(var node_p = node.first_child; node_p; node_p = node_p->next) {
@@ -585,9 +585,9 @@ namespace compute_asts {
             }
 
             // return string { 1024, mem_offset - 1024 };
-            emit_const       (1024, body);
+            emit_const_get(1024, body);
             emit(op_local_get, dst, body);
-            emit_const       (1024, body);
+            emit_const_get(1024, body);
             emit(op_i32_sub       , body);
 
             node.value_type = pt_str;
@@ -599,7 +599,7 @@ namespace compute_asts {
             if_ref(value_node, node.first_child); else { dbg_fail_return; }
             if(!is_func(value_node)); else { dbg_fail_return; }
             let c = value_node.text[0];
-            emit_const((uint)c, curr_func.body_wasm);
+            emit_const_get((uint) c, curr_func.body_wasm);
             node.value_type = pt_u32; // TODO: pt_u8
         }
 
@@ -798,7 +798,7 @@ namespace compute_asts {
 
         wasm_opcode get_bop_to_wasm(binary_op bop, prim_type pt) {
             var result = bop_to_wasm_op[(u32)bop * (u32)pt_enum_size + (u32)pt];
-            if (result != op_unreachable); else { printf("Unsupported combination of op %u and type %u\n", (uint)bop, (uint)pt); dbg_fail_return result; }
+            if (result != op_invalid); else { printf("Unsupported combination of op %u and type %u\n", (uint)bop, (uint)pt); dbg_fail_return result; }
             return result;
         }
 

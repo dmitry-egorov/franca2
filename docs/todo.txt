@@ -1,8 +1,6 @@
-- [ ] defs are macros by default
-    - [ ] #: embedded code
-    - [ ] support locals within inlined functions
 - [ ] 'emit' scope
     - directly writes wasm
+- [ ] consts?
 - [ ] var with init as macro
     - [ ] 'identifier' parameter kind
     - [ ] pass name and kind
@@ -72,6 +70,9 @@
 - [ ] wasm jit?
 
 done
+- [+] defs are macros by default
+    - [+] #: embedded code
+    - [+] support locals within inlined functions
 - [~] defs are macros by default
     - [+] $: temp local
 - [~] defs are macros by default

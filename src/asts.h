@@ -122,17 +122,23 @@ namespace compute_asts {
             sk_unknown,
             sk_str_lit,
             sk_num_lit,
+            sk_block,
+            sk_wasm_type,
             sk_wasm_op,
             sk_local_decl,
             sk_macro_decl,
             sk_macro_invoke,
             sk_local_get,
             sk_local_ref,
+            sk_code_embed,
         } sem_kind;
 
         union {
             struct { // sk_wasm_op
                 wasm_emit::wasm_opcode wasm_op;
+            };
+            struct { // sk_wasm_op
+                wasm_emit::wasm_type wasm_type;
             };
             struct { // sk_local_decl
                 local* decled_local;
@@ -204,11 +210,11 @@ namespace compute_asts {
         uint macro_index;
 
         enum struct kind_t {
-            vk_unknown  ,
-            vk_value    ,
-            vk_ref      ,
-            vk_code     ,
-            vk_enum_size,
+            lk_unknown  ,
+            lk_value    ,
+            lk_ref      ,
+            lk_code     ,
+            lk_enum_size,
         } kind;
 
         prim_type value_type;
@@ -516,8 +522,8 @@ namespace compute_asts {
         dbg_fail_return pt_invalid;
     }
 
-    wasm_emit::wasm_value_type wasm_type_of(prim_type type) {
-        using enum wasm_emit::wasm_value_type;
+    wasm_emit::wasm_type wasm_type_of(prim_type type) {
+        using enum wasm_emit::wasm_type;
 
         switch (type) {
             case pt_void: return vt_void;

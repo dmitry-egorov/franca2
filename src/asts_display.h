@@ -118,7 +118,7 @@ namespace compute_asts {
             }
 
             var op = wasm_emit::find_op(node.text);
-            if (op != wasm_emit::wasm_opcode::op_unreachable) {
+            if (op != wasm_emit::wasm_opcode::op_invalid) {
                 display_wasm_node(node, ctx);
                 return;
             }

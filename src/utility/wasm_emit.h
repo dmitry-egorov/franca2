@@ -36,24 +36,32 @@ namespace wasm_emit {
         sec_data_count = 12,
     };
 
-    enum wasm_value_type: u8 {
+#define WASM_VALUE_TYPES \
+    OP(vt_void   , 0x40) \
+    OP(vt_f64    , 0x7c) \
+    OP(vt_f32    , 0x7d) \
+    OP(vt_i64    , 0x7e) \
+    OP(vt_i32    , 0x7f) \
+
+    const uint wasm_value_type_count = 5;
+
+#define OP(name, value) name = value,
+    enum wasm_type: u8 {
         vt_unknown = 0x00,
-        vt_void = 0x40,
-        vt_f64  = 0x7c,
-        vt_f32  = 0x7d,
-        vt_i64  = 0x7e,
-        vt_i32  = 0x7f,
+        WASM_VALUE_TYPES
+        vt_invalid = 0xff,
     };
+#undef OP
 
     struct wasm_func_type {
-        arr_view<wasm_value_type> params;
-        arr_view<wasm_value_type> results;
+        arr_view<wasm_type> params;
+        arr_view<wasm_type> results;
     };
     typedef uint wasm_func_type_index;
 
     struct wasm_func {
         wasm_func_type_index type_index;
-        arr_view<wasm_value_type> locals;
+        arr_view<wasm_type> locals;
         arr_view<u8> body;
     };
 
@@ -320,6 +328,7 @@ namespace wasm_emit {
     enum struct wasm_opcode: u16 {
         WASM_OPCODES
         WASM_OPCODES_FC
+        op_invalid = 0xffff,
     };
 #undef OP
 
@@ -327,10 +336,21 @@ namespace wasm_emit {
     using enum wasm_section_id;
     using enum wasm_export_kind;
 
+    struct wasm_type_mapping {
+        string name;
+        wasm_type to;
+    };
+
     string opcode_map   [(size_t)0xff];
     string opcode_fc_map[(size_t)0x12];
+    wasm_type_mapping wasm_value_type_map[wasm_value_type_count];
 
     void init() {
+        using enum wasm_type;
+        var i = 0u;
+        #define OP(name, value) wasm_value_type_map[i] = { view(#name), (wasm_type)value }; i++;
+            WASM_VALUE_TYPES
+        #undef OP
         #define OP(name, value) opcode_map[value] = view(#name);
             WASM_OPCODES
         #undef OP
@@ -351,6 +371,15 @@ namespace wasm_emit {
         if ((u16)op < 0x00ff) emit((u8)op, dst); else emit((u16)op, dst);
     }
 
+    wasm_type find_value_type(string op_name) {
+        for (var i = 0u; i < wasm_value_type_count; ++i) {
+            ref mapping = wasm_value_type_map[i];
+            if (mapping.name == op_name) return mapping.to;
+        }
+
+        return vt_invalid;
+    }
+
     wasm_opcode find_op(string op_name) {
         for (u8 i = 0; i < (u8)0xff; ++i)
             if (op_name == opcode_map[i])
@@ -361,12 +390,12 @@ namespace wasm_emit {
                 return (wasm_opcode)(i + 0xfc00);
         }
 
-        return op_unreachable;
+        return op_invalid;
     }
 
     void emit_op(string op_name, stream& dst) {
         let op = find_op(op_name);
-        if (op != op_unreachable); else { printf("Unknown opcode: %.*s\n", (int)op_name.count, op_name.data); dbg_fail_return;}
+        if (op != op_invalid); else { printf("Unknown opcode: %.*s\n", (int)op_name.count, op_name.data); dbg_fail_return;}
 
         emit(op, dst);
     }
@@ -401,7 +430,7 @@ namespace wasm_emit {
 
     void emit(wasm_export_kind kind, stream& dst) { push(dst, (u8)kind); }
     void emit(wasm_section_id    id, stream& dst) { push(dst, (u8)id); }
-    void emit(wasm_value_type  type, stream& dst) { push(dst, (u8)type); }
+    void emit(wasm_type        type, stream& dst) { push(dst, (u8)type); }
 
     void emit(wasm_opcode op, uint value, stream& dst) {
         emit(op, dst);
@@ -435,20 +464,20 @@ namespace wasm_emit {
         emit(v1, dst);
     }
 
-    void emit_const(int value, stream& dst) {
+    void emit_const_get(int value, stream& dst) {
         emit(op_i32_const, value, dst);
     }
 
-    void emit_const(uint value, stream& dst) {
-        emit_const((int)value, dst);
+    void emit_const_get(uint value, stream& dst) {
+        emit_const_get((int) value, dst);
     }
 
-    void emit_const(float value, stream& dst) {
+    void emit_const_get(float value, stream& dst) {
         emit(op_f32_const, value, dst);
     }
 
-    void emit_const(size_t value, stream& dst) {
-        emit_const((int)value, dst);
+    void emit_const_get(size_t value, stream& dst) {
+        emit_const_get((int) value, dst);
     }
 
     void emit_while(stream& dst) {
@@ -473,7 +502,7 @@ namespace wasm_emit {
         push(emitter.wasm, {header, sizeof header});
     }
 
-    void emit_type_list(const arr_view<wasm_value_type>& types, stream& dst) {
+    void emit_type_list(const arr_view<wasm_type>& types, stream& dst) {
         emit(types.count, dst);
         for (var i = (size_t)0; i < types.count; ++i) {
             emit(types[i], dst);
@@ -506,7 +535,7 @@ namespace wasm_emit {
         emit((u8)0x60, dst);
     }
 
-    void emit_func_sig(const arr_view<wasm_value_type>& params, const arr_view<wasm_value_type>& returns, stream& dst) {
+    void emit_func_sig(const arr_view<wasm_type>& params, const arr_view<wasm_type>& returns, stream& dst) {
         emit_function_type_id(dst);
         emit_type_list(params, dst); // params
         emit_type_list(returns, dst); // returns
