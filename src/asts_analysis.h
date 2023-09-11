@@ -72,9 +72,11 @@ namespace compute_asts {
                 var prm_node_p = disp_node.first_child;
                 for (; prm_node_p; prm_node_p = prm_node_p->next) {
                     ref prm_node = *prm_node_p;
-                    let is_ref  = is_func(prm_node, ref_id);
-                    let is_val  = is_func(prm_node,  in_id);
-                    let is_code = is_func(prm_node,  in_id);
+                    if (!is_str_literal(prm_node)); else continue;
+
+                    let is_ref  = is_func(prm_node,  ref_id);
+                    let is_val  = is_func(prm_node,   in_id);
+                    let is_code = is_func(prm_node, code_id);
                     if (is_ref || is_val || is_code); else { dbg_fail_return; }
 
                     if_var2(prm_id_node, prm_type_node, deref2(prm_node.first_child)); else { dbg_fail_return; }
