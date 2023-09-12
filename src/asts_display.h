@@ -89,14 +89,12 @@ namespace compute_asts {
 
     namespace displaying {
         void display_node_chain(node* first_node, context& ctx) {
-            using_display_ctx;
-
-            for (var node_p = first_node; node_p; node_p = node_p->next) {
-                gather_definitions(*node_p, ctx);
+            for_chain(first_node) {
+                gather_definitions(*it, ctx);
             }
 
-            for (var node_p = first_node; node_p; node_p = node_p->next) {
-                ref node = *node_p;
+            for_chain(first_node) {
+                ref node = *it;
                 display_node(node, ctx);
                 put_text(inlays, sub_past_last(node.suffix, '\n'), ctx);
             }
@@ -141,8 +139,8 @@ namespace compute_asts {
 
             put_wasm_op(node.text, ctx);
 
-            for (var arg_p = node.first_child; arg_p; arg_p = arg_p->next) {
-                ref arg = *arg_p;
+            for_chain(node.first_child) {
+                ref arg = *it;
 
                 put_text(regulars, view(" "), ctx);
                 if_var1(vu, get_uint (arg)) { put_uint (constants, vu, ctx); continue; }

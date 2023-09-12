@@ -1,5 +1,11 @@
-- [ ] +=, -=, *=, /=, %= ...
+- [ ] implement print
+    - [ ] varargs?
+- [ ] multiple value types per node
+- [ ] last element of a block returns
 - [ ] emit a function and a call when needed
+- [ ] display new format
+    - [ ] separate display arg for defs
+    - [ ] use semantic ast
 - [ ] use arr_ptrs and arr_dyns in ast
 - [ ] consts?
 - [ ] 'emit' scope
@@ -16,11 +22,8 @@
 - [ ] $ -> in
 - [ ] mod color of custom functions
 - [ ] strings as compound types? that means a primitive can be expanded as multiple wasm consts
-- [ ] inline by creating a new var at the call site or reusing a var if it's passed directly
 - [ ] fix referencing locals outside a function
     - [ ] pass outside locals by reference?
-- [ ] display inline wasm
-    - [ ]
 - [ ] move store_u8 to prelude
     - [ ] accept u8 instead of u32
     - [ ] wasm definition
@@ -67,6 +70,8 @@
 - [ ] wasm jit?
 
 done
+- [+] +=, -=, *=, /=, %= ...
+- [+] multiple wasm types per semantic type
 - [+] handle return in macro scope!
     - [+] track block nesting level in the macro scope
     - [+] increase parent block depth when switching to it for embedding

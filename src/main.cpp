@@ -164,6 +164,8 @@ static bool init() {
     //push(source_files, (cstr)"embedded/ref_test.fr");
     push(source_files, (cstr)"embedded/macro_test.fr");
 
+    let old_compiler = false;
+
     wasm_emit::init();
 
     var ast_data_arena = arenas::make(4 * 1024 * 1024);
@@ -173,27 +175,36 @@ static bool init() {
     print_ast(ast);
     printf("AST parsed. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
-    let compile_start = std::chrono::high_resolution_clock::now();
-    printf("\nAnalyzing...\n");
-    analyze(ast);
-    printf("Analyzing in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+    arr_view<u8> old_wasm = {};
+    arr_view<u8> wasm = {};
 
-    let generate_start = std::chrono::high_resolution_clock::now();
-    printf("\nGenerating WASM...\n");
-    var wasm2 = emit_wasm(ast);
-    printf("Generated in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - generate_start).count(), wasm2.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+    if (old_compiler) {
+        let old_compile_start = std::chrono::high_resolution_clock::now();
+        printf("\n(WASM) Compiling...\n");
+        old_wasm = compile(ast);
+        printf("(WASM) Compiled in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - old_compile_start).count(), old_wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+        let view_start = std::chrono::high_resolution_clock::now();
 
-    //let compile_start = std::chrono::high_resolution_clock::now();
-    //printf("\n(WASM) Compiling...\n");
-    //let wasm = compile(ast);
-    //printf("(WASM) Compiled in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
-    //let view_start = std::chrono::high_resolution_clock::now();
-    //
-    //printf("\nGenerating code view...\n");
-    //display(ast, cv_it);
-    //code_view.line_count = cv_it.cell_idx.y + 1;
-    //printf(cv_it.builder.data);
-    //printf("Code view generated in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+        let old_view_gen_start = std::chrono::high_resolution_clock::now();
+        printf("\nGenerating code view...\n");
+        display(ast, cv_it);
+        code_view.line_count = cv_it.cell_idx.y + 1;
+        printf(cv_it.builder.data);
+        printf("Code view generated in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - old_view_gen_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+    } else {
+        let compile_start = std::chrono::high_resolution_clock::now();
+        printf("\nAnalyzing...\n");
+        analyze(ast);
+        printf("Analyzing in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+
+        let generate_start = std::chrono::high_resolution_clock::now();
+        printf("\nGenerating WASM...\n");
+        wasm = emit_wasm(ast);
+        printf("Generated in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - generate_start).count(), wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+
+    }
+
+
 
     if_var1(line_view, generate_line_view(code_view.line_count, line_view_size)); else return false;
 
@@ -245,17 +256,20 @@ static bool init() {
 
     printf("WGPU ready. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
-    //let wasm_start = std::chrono::high_resolution_clock::now();
-    //printf("\n(WASM) Running...\n");
-    //var wasm_result = run_wasm(wasm.data, wasm.count);
-    //printf("(WASM) Exited with code: %d\n", wasm_result);
-    //printf("(WASM) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - wasm_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
-
-    let wasm_start = std::chrono::high_resolution_clock::now();
-    printf("\n(WASM) Running...\n");
-    var wasm_result = run_wasm(wasm2.data, wasm2.count);
-    printf("(WASM) Exited with code: %d\n", wasm_result);
-    printf("(WASM) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - wasm_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+    if (old_compiler) {
+        let wasm_start = std::chrono::high_resolution_clock::now();
+        printf("\n(WASM) Running...\n");
+        var wasm_result = run_wasm(old_wasm.data, old_wasm.count);
+        printf("(WASM) Exited with code: %d\n", wasm_result);
+        printf("(WASM) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - wasm_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+    }
+    else {
+        let wasm_start = std::chrono::high_resolution_clock::now();
+        printf("\n(WASM) Running...\n");
+        var wasm_result = run_wasm(wasm.data, wasm.count);
+        printf("(WASM) Exited with code: %d\n", wasm_result);
+        printf("(WASM) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - wasm_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+    }
 
     return true;
 }

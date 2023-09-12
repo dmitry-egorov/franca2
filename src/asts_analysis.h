@@ -32,10 +32,10 @@ namespace compute_asts {
             .ast = ast
         };
 
-        add_import("env", "print_str", { pt_u32, pt_u32 }, { }, ast);
+        add_import("env", "print_str", { pt_str }, pt_void, ast);
 
         ref macro_main = add_macro("main", nullptr, ast.root, ast);
-        add_result(pt_u32, macro_main);
+        macro_main.result_type = pt_u32;
 
         add_fn(macro_main, true, ast);
 
@@ -56,8 +56,8 @@ namespace compute_asts {
         }
 
         void gather_scopes_and_defs_chain(node* first_node, scope& scope, context & ctx) {
-            for (var node_p = first_node; node_p; node_p = node_p->next)
-                gather_scopes_and_defs(*node_p, scope, ctx);
+            for_chain(first_node)
+                gather_scopes_and_defs(*it, scope, ctx);
         }
 
         void gather_scopes_and_defs(node& node, scope& scope, context & ctx) {
@@ -68,9 +68,8 @@ namespace compute_asts {
                 var body_chain = is_func(body_node, block_id) ? body_node.first_child : &body_node;
 
                 ref macro = add_macro(id_node.text, node.parent_scope, body_chain, ctx.ast);
-                var prm_node_p = disp_node.first_child;
-                for (; prm_node_p; prm_node_p = prm_node_p->next) {
-                    ref prm_node = *prm_node_p;
+                for_chain (disp_node.first_child) {
+                    ref prm_node = *it;
                     if (!is_str_literal(prm_node)); else continue;
 
                     let is_ref  = is_func(prm_node,  ref_id);
@@ -86,7 +85,7 @@ namespace compute_asts {
                     prm_node.value_type = value_type;
                 }
 
-                add_result(primitive_type_by(type_node.text), macro);
+                macro.result_type = primitive_type_by(type_node.text);
 
                 node.sem_kind     = sk_macro_decl;
                 node.decled_macro = &macro;
@@ -103,8 +102,8 @@ namespace compute_asts {
         }
 
         void type_check_chain(node* first_node, context& ctx) {
-            for (var node_p = first_node; node_p; node_p = node_p->next)
-                type_check(*node_p, ctx);
+            for_chain(first_node)
+                type_check(*it, ctx);
         }
 
         void type_check(node& node, context& ctx) {
@@ -119,10 +118,10 @@ namespace compute_asts {
             }
 
             if (node.type == literal) {
-                if (node.text_is_quoted) { node.sem_kind = sk_str_lit; node.value_type = pt_str; return; }
-                if (node.can_be_uint   ) { node.sem_kind = sk_num_lit; node.value_type = pt_u32; return; }
-                if (node.can_be_int    ) { node.sem_kind = sk_num_lit; node.value_type = pt_i32; return; }
-                if (node.can_be_float  ) { node.sem_kind = sk_num_lit; node.value_type = pt_f32; return; }
+                if (node.text_is_quoted) { node.sem_kind = sk_lit; node.value_type = pt_str; return; }
+                if (node.can_be_uint   ) { node.sem_kind = sk_lit; node.value_type = pt_u32; return; }
+                if (node.can_be_int    ) { node.sem_kind = sk_lit; node.value_type = pt_i32; return; }
+                if (node.can_be_float  ) { node.sem_kind = sk_lit; node.value_type = pt_f32; return; }
             }
 
             let wasm_type = find_value_type(node.text);
@@ -142,7 +141,7 @@ namespace compute_asts {
                     for (var arg_p = node.first_child; arg_p; arg_p = arg_p->next) {
                         ref arg = *arg_p;
                         if (is_uint_literal(arg)); else { printf("Only numeric literals are supported as arguments for opcodes.\n"); node_error(arg); return; }
-                        arg.sem_kind   = sk_num_lit;
+                        arg.sem_kind   = sk_lit;
                         arg.value_type = pt_u32;
                     }
                 }
@@ -157,26 +156,26 @@ namespace compute_asts {
             }
 
             if (is_func(node)) {
-                if_var1(node_id, get_id(node)); else { dbg_fail_return; }
                 var args_p = node.first_child;
 
-                if (node_id == block_id) {
+                if (node.text == block_id) {
                     node.sem_kind   = sk_block;
                     node.value_type = pt_void;
                     type_check_chain(args_p, ctx);
                     return;
                 }
 
-                if (node_id == ret_id) {
-                    if_ref(value, args_p); else { printf("'Return' requires a parameter."); dbg_fail_return; }
-                    type_check(value, ctx);
+                if (node.text == ret_id) {
+                    for_chain(args_p)
+                        type_check(*it, ctx);
+
                     node.sem_kind   = sk_ret;
                     node.value_type = pt_void;
                     macro.has_returns = true;
                     return;
                 }
 
-                if (node_id == decl_local_id) {
+                if (node.text == decl_local_id) {
                     if_var2(id_node, type_node, deref2(args_p)); else { dbg_fail_return; }
                     let type = primitive_type_by(type_node.text);
                     ref loc  = add_local(id_node.text, lk_value, type, scope);
@@ -187,11 +186,11 @@ namespace compute_asts {
                     node.sem_kind     = sk_local_decl;
                     node.decled_local = &loc;
                     node.init_node    = &init_node;
-                    node.value_type   = type;
+                    node.value_type = type;
                     return;
                 }
 
-                if (node_id == ref_id) {
+                if (node.text == ref_id) {
                     if_ref (var_id, node.first_child); else { dbg_fail_return; }
                     if_ref (refed_local, find_local(var_id.text, scope)); else { dbg_fail_return; }
                     if (refed_local.kind == lk_ref); else { printf("Only mutable variables can be referenced.\n"); node_error(node); return; }
@@ -201,7 +200,31 @@ namespace compute_asts {
                     return;
                 }
 
-                // macro invocation
+                if (node.text == chr_id) {
+                    if_ref(value_node, node.first_child); else { dbg_fail_return; }
+                    node.sem_kind   = sk_chr;
+                    node.chr_value  = (u8)value_node.text[0];
+                    node.value_type = pt_u32; // TODO: pt_u8
+                    return;
+                }
+
+                if (node.text == sub_of_id) {
+                    if_chain2(sub_of_index, sub_of_node, node.first_child); else { dbg_fail_return; }
+                    if_var1(idx, get_uint(sub_of_index)); else { dbg_fail_return; }
+
+                    type_check(sub_of_node, ctx);
+
+                    let size = size_32_of(sub_of_node.value_type);
+                    if (idx < size); else { printf("Index %u is out of bounds for type %s.\n", idx, sub_of_node.text.data); node_error(node); return; }
+
+                    node.sem_kind    = sk_sub_of;
+                    node.sub_index   = sub_of_index.uint_value;
+                    node.sub_of_node = &sub_of_node;
+                    node.value_type  = pt_u32;
+                    return;
+                }
+
+                // macro invocation or function call
                 {
                     var arg_types = make_arr_dyn<prim_type>(4, ctx.ast.data_arena);
                     var arg_p = args_p;
@@ -211,10 +234,17 @@ namespace compute_asts {
                         push(arg_types, arg.value_type);
                     }
 
-                    if_ref(invoked_macro, find_macro(node_id, arg_types.data, scope)) {
+                    if_ref(invoked_macro, find_macro(node.text, arg_types.data, scope)) {
                         node.sem_kind    = sk_macro_invoke;
                         node.refed_macro = &invoked_macro;
-                        node.value_type  =  invoked_macro.results.data[0];
+                        node.value_type = invoked_macro.result_type;
+                        return;
+                    }
+
+                    if_ref(called_fn, find_fn(node.text, arg_types.data, ctx.ast)) {
+                        node.sem_kind   = sk_fn_call;
+                        node.refed_fn   = ref_in(&called_fn, ctx.ast.fns.data);
+                        node.value_type = called_fn.result_type;
                         return;
                     }
                 }

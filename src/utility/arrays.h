@@ -25,7 +25,13 @@ namespace arrays {
 
 
     tt struct array {
-        arr_view<t> data;
+        union {
+            arrays::arr_view<t> data;
+            struct {
+                t* bytes;
+                size_t count;
+            };
+        };
         size_t capacity;
     };
 
@@ -35,11 +41,13 @@ namespace arrays {
     tt t    pop (array<t>& s);
     tt t    peek(const array<t>& s);
 
-    tt struct arr_ptr {
+    tt struct arr_ref {
         size_t offset;
     };
 
-    tt t* ptr(arr_ptr<t>, const arr_view<t>&);
+    tt t* ptr(arr_ref<t>, const arr_view<t>&);
+    tt arr_ref<t> ref_in(const t*, const arr_view<t>&);
+
 }
 #endif //FRANCA2_ARRAYS_H
 
@@ -79,9 +87,19 @@ namespace arrays {
         }
         return count;
     }
+
     tt arr_view<t> sub(const arr_view<t>& view, size_t count) {
+        if (count == 0) return {nullptr, 0};
+
         assert(count <= view.count);
         return {view.data, count};
+    }
+
+    tt arr_view<t> sub(const arr_view<t>& view, size_t offset, size_t count) {
+        if (count == 0) return {nullptr, 0};
+
+        assert(offset + count <= view.count);
+        return {view.data + offset, count};
     }
 
     tt arr_view<t> sub_past_last(const arr_view<t>& view, const t& item) {
@@ -106,31 +124,37 @@ namespace arrays {
     }
 
     tt t& push(array<t>& s, const t& value) {
-        assert(s.data.count < s.capacity);
+        assert(s.count < s.capacity);
         enlarge(s.data);
-        s.data[s.data.count - 1] = value;
-        return s.data[s.data.count - 1];
+        s.data[s.count - 1] = value;
+        return s.data[s.count - 1];
     }
 
     tt t pop(array<t>& s) {
-        assert(s.data.count > 0);
-        return s.data[--s.data.count];
+        assert(s.count > 0);
+        return s.data[--s.count];
     }
 
     tt arr_view<t> pop(array<t>& s, size_t count) {
-        assert(s.data.count >= count);
-        s.data.count -= count;
-        return {s.data.data + s.data.count, count};
+        assert(s.count >= count);
+        s.count -= count;
+        return {s.data.data + s.count, count};
     }
 
     tt t peek(const array<t>& s) {
         assert(s.count > 0);
-        return s.data[s.data.count - 1];
+        return s.data[s.count - 1];
     }
 
-    tt t* ptr(arr_ptr<t> ptr, const arr_view<t>& view) {
-        assert(ptr.offset < view.count);
+    tt t* ptr(arr_ref<t> ptr, const arr_view<t>& view) {
+        if (ptr.offset < view.count); else return nullptr;
         return view.data + ptr.offset;
+    }
+
+    tt arr_ref<t> ref_in(const t* p, const arr_view<t>& v) {
+        let offset = (size_t)p - (size_t)v.data;
+        if (offset < v.count); else return {(size_t)-1};
+        return {offset};
     }
 }
 #endif

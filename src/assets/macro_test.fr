@@ -1,18 +1,17 @@
-//var[s u32  0]
-//var[i u32 10]
-//while[i {}[
-//  -=[i 1]
-//  +=[s 3]
-//]]
+//print_str["Hello, world!"]
 
-//ret[*[+[1 2] +[3 4]]]
+var [dst u32 1024]
+
+var [x u32 123]
+push["x = " dst]
+push[x dst]
+
+print_str[make_str[1024 -[dst 1024]]]
+
 ret[-[fib_at[40] fib_at[30]]]
 
-//ret[+[foo[1] 1]]
-
-def[foo disp["foo"#[a u32]] u32 {}[while[1 ret[a]] ret[a]]]
-
-def[fib_at disp["fib at "$[n u32]] u32 {}[
+////////////////////////////////////////
+def[fib_at .[$[n u32]] u32 {}[
     if[==[n 0] ret[0]]
     if[==[n 1] ret[1]]
 
@@ -28,16 +27,32 @@ def[fib_at disp["fib at "$[n u32]] u32 {}[
     ret[v1]]]
 
 ////////////////////////////////////////
-def[()  disp["("#[expr u32]")"] u32 expr]
-def[=   disp[&[a u32]" = "#[b u32]] void {}[b op_local_set &[a]]]
+def[push .[$[n u32] &[dst u32]] void {}[
+    if[==[n 0] {}[push_chr[chr[0] dst] ret[]]]
 
-def[if disp["if "#[a u32]" "#[b void]] void {}[
+    var[d u32 1000000000]
+    while[>[d n] /=[d 10]]
+
+    while[>[d 0] {}[
+        push_chr[()[+[chr[0] %[()[/[n d]] 10]]] dst]
+        /=[d 10]]]]]
+
+def[push     .[$[s  str] &[dst u32]] void {}[copy_str[s  dst] +=[dst sub_of[1 s]]]]
+def[push_chr .[$[ch u32] &[dst u32]] void {}[store_u8[ch dst] +=[dst 1]]]
+
+def[make_str .[#[ptr u32] #[len u32]] str  {}[ptr len]]
+def[copy_str .[$[s   str] &[dst u32]] void {}[mem_copy[sub_of[0 s] sub_of[1 s] dst]]]
+
+def[mem_copy .[#[src u32] #[count u32] #[dst u32]] void {}[dst src count op_memory_copy[0 0]]]
+def[store_u8 .[#[ch  u32]              #[dst u32]] void {}[dst ch op_i32_store8[0 0]]]
+
+def[if .[#[a u32] #[b void]] void {}[
     a
     op_if vt_void
         b
     op_end]]
 
-def[while disp["while "#[a u32]" "#[b void]] void {}[
+def[while .[#[a u32] #[b void]] void {}[
     op_block vt_void
         op_loop vt_void
             a
@@ -48,25 +63,32 @@ def[while disp["while "#[a u32]" "#[b void]] void {}[
         op_end
     op_end]]
 
-def[+ disp[#[a u32]" + "#[b u32]] u32 {}[a b op_i32_add]]
-def[- disp[#[a u32]" - "#[b u32]] u32 {}[a b op_i32_sub]]
-def[* disp[#[a u32]" * "#[b u32]] u32 {}[a b op_i32_mul]]
-def[/ disp[#[a u32]" / "#[b u32]] u32 {}[a b op_i32_div_u]]
-def[% disp[#[a u32]" % "#[b u32]] u32 {}[a b op_i32_rem_u]]
+def[floor .[#[a f32]] f32 {}[a op_f32_nearest]]
 
-def[== disp[#[a u32]" == "#[b u32]] u32 {}[a b op_i32_eq]]
-def[!= disp[#[a u32]" == "#[b u32]] u32 {}[a b op_i32_ne]]
-def[<  disp[#[a u32]" < " #[b u32]] u32 {}[a b op_i32_lt_u]]
-def[>  disp[#[a u32]" > " #[b u32]] u32 {}[a b op_i32_gt_u]]
-def[<= disp[#[a u32]" <= "#[b u32]] u32 {}[a b op_i32_le_u]]
-def[>= disp[#[a u32]" >= "#[b u32]] u32 {}[a b op_i32_ge_u]]
+def[() .[#[a u32]] u32 a]
 
-def[- disp["-"#[a u32]] u32 {}[0 a op_i32_sub]]
+def[+ .[#[a u32] #[b u32]] u32 {}[a b op_i32_add  ]]
+def[- .[#[a u32] #[b u32]] u32 {}[a b op_i32_sub  ]]
+def[* .[#[a u32] #[b u32]] u32 {}[a b op_i32_mul  ]]
+def[/ .[#[a u32] #[b u32]] u32 {}[a b op_i32_div_u]]
+def[% .[#[a u32] #[b u32]] u32 {}[a b op_i32_rem_u]]
 
-def[+= disp[&[a u32]" += "#[b u32]] void =[a +[a b]]]
-def[-= disp[&[a u32]" -= "#[b u32]] void =[a -[a b]]]
+def[== .[#[a u32] #[b u32]] u32 {}[a b op_i32_eq  ]]
+def[!= .[#[a u32] #[b u32]] u32 {}[a b op_i32_ne  ]]
+def[<  .[#[a u32] #[b u32]] u32 {}[a b op_i32_lt_u]]
+def[>  .[#[a u32] #[b u32]] u32 {}[a b op_i32_gt_u]]
+def[<= .[#[a u32] #[b u32]] u32 {}[a b op_i32_le_u]]
+def[>= .[#[a u32] #[b u32]] u32 {}[a b op_i32_ge_u]]
 
-def[floor disp["floor "#[a f32]] f32 {}[a op_f32_nearest]]
+def[- .[#[a u32]] u32 {}[0 a op_i32_sub]]
+
+def[+= .[&[a u32] #[b u32]] void =[a +[a b]]]
+def[-= .[&[a u32] #[b u32]] void =[a -[a b]]]
+def[*= .[&[a u32] #[b u32]] void =[a *[a b]]]
+def[/= .[&[a u32] #[b u32]] void =[a /[a b]]]
+def[%= .[&[a u32] #[b u32]] void =[a %[a b]]]
+
+def[=  .[&[a u32] #[b u32]] void {}[b op_local_set &[a]]]
 
 // $    -- add var on expansion
 // &    -- local reference

@@ -103,6 +103,7 @@ namespace compute_asts {
         float float_value;
 
         prim_type value_type;
+
         func* declared_func; //TODO: remove with compilation
 
         string prefix;
@@ -120,8 +121,7 @@ namespace compute_asts {
 
         enum struct sem_kind_t {
             sk_unknown,
-            sk_str_lit,
-            sk_num_lit,
+            sk_lit,
             sk_block,
             sk_ret,
             sk_wasm_type,
@@ -129,9 +129,12 @@ namespace compute_asts {
             sk_local_decl,
             sk_macro_decl,
             sk_macro_invoke,
+            sk_fn_call,
             sk_local_get,
             sk_local_ref,
             sk_code_embed,
+            sk_chr,
+            sk_sub_of,
         } sem_kind;
 
         union {
@@ -151,11 +154,21 @@ namespace compute_asts {
             struct { // sk_macro_invoke
                 macro* refed_macro;
             };
+            struct {
+                arr_ref<fn> refed_fn;
+            };
             struct { // sk_local_get & sk_local_ref
                 local* local;
             };
             struct { // sk_ret
                 node* value_node;
+            };
+            struct {
+                u8 chr_value;
+            };
+            struct {
+                u32 sub_index;
+                node* sub_of_node;
             };
         };
     };
@@ -211,6 +224,7 @@ namespace compute_asts {
     struct local {
         string id;
         uint index_in_macro;
+        uint offset;
 
         enum struct kind_t {
             lk_unknown  ,
@@ -228,7 +242,7 @@ namespace compute_asts {
         uint index;
 
         arr_dyn<prim_type> params ;
-        arr_dyn<prim_type> results;
+        prim_type result_type;
 
         enum struct kind_t {
             fk_unknown,
@@ -239,9 +253,11 @@ namespace compute_asts {
 
         union {
             struct { // local and exported
-                arr_dyn<prim_type> locals;
+                arr_dyn<prim_type> local_types  ;
+                arr_dyn<uint     > local_offsets;
                 macro* macro;
                 stream body_wasm;
+                uint next_local_offset;
                 bool   exported;
             };
             struct { // imported
@@ -254,8 +270,8 @@ namespace compute_asts {
         string id;
 
         uint params_count;
-        arr_dyn<prim_type> results;
-        arr_dyn<local    > locals ; // includes parameters
+        prim_type result_type;
+        arr_dyn<local> locals ; // includes parameters
 
         bool has_returns;
 
@@ -263,7 +279,7 @@ namespace compute_asts {
         scope*   body_scope;
     };
 
-#define loop_over_chain(name, first_node) for (var name = body_chain; name; name = name->next)
+#define for_chain(first_node) for (var it = first_node; it; it = it->next)
 
     static let emit_local_get_id = view("emit_local_get");
     static let  decl_local_id = view("var");
@@ -289,6 +305,7 @@ namespace compute_asts {
     static let       rem_a_id = view("%=");
     static let       print_id = view("print");
     static let        show_id = view("show");
+    static let      sub_of_id = view("sub_of");
 
     ast make_ast(arena& data_arena, arena& temp_arena = gta) {
         return {
@@ -342,7 +359,6 @@ namespace compute_asts {
     macro& add_macro(string id, scope* parent_scope, node* body_chain, ast& ast) {
         ref macro = push(ast.macros, compute_asts::macro {
             .id           = id,
-            .results      = make_arr_dyn<prim_type>(2, ast.data_arena),
             .locals       = make_arr_dyn<local    >(16, ast.data_arena),
             .parent_scope = parent_scope,
         });
@@ -361,7 +377,7 @@ namespace compute_asts {
 
     local& add_local(string id, local::kind_t kind, prim_type type, scope& scope) {
         ref macro = *scope.parent_macro;
-        var index = macro.locals.data.count;
+        var index = macro.locals.count;
         ref local = push(scope.parent_macro->locals, compute_asts::local {
             .id = id,
             .index_in_macro = index,
@@ -373,13 +389,9 @@ namespace compute_asts {
     }
 
     inline local& add_param(string id, local::kind_t kind, prim_type value_type, macro& macro) {
-        assert(macro.locals.data.count == macro.params_count); // params must be added before locals
+        assert(macro.locals.count == macro.params_count); // params must be added before locals
         macro.params_count += 1;
         return add_local(id, kind, value_type, *macro.body_scope);
-    }
-
-    inline void add_result(prim_type type, macro& macro) {
-        push(macro.results, type);
     }
 
     arr_view<local> params_of(macro& macro) {
@@ -387,48 +399,73 @@ namespace compute_asts {
     }
 
     fn& add_fn(macro& macro, bool exported, ast& ast) {
-        let index   = ast.fns.data.count;
+        let index   = ast.fns.count;
         let params  = params_of(macro);
-        let results = macro.results.data;
 
         ref fn = push(ast.fns, {
-            .id        = macro.id,
-            .index     = index,
-            .params    = make_arr_dyn<prim_type>(params .count, ast.data_arena),
-            .results   = make_arr_dyn<prim_type>(results.count, ast.data_arena),
-            .kind      = fn::kind_t::fk_regular,
-            .locals    = make_arr_dyn<prim_type>(8, ast.data_arena),
-            .macro     = &macro,
-            .body_wasm = make_stream(32, ast.data_arena),
-            .exported  = exported,
+            .id            = macro.id,
+            .index         = index,
+            .params        = make_arr_dyn<prim_type>(params .count, ast.data_arena),
+            .result_type   = macro.result_type,
+            .kind          = fn::kind_t::fk_regular,
+            .local_types   = make_arr_dyn<prim_type>(8, ast.data_arena),
+            .local_offsets = make_arr_dyn<uint     >(8, ast.data_arena),
+            .macro         = &macro,
+            .body_wasm     = make_stream(32, ast.data_arena),
+            .exported      = exported,
         });
 
         for (var i = 0u; i < params.count; ++i)
             push(fn.params, params[i].value_type);
 
-        push(fn.results, results);
-
         return fn;
     }
 
-    fn& add_import(string module_id, string id, arr_view<prim_type> params, arr_view<prim_type> results, ast& ast) {
+    fn& add_import(string module_id, string id, arr_view<prim_type> params, prim_type result_type, ast& ast) {
         ref fn = push(ast.fns, compute_asts::fn {
             .id      = id,
-            .index   = ast.fns.data.count,
+            .index   = ast.fns.count,
             .params  = make_arr_dyn<prim_type>(params .count, ast.data_arena),
-            .results = make_arr_dyn<prim_type>(results.count, ast.data_arena),
+            .result_type = result_type,
             .kind = fn::kind_t::fk_imported,
             .import_module = module_id,
         });
 
         push(fn.params , params);
-        push(fn.results, results);
 
         return fn;
     }
 
-    fn& add_import(cstr module_id, cstr id, init_list<prim_type> params, init_list<prim_type> results, ast& ast) {
-        return add_import(view(module_id), view(id), view(params), view(results), ast);
+    fn& add_import(cstr module_id, cstr id, init_list<prim_type> params, prim_type result_type, ast& ast) {
+        return add_import(view(module_id), view(id), view(params), result_type, ast);
+    }
+
+    arr_ref<fn> find_fn_ptr(string id, arr_view<prim_type> param_types, ast& ast) {
+        let fns = ast.fns.data;
+        for (var i = 0u; i < fns.count; i += 1) {
+            ref fn = ast.fns.data[i];
+            if (fn.id == id); else continue;
+
+            let params = fn.params.data;
+            if (params.count == param_types.count); else continue;
+
+            var found = true;
+            for (var prm_i = 0u; prm_i < param_types.count; ++prm_i)
+                if (params[prm_i] != param_types[prm_i]) {
+                    found = false;
+                    break;
+                }
+
+            if (found); else continue;
+
+            return {i};
+        }
+
+        return {(size_t)-1};
+    }
+
+    fn* find_fn(string id, arr_view<prim_type> param_types, ast& ast) {
+        return ptr(find_fn_ptr(id, param_types, ast), ast.fns);
     }
 
     macro* find_macro(string id, arr_view<prim_type> param_types, scope& scope) {
@@ -505,6 +542,8 @@ namespace compute_asts {
     }
 #pragma clang diagnostic pop
 
+    #define if_chain2(n0, n1, first_node) if_var2(n0, n1, deref2(first_node))
+
     prim_type primitive_type_by(string name) {
         if (name == view("void")) return pt_void ;
         if (name == view("i8"  )) return pt_i8 ;
@@ -517,29 +556,38 @@ namespace compute_asts {
         if (name == view("u64" )) return pt_u64;
         if (name == view("f32" )) return pt_f32;
         if (name == view("f64" )) return pt_f64;
+        if (name == view("str" )) return pt_str;
 
         printf("Type %.*s not found.\n", (int)name.count, name.data);
         dbg_fail_return pt_invalid;
     }
 
-    wasm_emit::wasm_type wasm_type_of(prim_type type) {
+    arr_view<wasm_emit::wasm_type> wasm_types_of(prim_type type, bool void_as_empty = true) {
         using enum wasm_emit::wasm_type;
 
+        static let wasm_types_arr = alloc(gta, {vt_void, vt_i32, vt_i64, vt_f32, vt_f64, /* str */ vt_i32, vt_i32});
+
         switch (type) {
-            case pt_void: return vt_void;
+            case pt_void: return void_as_empty ? sub(wasm_types_arr, 0, 0) : sub(wasm_types_arr, 0, 1);
             case pt_i8 :
             case pt_i16:
             case pt_i32:
             case pt_u8 :
             case pt_u16:
-            case pt_u32: return vt_i32;
+            case pt_u32: return sub(wasm_types_arr, 1, 1);
             case pt_i64:
-            case pt_u64: return vt_i64;
-            case pt_f32: return vt_f32;
-            case pt_f64: return vt_f64;
+            case pt_u64: return sub(wasm_types_arr, 2, 1);
+            case pt_f32: return sub(wasm_types_arr, 3, 1);
+            case pt_f64: return sub(wasm_types_arr, 4, 1);
 
-            default: dbg_fail_return vt_unknown;
+            case pt_str: return sub(wasm_types_arr, 5, 2);
+
+            default: dbg_fail_return {};
         }
+    }
+
+    uint size_32_of(prim_type type, bool void_as_empty = true) {
+        return wasm_types_of(type, void_as_empty).count;
     }
 
     void node_error(node& node) {

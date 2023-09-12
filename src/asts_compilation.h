@@ -114,7 +114,7 @@ namespace compute_asts {
         // emit wasm
         ref emitter = ctx.emitter;
 
-        var func_types = alloc<wasm_func_type>(ast.temp_arena, ctx.funcs.data.count);
+        var func_types = alloc<wasm_func_type>(ast.temp_arena, ctx.funcs.count);
         var imports    = make_arr_dyn<wasm_func_import>( 32, ast.temp_arena);
         var exports    = make_arr_dyn<wasm_export     >( 32, ast.temp_arena);
         var func_specs = make_arr_dyn<wasm_func       >(256, ast.temp_arena);
@@ -122,36 +122,36 @@ namespace compute_asts {
         push(exports, wasm_export {.name = view("memory"), .kind = ek_mem, .obj_index = 0});
 
         var func_i = 0u;
-        for (var i = 0u; i < ctx.funcs.data.count; ++i) {
+        for (var i = 0u; i < ctx.funcs.count; ++i) {
             let func = ctx.funcs.data[i];
             if (!func.is_inline_wasm); else continue;
             defer { func_i += 1; };
 
             func_types[func_i] = { // TODO: distinct
-                .params  = alloc_g<wasm_type>(ast.temp_arena, func.params .data.count),
-                .results = alloc_g<wasm_type>(ast.temp_arena, func.results.data.count),
+                .params  = alloc_g<wasm_type>(ast.temp_arena, func.params .count),
+                .results = alloc_g<wasm_type>(ast.temp_arena, func.results.count),
             };
 
-            for (var pi = 0u; pi < func.params.data.count; pi += 1)
-                func_types[func_i].params[pi] = wasm_type_of(func.params.data[pi].value_type);
+            for (var pi = 0u; pi < func.params.count; pi += 1)
+                func_types[func_i].params[pi] = wasm_types_of(func.params.data[pi].value_type)[0]; // NOTE: multi-value not supported
 
-            for (var ri = 0u; ri < func.results.data.count; ri += 1)
-                func_types[func_i].results[ri] = wasm_type_of(func.results.data[ri]);
+            for (var ri = 0u; ri < func.results.count; ri += 1)
+                func_types[func_i].results[ri] = wasm_types_of(func.results.data[ri])[0];
 
             if (func.imported) {
                 push(imports, {.module = func.import_module, .name = func.id, .type_index = func_i});
-                assert(func.body_wasm.data.count == 0);
+                assert(func.body_wasm.count == 0);
                 continue;
             }
 
             var wasm_func = wasm_emit::wasm_func {
                 .type_index = func_i,
-                .locals     = alloc_g<wasm_type>(ast.temp_arena, func.locals.data.count),
+                .locals     = alloc_g<wasm_type>(ast.temp_arena, func.locals.count),
                 .body       = func.body_wasm.data,
             };
 
-            for (var li = 0u; li < func.locals.data.count; li += 1)
-                wasm_func.locals[li] = wasm_type_of(func.locals.data[li].value_type);
+            for (var li = 0u; li < func.locals.count; li += 1)
+                wasm_func.locals[li] = wasm_types_of(func.locals.data[li].value_type)[0];
 
             push(func_specs, wasm_func);
 
@@ -165,9 +165,9 @@ namespace compute_asts {
         var datas = view(data);
 
         printf("func types: %zu\n", func_types.count);
-        printf("imports   : %zu\n", imports   .data.count);
-        printf("exports   : %zu\n", exports   .data.count);
-        printf("funcs     : %zu\n", func_specs.data.count);
+        printf("imports   : %zu\n", imports   .count);
+        printf("exports   : %zu\n", exports   .count);
+        printf("funcs     : %zu\n", func_specs.count);
         printf("wasm:\n");
 
         emit_header(emitter);
@@ -446,7 +446,7 @@ namespace compute_asts {
                 }
 
                 if_ref(func, find_func(node_id, args.data, ctx)); else { error_func_not_found(node_id); return; }
-                node.value_type = func.results.data.count == 0 ? pt_void : func.results.data[0]; //TODO: support multiple return values
+                node.value_type = func.results.count == 0 ? pt_void : func.results.data[0]; //TODO: support multiple return values
 
                 arg_node_p = args_node_p;
                 let params = func.params.data;
@@ -644,17 +644,17 @@ namespace compute_asts {
         }
 
         void push_scope(context& ctx) { push(ctx.scope_stack, {
-            .prev_locals_in_scope_count = ctx.locals_in_scope.data.count,
-            . prev_funcs_in_scope_count = ctx. funcs_in_scope.data.count
+            .prev_locals_in_scope_count = ctx.locals_in_scope.count,
+            . prev_funcs_in_scope_count = ctx. funcs_in_scope.count
         });}
 
         void pop_scope(context& ctx) { let scope = pop(ctx.scope_stack);
-            ctx.locals_in_scope.data.count = scope.prev_locals_in_scope_count;
-            ctx. funcs_in_scope.data.count = scope. prev_funcs_in_scope_count;
+            ctx.locals_in_scope.count = scope.prev_locals_in_scope_count;
+            ctx. funcs_in_scope.count = scope. prev_funcs_in_scope_count;
         }
 
         variable* find_local(string id, context& ctx) {
-            for (var i = (int)ctx.locals_in_scope.data.count - 1; i >= 0; i--) {
+            for (var i = (int)ctx.locals_in_scope.count - 1; i >= 0; i--) {
                 ref v = ctx.locals_in_scope.data[i];
                 if (v.id == id) return &v;
             }
@@ -662,7 +662,7 @@ namespace compute_asts {
         }
 
         func* find_func(string id, arr_view<prim_type> params, context& ctx) {
-            for (var i = (int)ctx.funcs_in_scope.data.count - 1; i >= 0; i--) {
+            for (var i = (int)ctx.funcs_in_scope.count - 1; i >= 0; i--) {
                 if_ref(func, ctx.funcs_in_scope.data[i]); else { dbg_fail_return nullptr; }
                 if (func.id == id); else continue;
                 let f_params = func.params.data;
@@ -693,7 +693,7 @@ namespace compute_asts {
         }
 
         func& declare_import(string module_id, string id, arr_view<prim_type> params, arr_view<prim_type> results, context& ctx) {
-            let index = ctx.funcs.data.count;
+            let index = ctx.funcs.count;
             var prms = make_arr_dyn<variable>(params.count, ctx.arena);
             for (var prm_i = 0u; prm_i < params.count; ++prm_i)
                 push(prms, {.id = view(""), .index = prm_i, .value_type = params[prm_i], .kind = variable::kind_t::vk_param_value});
@@ -757,7 +757,7 @@ namespace compute_asts {
         }
 
         uint add_data(const string& text, context& ctx) {
-            var offset = ctx.data.data.count;
+            var offset = ctx.data.count;
             push(ctx.data, {(u8*)text.data, text.count});
             return offset;
         }
@@ -769,7 +769,7 @@ namespace compute_asts {
 
         variable& add_local(string id, prim_type type, context& ctx) {
             ref curr_func = curr_func_of(ctx);
-            var index = curr_func.params.data.count + curr_func.locals.data.count;
+            var index = curr_func.params.count + curr_func.locals.count;
             ref v = push(curr_func.locals, {.id = id, .index = index, .value_type = type, .kind = variable::kind_t::vk_local} );
             push(ctx.locals_in_scope, v);
             return v;
@@ -786,8 +786,8 @@ namespace compute_asts {
         }
 
         uint add_param(string id, node* node, prim_type type, variable::kind_t kind, func& func) {
-            assert(func.locals.data.count == 0); // add params before locals
-            let index = func.params.data.count;
+            assert(func.locals.count == 0); // add params before locals
+            let index = func.params.count;
             push(func.params, {id, index, node, type, kind});
             return index;
         }

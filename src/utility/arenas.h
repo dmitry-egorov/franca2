@@ -118,7 +118,7 @@ namespace arenas {
         return { (t*)alloc(arena, count * sizeof(t), align), (uint)count };
     }
 
-    tt arr_view<t> alloc(arena& arena, const init_list<t> list, const uint align) {
+    tt arr_view<t> alloc(arena& arena, const std::initializer_list<t> list, const uint align) {
         let count = list.size();
         if(count > 0); else return { 0, 0 };
 
@@ -139,7 +139,7 @@ namespace arenas {
 
     tt array<t> alloc_array(arena& arena, const size_t capacity, const uint align) {
         var storage = alloc<t>(arena, capacity, align);
-        return {{storage.data, 0}, storage.count};
+        return {.data = {storage.data, 0}, .capacity = storage.count};
     }
 
     // gta_ -> global temp arena

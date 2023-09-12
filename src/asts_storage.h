@@ -74,14 +74,14 @@ namespace compute_asts {
 
     void push_scope(storage& storage) {
         using_storage;
-        push(scopes, {vars.data.count, funcs.data.count});
+        push(scopes, {vars.count, funcs.count});
     }
 
     void pop_scope(storage& storage) {
         using_storage;
         let scope = pop(scopes);
-        vars .data.count = scope.prev_vars_count;
-        funcs.data.count = scope.prev_funcs_count;
+        vars .count = scope.prev_vars_count;
+        funcs.count = scope.prev_funcs_count;
     }
 #define tmp_scope(storage) push_scope(storage); defer { pop_scope(storage); }
 

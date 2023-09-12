@@ -71,7 +71,13 @@ namespace wasm_emit {
     };
 
     struct wasm_data {
-        arr_view<u8> data;
+        union {
+            arr_view<u8> data;
+            struct {
+                u8* bytes;
+                size_t count;
+            };
+        };
     };
 
     struct wasm_func_import {
@@ -371,6 +377,7 @@ namespace wasm_emit {
         if ((u16)op < 0x00ff) emit((u8)op, dst); else emit((u16)op, dst);
     }
 
+
     wasm_type find_value_type(string op_name) {
         for (var i = 0u; i < wasm_value_type_count; ++i) {
             ref mapping = wasm_value_type_map[i];
@@ -464,6 +471,12 @@ namespace wasm_emit {
         emit(v1, dst);
     }
 
+    void emit(wasm_opcode op, arr_view<wasm_type> types, stream& dst) {
+        emit(op, dst);
+        for (var i = (size_t)0; i < types.count; ++i)
+            emit(types[i], dst);
+    }
+
     void emit_const_get(int value, stream& dst) {
         emit(op_i32_const, value, dst);
     }
@@ -528,7 +541,7 @@ namespace wasm_emit {
 
         emit (id          , wasm);
         emit (section.data, wasm);
-        reset(section);
+        clear(section);
     }
 
     void emit_function_type_id(stream& dst) {
@@ -652,7 +665,7 @@ namespace wasm_emit {
             emit(op_end      , section);
             emit(data.data   , section);
 
-            offset += data.data.count;
+            offset += data.count;
         }
 
         emit_section(sec_data, emitter);
