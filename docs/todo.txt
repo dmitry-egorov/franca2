@@ -1,19 +1,16 @@
+- [ ] +=, -=, *=, /=, %= ...
+- [ ] emit a function and a call when needed
+- [ ] use arr_ptrs and arr_dyns in ast
+- [ ] consts?
 - [ ] 'emit' scope
     - directly writes wasm
-- [ ] consts?
+- [ ] line and column numbers for nodes
+- [ ] breakable scope for loops
 - [ ] var with init as macro
     - [ ] 'identifier' parameter kind
     - [ ] pass name and kind
     - [ ] local builtin
-- [ ] emit a function and a call when needed
-- [ ] line and column numbers for nodes
-- [ ] breakable scope for loops
-- [ ] +=, -=, *=, /=, %= ...
 - [ ] fix display of wasm nodes (no space between ops)
-- [ ] generalize funcs
-    - [ ] a new param type: on stack?
-    - [ ] if func is inline add external var ref
-    - [ ] if func is called pass value and set var after return
 - [ ] inline store_u8
     - [ ] separate display and param list
 - [ ] $ -> in
@@ -70,6 +67,13 @@
 - [ ] wasm jit?
 
 done
+- [+] handle return in macro scope!
+    - [+] track block nesting level in the macro scope
+    - [+] increase parent block depth when switching to it for embedding
+- [+] generalize funcs
+    - [+] a new param type: on stack?
+    - [+] if func is inline add external var ref
+    - [+] if func is called pass value and set var after return
 - [+] defs are macros by default
     - [+] #: embedded code
     - [+] support locals within inlined functions

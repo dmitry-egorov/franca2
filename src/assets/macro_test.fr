@@ -5,7 +5,12 @@
 //  +=[s 3]
 //]]
 
-ret[fib_at[40]]
+//ret[*[+[1 2] +[3 4]]]
+ret[-[fib_at[40] fib_at[30]]]
+
+//ret[+[foo[1] 1]]
+
+def[foo disp["foo"#[a u32]] u32 {}[while[1 ret[a]] ret[a]]]
 
 def[fib_at disp["fib at "$[n u32]] u32 {}[
     if[==[n 0] ret[0]]
@@ -23,7 +28,6 @@ def[fib_at disp["fib at "$[n u32]] u32 {}[
     ret[v1]]]
 
 ////////////////////////////////////////
-def[ret disp["return "#[a u32]] void {}[a op_return]]
 def[()  disp["("#[expr u32]")"] u32 expr]
 def[=   disp[&[a u32]" = "#[b u32]] void {}[b op_local_set &[a]]]
 
@@ -76,6 +80,9 @@ def[floor disp["floor "#[a f32]] f32 {}[a op_f32_nearest]]
 // ...
 
 // def[loop disp["loop "#[b u32]] void wasm[wasm.loop scope[b wasm.br 1] wasm.end]]
+
+// separate display and signature, because some parameters can be in different order or even missing from view (e.g. type parameters)
+// def[+ ..[#[a u32] #[b u32]] u32 ..[a" + "b] {}[a b op_i32_add]]
 
 //Need 'identifier' parameter kind
 // def[var disp["var "id[name]": "id[type]" = " #[value u32]] void =[local[name type] value]]

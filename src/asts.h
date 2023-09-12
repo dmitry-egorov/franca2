@@ -123,6 +123,7 @@ namespace compute_asts {
             sk_str_lit,
             sk_num_lit,
             sk_block,
+            sk_ret,
             sk_wasm_type,
             sk_wasm_op,
             sk_local_decl,
@@ -152,6 +153,9 @@ namespace compute_asts {
             };
             struct { // sk_local_get & sk_local_ref
                 local* local;
+            };
+            struct { // sk_ret
+                node* value_node;
             };
         };
     };
@@ -193,7 +197,6 @@ namespace compute_asts {
     };
 //---- old end ----
 
-
     struct scope {
         macro* parent_macro;
         node*  body_chain;
@@ -207,7 +210,7 @@ namespace compute_asts {
 
     struct local {
         string id;
-        uint macro_index;
+        uint index_in_macro;
 
         enum struct kind_t {
             lk_unknown  ,
@@ -251,8 +254,10 @@ namespace compute_asts {
         string id;
 
         uint params_count;
-        arr_dyn <prim_type> results;
-        arr_dyn <local    > locals ; // includes parameters
+        arr_dyn<prim_type> results;
+        arr_dyn<local    > locals ; // includes parameters
+
+        bool has_returns;
 
         scope* parent_scope;
         scope*   body_scope;
@@ -271,6 +276,7 @@ namespace compute_asts {
     static let        wasm_id = view("wasm");
     static let          fn_id = view("fn");
     static let       block_id = view("{}");
+    static let         ret_id = view("ret");
     static let          as_id = view("as");
     static let          if_id = view("if");
     static let       while_id = view("while");
@@ -311,11 +317,6 @@ namespace compute_asts {
     inline bool is_func(const node& node, string id) {
         if     (is_func(node)); else return false;
         return node.text == id;
-    }
-
-    inline bool is_func(const node* n, string id) {
-        if_ref (node , n); else return false;
-        return is_func(node, id);
     }
 
     inline bool parent_is_func(const node& node, string id) {
@@ -363,7 +364,7 @@ namespace compute_asts {
         var index = macro.locals.data.count;
         ref local = push(scope.parent_macro->locals, compute_asts::local {
             .id = id,
-            .macro_index = index,
+            .index_in_macro = index,
             .kind = kind,
             .value_type = type
         });
@@ -391,8 +392,8 @@ namespace compute_asts {
         let results = macro.results.data;
 
         ref fn = push(ast.fns, {
-            .id = macro.id,
-            .index = index,
+            .id        = macro.id,
+            .index     = index,
             .params    = make_arr_dyn<prim_type>(params .count, ast.data_arena),
             .results   = make_arr_dyn<prim_type>(results.count, ast.data_arena),
             .kind      = fn::kind_t::fk_regular,
@@ -430,8 +431,7 @@ namespace compute_asts {
         return add_import(view(module_id), view(id), view(params), view(results), ast);
     }
 
-
-    macro* find_macro(string id, arr_view<prim_type> params, scope& scope) {
+    macro* find_macro(string id, arr_view<prim_type> param_types, scope& scope) {
         for(var scope_p = &scope; scope_p; ) {
             ref sc = *scope_p;
             var macros = sc.macros.data;
@@ -444,12 +444,12 @@ namespace compute_asts {
                 if_ref(macro, macros[i]); else { dbg_fail_return nullptr; }
                 if (macro.id == id); else continue;
 
-                let m_params = params_of(macro);
-                if (m_params.count == params.count); else continue;
+                let params = params_of(macro);
+                if (params.count == param_types.count); else continue;
 
                 var found = true;
-                for (var prm_i = 0u; prm_i < params.count; ++prm_i)
-                    if (m_params[prm_i].value_type != params[prm_i]) {
+                for (var prm_i = 0u; prm_i < param_types.count; ++prm_i)
+                    if (params[prm_i].value_type != param_types[prm_i]) {
                         found = false;
                         break;
                     }

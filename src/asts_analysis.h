@@ -64,9 +64,8 @@ namespace compute_asts {
             node.parent_scope = &scope;
 
             if (is_func(node, def_id)) {
-                if_var3(id_node, disp_node, type_node, deref3(node.first_child)); else { dbg_fail_return; }
-                var body_node  = type_node.next;
-                var body_chain = is_func(body_node, block_id) ? body_node->first_child : body_node;
+                if_var4(id_node, disp_node, type_node, body_node, deref4(node.first_child)); else { dbg_fail_return; }
+                var body_chain = is_func(body_node, block_id) ? body_node.first_child : &body_node;
 
                 ref macro = add_macro(id_node.text, node.parent_scope, body_chain, ctx.ast);
                 var prm_node_p = disp_node.first_child;
@@ -165,6 +164,15 @@ namespace compute_asts {
                     node.sem_kind   = sk_block;
                     node.value_type = pt_void;
                     type_check_chain(args_p, ctx);
+                    return;
+                }
+
+                if (node_id == ret_id) {
+                    if_ref(value, args_p); else { printf("'Return' requires a parameter."); dbg_fail_return; }
+                    type_check(value, ctx);
+                    node.sem_kind   = sk_ret;
+                    node.value_type = pt_void;
+                    macro.has_returns = true;
                     return;
                 }
 

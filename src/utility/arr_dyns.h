@@ -110,6 +110,17 @@ namespace arrays {
 
     tt const t& arr_dyn<t>::operator[](const size_t index) const { assert(index < data.count); return data[index]; }
     tt t& arr_dyn<t>::operator[](const size_t index) { assert(index < data.count); return data[index]; }
+
+    tt t* ptr(arr_ptr<t> p, const arr_dyn<t>& a) {
+        assert(p.offset < a.data.count);
+        return a.data.data + p.offset;
+    }
+
+    tt arr_ptr<t> last_ptr_of(arr_dyn<t>& s) {
+        if (s.data.count > 0); else return {(size_t)-1};
+        return {s.data.count - 1};
+    }
+
 }
 
 #endif //FRANCA2_ARENA_ARRAYS_H

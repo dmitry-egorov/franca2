@@ -29,13 +29,17 @@ namespace arrays {
         size_t capacity;
     };
 
-    tt array<t> malloc_array(size_t capacity) {
-        return { { (t*)malloc(capacity * sizeof(t)), 0}, capacity};
-    }
+    tt array<t> malloc_array(size_t capacity);
 
     tt t& push(array<t>& s, const t& value);
     tt t    pop (array<t>& s);
     tt t    peek(const array<t>& s);
+
+    tt struct arr_ptr {
+        size_t offset;
+    };
+
+    tt t* ptr(arr_ptr<t>, const arr_view<t>&);
 }
 #endif //FRANCA2_ARRAYS_H
 
@@ -96,6 +100,11 @@ namespace arrays {
         return {&item, 1};
     }
 
+
+    tt array<t> malloc_array(size_t capacity) {
+        return { { (t*)malloc(capacity * sizeof(t)), 0}, capacity};
+    }
+
     tt t& push(array<t>& s, const t& value) {
         assert(s.data.count < s.capacity);
         enlarge(s.data);
@@ -117,6 +126,11 @@ namespace arrays {
     tt t peek(const array<t>& s) {
         assert(s.count > 0);
         return s.data[s.data.count - 1];
+    }
+
+    tt t* ptr(arr_ptr<t> ptr, const arr_view<t>& view) {
+        assert(ptr.offset < view.count);
+        return view.data + ptr.offset;
     }
 }
 #endif
