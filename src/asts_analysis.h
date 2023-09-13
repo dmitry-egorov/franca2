@@ -26,16 +26,16 @@ namespace compute_asts {
 
     void analyze(ast& ast) {
         using namespace analysis;
-        using enum prim_type;
+        using enum type_t;
 
         var ctx = context {
             .ast = ast
         };
 
-        add_import("env", "print_str", { pt_str }, pt_void, ast);
+        add_import("env", "print_str", { t_str }, t_void, ast);
 
         ref macro_main = add_macro("main", nullptr, ast.root, ast);
-        macro_main.result_type = pt_u32;
+        macro_main.result_type = t_u32;
 
         add_fn(macro_main, true, ast);
 
@@ -47,7 +47,8 @@ namespace compute_asts {
 
     namespace analysis {
         using namespace wasm_emit;
-        using enum node::type_t;
+        using enum type_t;
+        using enum node::lex_kind_t;
         using enum node::sem_kind_t;
         using enum local::kind_t;
 
@@ -117,18 +118,18 @@ namespace compute_asts {
                 return;
             }
 
-            if (node.type == literal) {
-                if (node.text_is_quoted) { node.sem_kind = sk_lit; node.value_type = pt_str; return; }
-                if (node.can_be_uint   ) { node.sem_kind = sk_lit; node.value_type = pt_u32; return; }
-                if (node.can_be_int    ) { node.sem_kind = sk_lit; node.value_type = pt_i32; return; }
-                if (node.can_be_float  ) { node.sem_kind = sk_lit; node.value_type = pt_f32; return; }
+            if (node.lex_kind == lk_leaf) {
+                if (node.text_is_quoted) { node.sem_kind = sk_lit; node.value_type = t_str; return; }
+                if (node.can_be_uint   ) { node.sem_kind = sk_lit; node.value_type = t_u32; return; }
+                if (node.can_be_int    ) { node.sem_kind = sk_lit; node.value_type = t_i32; return; }
+                if (node.can_be_float  ) { node.sem_kind = sk_lit; node.value_type = t_f32; return; }
             }
 
             let wasm_type = find_value_type(node.text);
             if (wasm_type != vt_invalid) {
                 node.sem_kind   = sk_wasm_type;
                 node.wasm_type  = wasm_type;
-                node.value_type = pt_void;
+                node.value_type = t_void;
                 return;
             }
 
@@ -136,13 +137,13 @@ namespace compute_asts {
             if (wasm_op != op_invalid) {
                 node.sem_kind   = sk_wasm_op;
                 node.wasm_op    = wasm_op;
-                node.value_type = pt_void;
+                node.value_type = t_void;
                 if (is_func(node)) {
                     for (var arg_p = node.first_child; arg_p; arg_p = arg_p->next) {
                         ref arg = *arg_p;
                         if (is_uint_literal(arg)); else { printf("Only numeric literals are supported as arguments for opcodes.\n"); node_error(arg); return; }
                         arg.sem_kind   = sk_lit;
-                        arg.value_type = pt_u32;
+                        arg.value_type = t_u32;
                     }
                 }
                 return;
@@ -160,7 +161,7 @@ namespace compute_asts {
 
                 if (node.text == block_id) {
                     node.sem_kind   = sk_block;
-                    node.value_type = pt_void;
+                    node.value_type = t_void;
                     type_check_chain(args_p, ctx);
                     return;
                 }
@@ -170,7 +171,7 @@ namespace compute_asts {
                         type_check(*it, ctx);
 
                     node.sem_kind   = sk_ret;
-                    node.value_type = pt_void;
+                    node.value_type = t_void;
                     macro.has_returns = true;
                     return;
                 }
@@ -204,7 +205,7 @@ namespace compute_asts {
                     if_ref(value_node, node.first_child); else { dbg_fail_return; }
                     node.sem_kind   = sk_chr;
                     node.chr_value  = (u8)value_node.text[0];
-                    node.value_type = pt_u32; // TODO: pt_u8
+                    node.value_type = t_u32; // TODO: t_u8
                     return;
                 }
 
@@ -220,13 +221,13 @@ namespace compute_asts {
                     node.sem_kind    = sk_sub_of;
                     node.sub_index   = sub_of_index.uint_value;
                     node.sub_of_node = &sub_of_node;
-                    node.value_type  = pt_u32;
+                    node.value_type  = t_u32;
                     return;
                 }
 
                 // macro invocation or function call
                 {
-                    var arg_types = make_arr_dyn<prim_type>(4, ctx.ast.data_arena);
+                    var arg_types = make_arr_dyn<type_t>(4, ctx.ast.data_arena);
                     var arg_p = args_p;
                     for (; arg_p; arg_p = arg_p->next) {
                         ref arg = *arg_p;

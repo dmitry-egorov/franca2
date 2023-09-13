@@ -16,7 +16,7 @@ namespace compute_asts {
 
     namespace compilation {
         using namespace wasm_emit;
-        using enum prim_type;
+        using enum type_t;
         using enum binary_op;
 
         struct scope_old {
@@ -38,7 +38,7 @@ namespace compute_asts {
             arena& arena;
         };
 
-        static wasm_opcode bop_to_wasm_op[(u32)pt_enum_size * (u32)bop_enum_size];
+        static wasm_opcode bop_to_wasm_op[(u32)t_enum_size * (u32)bop_enum_size];
 
         context make_context(arena& arena);
 
@@ -59,18 +59,18 @@ namespace compute_asts {
         void emit_chr             (node&, context&);
         void emit_bop_a(binary_op, node&, context&);
 
-        void emit_func_call(const string& id, arr_view<prim_type> params, context&);
+        void emit_func_call(const string& id, arr_view<type_t> params, context&);
 
         void push_scope(context&);
         void  pop_scope(context&);
         #define tmp_compilation_scope(ctx) push_scope(ctx); defer { pop_scope(ctx); }
 
         auto find_local     (string id, context&) -> variable*;
-        auto find_func      (string id, arr_view<prim_type> params, context&) -> func*;
-        auto find_func_index(string id, arr_view<prim_type> params, context&) -> ret1<uint>;
+        auto find_func      (string id, arr_view<type_t> params, context&) -> func*;
+        auto find_func_index(string id, arr_view<type_t> params, context&) -> ret1<uint>;
 
-        func& declare_import(cstr module_id, cstr id, const init_list<prim_type>& params, const init_list<prim_type>& results, context& ctx);
-        func& declare_import(string module_id, string id, arr_view<prim_type> params, arr_view<prim_type> results, context& ctx);
+        func& declare_import(cstr module_id, cstr id, const init_list<type_t>& params, const init_list<type_t>& results, context& ctx);
+        func& declare_import(string module_id, string id, arr_view<type_t> params, arr_view<type_t> results, context& ctx);
 
         func& declare_func(cstr id, node* body_node, bool is_inline_wasm, context&);
         func& declare_func(string id, node* body_node, bool is_inline_wasm, context&);
@@ -83,18 +83,18 @@ namespace compute_asts {
 
         auto add_data(const string& text, context&) -> uint;
 
-        auto get_or_add_local(string id, prim_type, context&) -> variable&;
-        auto add_local       (string id, prim_type, context&) -> variable&;
+        auto get_or_add_local(string id, type_t, context&) -> variable&;
+        auto add_local       (string id, type_t, context&) -> variable&;
 
         void error_local_not_found(string id);
         void error_func_not_found (string id);
 
-        auto add_param(string id, node*, prim_type, variable::kind_t, func&) -> uint;
-        void add_result(prim_type, func&);
+        auto add_param(string id, node*, type_t, variable::kind_t, func&) -> uint;
+        void add_result(type_t, func&);
 
         void fill_bop_to_wasm();
-        auto get_bop_to_wasm(binary_op, prim_type) -> wasm_opcode;
-        void set_bop_to_wasm(binary_op, prim_type, wasm_opcode);
+        auto get_bop_to_wasm(binary_op, type_t) -> wasm_opcode;
+        void set_bop_to_wasm(binary_op, type_t, wasm_opcode);
 
         void print_node_error(node& node);
     }
@@ -108,7 +108,7 @@ namespace compute_asts {
 
         var ctx = make_context(ast.temp_arena);
 
-        declare_import("env", "print_str", {pt_u32, pt_u32}, {   }, ctx);
+        declare_import("env", "print_str", {t_u32, t_u32}, {   }, ctx);
         compile_fn_main(ast.root, ctx);
 
         // emit wasm
@@ -189,7 +189,7 @@ namespace compute_asts {
 
         void compile_fn_main(node* root, context & ctx) {
             ref func = declare_func("main", root, false, ctx);
-            add_result(pt_u32, func);
+            add_result(t_u32, func);
             func.exported = true;
 
             tmp_func_definition_scope(func, ctx);
@@ -233,7 +233,7 @@ namespace compute_asts {
                 }
 
                 let res_type = primitive_type_by(type_node.text);
-                if (res_type != pt_void)
+                if (res_type != t_void)
                     add_result(res_type, func);
 
                 //TODO: recurse to allow for function definitions inside expressions
@@ -243,11 +243,11 @@ namespace compute_asts {
         void type_check(node*, context&) {
             //TODO: implement
             //
-            // using enum node::type_t;
+            // using enum node::lex_kind_t;
             // for (var node_p = chain; node_p; node_p = node_p->next) {
             //     ref node = *node_p;
             //     if (node.type == literal) {
-            //         if (node.text_is_quoted) { node.type = pt_str; continue; }
+            //         if (node.text_is_quoted) { node.type = t_str; continue; }
             //         node.type = pt_num_literal;
             //         continue;
             //     }
@@ -299,25 +299,25 @@ namespace compute_asts {
                 let offset = add_data(str, ctx);
                 emit_const_get(offset, body);
                 emit_const_get(str.count, body);
-                node.value_type = pt_str;
+                node.value_type = t_str;
                 return;
             }
 
             if (is_uint_literal(node)) {
                 emit_const_get(node.uint_value, body);
-                node.value_type = pt_u32;
+                node.value_type = t_u32;
                 return;
             }
 
             if (is_int_literal(node)) {
                 emit_const_get(node.int_value, body);
-                node.value_type = pt_i32;
+                node.value_type = t_i32;
                 return;
             }
 
             if (is_float_literal(node)) {
                 emit_const_get(node.float_value, body);
-                node.value_type = pt_f32;
+                node.value_type = t_f32;
                 return;
             }
 
@@ -361,9 +361,9 @@ namespace compute_asts {
                     emit_node(arg_node, ctx);
                     var src_type = arg_node.value_type;
                     var dst_type = primitive_type_by(type_node.text);
-                    if (src_type == pt_f32 && dst_type == pt_u32)
+                    if (src_type == t_f32 && dst_type == t_u32)
                         emit(op_i32_trunc_f32_u, body);
-                    if (src_type == pt_f32 && dst_type == pt_i32)
+                    if (src_type == t_f32 && dst_type == t_i32)
                         emit(op_i32_trunc_f32_s, body);
 
                     node.value_type = dst_type;
@@ -376,7 +376,7 @@ namespace compute_asts {
                     if_ref(init_node, type_node.next) {
                         emit_node(init_node, ctx);
                         emit(op_local_set, local.index, body);
-                        node.value_type = pt_void; // TODO: analyze compatible and cast
+                        node.value_type = t_void; // TODO: analyze compatible and cast
                     }
                     return;
                 }
@@ -397,7 +397,7 @@ namespace compute_asts {
                     emit(op_block, vt_void, body);
                     emit_scoped_chain(args_node_p, ctx);
                     emit(op_end, body);
-                    node.value_type = pt_void; // TODO: allow returning values from blocks
+                    node.value_type = t_void; // TODO: allow returning values from blocks
                     return;
                 }
 
@@ -410,7 +410,7 @@ namespace compute_asts {
                     emit_body(then_node, ctx);
                     emit(op_end, body);
 
-                    node.value_type = pt_void; // TODO: allow returning from ifs
+                    node.value_type = t_void; // TODO: allow returning from ifs
                     return;
                 }
 
@@ -424,20 +424,20 @@ namespace compute_asts {
 
                     tmp_compilation_scope(ctx);
                     emit_body(body_node, ctx);
-                    node.value_type = pt_void; // TODO: allow returning from loops
+                    node.value_type = t_void; // TODO: allow returning from loops
                     return;
                 }
 
                 if (node_id == print_id) {
                     emit_istr(node, ctx);
-                    emit_func_call(view("print_str"), view({pt_u32, pt_u32}), ctx);
-                    node.value_type = pt_void; // TODO: allow returning from prints
+                    emit_func_call(view("print_str"), view({t_u32, t_u32}), ctx);
+                    node.value_type = t_void; // TODO: allow returning from prints
                     return;
                 }
 
                 tmp_compilation_scope(ctx);
 
-                var args = make_arr_dyn<prim_type>(4, ctx.arena);
+                var args = make_arr_dyn<type_t>(4, ctx.arena);
                 var arg_node_p = args_node_p;
                 for (; arg_node_p; arg_node_p = arg_node_p->next) {
                     ref arg = *arg_node_p;
@@ -446,7 +446,7 @@ namespace compute_asts {
                 }
 
                 if_ref(func, find_func(node_id, args.data, ctx)); else { error_func_not_found(node_id); return; }
-                node.value_type = func.results.count == 0 ? pt_void : func.results.data[0]; //TODO: support multiple return values
+                node.value_type = func.results.count == 0 ? t_void : func.results.data[0]; //TODO: support multiple return values
 
                 arg_node_p = args_node_p;
                 let params = func.params.data;
@@ -550,16 +550,16 @@ namespace compute_asts {
             }
 
             emit_body(body_node, ctx);
-            node.value_type = pt_void;
+            node.value_type = t_void;
         }
 
         void emit_istr(node& node, context& ctx) {
             ref curr_func = curr_func_of(ctx);
             // TODO: implement with string builder
-            if_var1(push_str, find_func_index(view("push"), view({pt_u32, pt_u32, pt_u32}), ctx)); else { dbg_fail_return; }
-            if_var1(push_u32, find_func_index(view("push"), view({pt_u32        , pt_u32}), ctx)); else { dbg_fail_return; }
-            if_var1(push_i32, find_func_index(view("push"), view({pt_i32        , pt_u32}), ctx)); else { dbg_fail_return; }
-            if_var1(push_f32, find_func_index(view("push"), view({pt_f32        , pt_u32}), ctx)); else { dbg_fail_return; }
+            if_var1(push_str, find_func_index(view("push"), view({t_u32, t_u32, t_u32}), ctx)); else { dbg_fail_return; }
+            if_var1(push_u32, find_func_index(view("push"), view({t_u32        , t_u32}), ctx)); else { dbg_fail_return; }
+            if_var1(push_i32, find_func_index(view("push"), view({t_i32        , t_u32}), ctx)); else { dbg_fail_return; }
+            if_var1(push_f32, find_func_index(view("push"), view({t_f32        , t_u32}), ctx)); else { dbg_fail_return; }
 
             ref body = curr_func.body_wasm;
 
@@ -567,7 +567,7 @@ namespace compute_asts {
             // convert uints to strings
 
             // var mem_offset = 1024;
-            var dst = get_or_add_local(view("istr_dst__"), pt_u32, ctx).index;
+            var dst = get_or_add_local(view("istr_dst__"), t_u32, ctx).index;
             emit_const_get(1024, body);
             emit(op_local_set, dst, body);
 
@@ -578,7 +578,7 @@ namespace compute_asts {
                 emit_node(arg_node, ctx);
 
                 let t  = arg_node.value_type;
-                let fn = t == pt_str ? push_str : t == pt_i32 ? push_i32 : t == pt_f32 ? push_f32 : push_u32;
+                let fn = t == t_str ? push_str : t == t_i32 ? push_i32 : t == t_f32 ? push_f32 : push_u32;
                 emit(op_local_get, dst, body);
                 emit(op_call,       fn, body);
                 emit(op_local_set, dst, body);
@@ -590,7 +590,7 @@ namespace compute_asts {
             emit_const_get(1024, body);
             emit(op_i32_sub       , body);
 
-            node.value_type = pt_str;
+            node.value_type = t_str;
         }
 
         void emit_chr(node& node, context& ctx) {
@@ -600,7 +600,7 @@ namespace compute_asts {
             if(!is_func(value_node)); else { dbg_fail_return; }
             let c = value_node.text[0];
             emit_const_get((uint) c, curr_func.body_wasm);
-            node.value_type = pt_u32; // TODO: pt_u8
+            node.value_type = t_u32; // TODO: t_u8
         }
 
         void emit_bop_a(binary_op bop, node& node, context& ctx) {
@@ -637,7 +637,7 @@ namespace compute_asts {
             };
         }
 
-        void emit_func_call(const string& id, arr_view<prim_type> params, context& ctx) {
+        void emit_func_call(const string& id, arr_view<type_t> params, context& ctx) {
             ref curr_func = curr_func_of(ctx);
             if_ref(func, find_func(id, params, ctx)); else { dbg_fail_return; }
             emit(op_call, func.index, curr_func.body_wasm);
@@ -661,7 +661,7 @@ namespace compute_asts {
             return nullptr;
         }
 
-        func* find_func(string id, arr_view<prim_type> params, context& ctx) {
+        func* find_func(string id, arr_view<type_t> params, context& ctx) {
             for (var i = (int)ctx.funcs_in_scope.count - 1; i >= 0; i--) {
                 if_ref(func, ctx.funcs_in_scope.data[i]); else { dbg_fail_return nullptr; }
                 if (func.id == id); else continue;
@@ -683,16 +683,16 @@ namespace compute_asts {
             return nullptr;
         }
 
-        ret1<uint> find_func_index(string id, arr_view<prim_type> params, context& ctx) {
+        ret1<uint> find_func_index(string id, arr_view<type_t> params, context& ctx) {
             if_ref(func, find_func(id, params, ctx)); else { dbg_fail_return {}; }
             return ret1_ok(func.index);
         }
 
-        func& declare_import(cstr module_id, cstr id, const init_list<prim_type>& params, const init_list<prim_type>& results, context& ctx) {
+        func& declare_import(cstr module_id, cstr id, const init_list<type_t>& params, const init_list<type_t>& results, context& ctx) {
             return declare_import(view(module_id), view(id), view(params), view(results), ctx);
         }
 
-        func& declare_import(string module_id, string id, arr_view<prim_type> params, arr_view<prim_type> results, context& ctx) {
+        func& declare_import(string module_id, string id, arr_view<type_t> params, arr_view<type_t> results, context& ctx) {
             let index = ctx.funcs.count;
             var prms = make_arr_dyn<variable>(params.count, ctx.arena);
             for (var prm_i = 0u; prm_i < params.count; ++prm_i)
@@ -728,7 +728,7 @@ namespace compute_asts {
                 .is_inline_wasm = is_inline_wasm,
 
                 .params    = make_arr_dyn<variable      >(4, ctx.arena),
-                .results   = make_arr_dyn<prim_type>(2, ctx.arena),
+                .results   = make_arr_dyn<type_t>(2, ctx.arena),
                 .locals    = make_arr_dyn<variable>(32, ctx.arena),
             });
 
@@ -762,12 +762,12 @@ namespace compute_asts {
             return offset;
         }
 
-        variable& get_or_add_local(string id, prim_type type, context& ctx) {
+        variable& get_or_add_local(string id, type_t type, context& ctx) {
             if_ref(v, find_local(id, ctx)) return v;
             return add_local(id, type, ctx);
         }
 
-        variable& add_local(string id, prim_type type, context& ctx) {
+        variable& add_local(string id, type_t type, context& ctx) {
             ref curr_func = curr_func_of(ctx);
             var index = curr_func.params.count + curr_func.locals.count;
             ref v = push(curr_func.locals, {.id = id, .index = index, .value_type = type, .kind = variable::kind_t::vk_local} );
@@ -785,125 +785,125 @@ namespace compute_asts {
             dbg_fail_return;
         }
 
-        uint add_param(string id, node* node, prim_type type, variable::kind_t kind, func& func) {
+        uint add_param(string id, node* node, type_t type, variable::kind_t kind, func& func) {
             assert(func.locals.count == 0); // add params before locals
             let index = func.params.count;
             push(func.params, {id, index, node, type, kind});
             return index;
         }
 
-        void add_result(prim_type type, func& func) {
+        void add_result(type_t type, func& func) {
             push(func.results, type);
         }
 
-        wasm_opcode get_bop_to_wasm(binary_op bop, prim_type pt) {
-            var result = bop_to_wasm_op[(u32)bop * (u32)pt_enum_size + (u32)pt];
+        wasm_opcode get_bop_to_wasm(binary_op bop, type_t pt) {
+            var result = bop_to_wasm_op[(u32)bop * (u32)t_enum_size + (u32)pt];
             if (result != op_invalid); else { printf("Unsupported combination of op %u and type %u\n", (uint)bop, (uint)pt); dbg_fail_return result; }
             return result;
         }
 
-        void set_bop_to_wasm(binary_op bop, prim_type pt, wasm_opcode op) {
-            bop_to_wasm_op[(u32)bop * (u32)pt_enum_size + (u32)pt] = op;
+        void set_bop_to_wasm(binary_op bop, type_t pt, wasm_opcode op) {
+            bop_to_wasm_op[(u32)bop * (u32)t_enum_size + (u32)pt] = op;
         }
 
         void fill_bop_to_wasm() {
-            set_bop_to_wasm(bop_eq  , pt_i32, op_i32_eq   );
-            set_bop_to_wasm(bop_ne  , pt_i32, op_i32_ne   );
-            set_bop_to_wasm(bop_lt  , pt_i32, op_i32_lt_s );
-            set_bop_to_wasm(bop_gt  , pt_i32, op_i32_gt_s );
-            set_bop_to_wasm(bop_le  , pt_i32, op_i32_le_s );
-            set_bop_to_wasm(bop_ge  , pt_i32, op_i32_ge_s );
-            set_bop_to_wasm(bop_add , pt_i32, op_i32_add  );
-            set_bop_to_wasm(bop_sub , pt_i32, op_i32_sub  );
-            set_bop_to_wasm(bop_mul , pt_i32, op_i32_mul  );
-            set_bop_to_wasm(bop_div , pt_i32, op_i32_div_s);
-            set_bop_to_wasm(bop_rem , pt_i32, op_i32_rem_s);
-            set_bop_to_wasm(bop_and , pt_i32, op_i32_and  );
-            set_bop_to_wasm(bop_or  , pt_i32, op_i32_or   );
-            set_bop_to_wasm(bop_xor , pt_i32, op_i32_xor  );
-            set_bop_to_wasm(bop_shl , pt_i32, op_i32_shl  );
-            set_bop_to_wasm(bop_shr , pt_i32, op_i32_shr_s);
-            set_bop_to_wasm(bop_rotl, pt_i32, op_i32_rotl );
-            set_bop_to_wasm(bop_rotr, pt_i32, op_i32_rotr );
+            set_bop_to_wasm(bop_eq  , t_i32, op_i32_eq   );
+            set_bop_to_wasm(bop_ne  , t_i32, op_i32_ne   );
+            set_bop_to_wasm(bop_lt  , t_i32, op_i32_lt_s );
+            set_bop_to_wasm(bop_gt  , t_i32, op_i32_gt_s );
+            set_bop_to_wasm(bop_le  , t_i32, op_i32_le_s );
+            set_bop_to_wasm(bop_ge  , t_i32, op_i32_ge_s );
+            set_bop_to_wasm(bop_add , t_i32, op_i32_add  );
+            set_bop_to_wasm(bop_sub , t_i32, op_i32_sub  );
+            set_bop_to_wasm(bop_mul , t_i32, op_i32_mul  );
+            set_bop_to_wasm(bop_div , t_i32, op_i32_div_s);
+            set_bop_to_wasm(bop_rem , t_i32, op_i32_rem_s);
+            set_bop_to_wasm(bop_and , t_i32, op_i32_and  );
+            set_bop_to_wasm(bop_or  , t_i32, op_i32_or   );
+            set_bop_to_wasm(bop_xor , t_i32, op_i32_xor  );
+            set_bop_to_wasm(bop_shl , t_i32, op_i32_shl  );
+            set_bop_to_wasm(bop_shr , t_i32, op_i32_shr_s);
+            set_bop_to_wasm(bop_rotl, t_i32, op_i32_rotl );
+            set_bop_to_wasm(bop_rotr, t_i32, op_i32_rotr );
 
-            set_bop_to_wasm(bop_eq  , pt_u32, op_i32_eq   );
-            set_bop_to_wasm(bop_ne  , pt_u32, op_i32_ne   );
-            set_bop_to_wasm(bop_lt  , pt_u32, op_i32_lt_u );
-            set_bop_to_wasm(bop_gt  , pt_u32, op_i32_gt_u );
-            set_bop_to_wasm(bop_le  , pt_u32, op_i32_le_u );
-            set_bop_to_wasm(bop_ge  , pt_u32, op_i32_ge_u );
-            set_bop_to_wasm(bop_add , pt_u32, op_i32_add  );
-            set_bop_to_wasm(bop_sub , pt_u32, op_i32_sub  );
-            set_bop_to_wasm(bop_mul , pt_u32, op_i32_mul  );
-            set_bop_to_wasm(bop_div , pt_u32, op_i32_div_u);
-            set_bop_to_wasm(bop_rem , pt_u32, op_i32_rem_u);
-            set_bop_to_wasm(bop_and , pt_u32, op_i32_and  );
-            set_bop_to_wasm(bop_or  , pt_u32, op_i32_or   );
-            set_bop_to_wasm(bop_xor , pt_u32, op_i32_xor  );
-            set_bop_to_wasm(bop_shl , pt_u32, op_i32_shl  );
-            set_bop_to_wasm(bop_shr , pt_u32, op_i32_shr_u);
-            set_bop_to_wasm(bop_rotl, pt_u32, op_i32_rotl );
-            set_bop_to_wasm(bop_rotr, pt_u32, op_i32_rotr );
+            set_bop_to_wasm(bop_eq  , t_u32, op_i32_eq   );
+            set_bop_to_wasm(bop_ne  , t_u32, op_i32_ne   );
+            set_bop_to_wasm(bop_lt  , t_u32, op_i32_lt_u );
+            set_bop_to_wasm(bop_gt  , t_u32, op_i32_gt_u );
+            set_bop_to_wasm(bop_le  , t_u32, op_i32_le_u );
+            set_bop_to_wasm(bop_ge  , t_u32, op_i32_ge_u );
+            set_bop_to_wasm(bop_add , t_u32, op_i32_add  );
+            set_bop_to_wasm(bop_sub , t_u32, op_i32_sub  );
+            set_bop_to_wasm(bop_mul , t_u32, op_i32_mul  );
+            set_bop_to_wasm(bop_div , t_u32, op_i32_div_u);
+            set_bop_to_wasm(bop_rem , t_u32, op_i32_rem_u);
+            set_bop_to_wasm(bop_and , t_u32, op_i32_and  );
+            set_bop_to_wasm(bop_or  , t_u32, op_i32_or   );
+            set_bop_to_wasm(bop_xor , t_u32, op_i32_xor  );
+            set_bop_to_wasm(bop_shl , t_u32, op_i32_shl  );
+            set_bop_to_wasm(bop_shr , t_u32, op_i32_shr_u);
+            set_bop_to_wasm(bop_rotl, t_u32, op_i32_rotl );
+            set_bop_to_wasm(bop_rotr, t_u32, op_i32_rotr );
 
-            set_bop_to_wasm(bop_eq  , pt_i64, op_i64_eq   );
-            set_bop_to_wasm(bop_ne  , pt_i64, op_i64_ne   );
-            set_bop_to_wasm(bop_lt  , pt_i64, op_i64_lt_s );
-            set_bop_to_wasm(bop_gt  , pt_i64, op_i64_gt_s );
-            set_bop_to_wasm(bop_le  , pt_i64, op_i64_le_s );
-            set_bop_to_wasm(bop_ge  , pt_i64, op_i64_ge_s );
-            set_bop_to_wasm(bop_add , pt_i64, op_i64_add  );
-            set_bop_to_wasm(bop_sub , pt_i64, op_i64_sub  );
-            set_bop_to_wasm(bop_mul , pt_i64, op_i64_mul  );
-            set_bop_to_wasm(bop_div , pt_i64, op_i64_div_s);
-            set_bop_to_wasm(bop_rem , pt_i64, op_i64_rem_s);
-            set_bop_to_wasm(bop_and , pt_i64, op_i64_and  );
-            set_bop_to_wasm(bop_or  , pt_i64, op_i64_or   );
-            set_bop_to_wasm(bop_xor , pt_i64, op_i64_xor  );
-            set_bop_to_wasm(bop_shl , pt_i64, op_i64_shl  );
-            set_bop_to_wasm(bop_shr , pt_i64, op_i64_shr_s);
-            set_bop_to_wasm(bop_rotl, pt_i64, op_i64_rotl );
-            set_bop_to_wasm(bop_rotr, pt_i64, op_i64_rotr );
+            set_bop_to_wasm(bop_eq  , t_i64, op_i64_eq   );
+            set_bop_to_wasm(bop_ne  , t_i64, op_i64_ne   );
+            set_bop_to_wasm(bop_lt  , t_i64, op_i64_lt_s );
+            set_bop_to_wasm(bop_gt  , t_i64, op_i64_gt_s );
+            set_bop_to_wasm(bop_le  , t_i64, op_i64_le_s );
+            set_bop_to_wasm(bop_ge  , t_i64, op_i64_ge_s );
+            set_bop_to_wasm(bop_add , t_i64, op_i64_add  );
+            set_bop_to_wasm(bop_sub , t_i64, op_i64_sub  );
+            set_bop_to_wasm(bop_mul , t_i64, op_i64_mul  );
+            set_bop_to_wasm(bop_div , t_i64, op_i64_div_s);
+            set_bop_to_wasm(bop_rem , t_i64, op_i64_rem_s);
+            set_bop_to_wasm(bop_and , t_i64, op_i64_and  );
+            set_bop_to_wasm(bop_or  , t_i64, op_i64_or   );
+            set_bop_to_wasm(bop_xor , t_i64, op_i64_xor  );
+            set_bop_to_wasm(bop_shl , t_i64, op_i64_shl  );
+            set_bop_to_wasm(bop_shr , t_i64, op_i64_shr_s);
+            set_bop_to_wasm(bop_rotl, t_i64, op_i64_rotl );
+            set_bop_to_wasm(bop_rotr, t_i64, op_i64_rotr );
 
-            set_bop_to_wasm(bop_eq  , pt_u64, op_i64_eq   );
-            set_bop_to_wasm(bop_ne  , pt_u64, op_i64_ne   );
-            set_bop_to_wasm(bop_lt  , pt_u64, op_i64_lt_u );
-            set_bop_to_wasm(bop_gt  , pt_u64, op_i64_gt_u );
-            set_bop_to_wasm(bop_le  , pt_u64, op_i64_le_u );
-            set_bop_to_wasm(bop_ge  , pt_u64, op_i64_ge_u );
-            set_bop_to_wasm(bop_add , pt_u64, op_i64_add  );
-            set_bop_to_wasm(bop_sub , pt_u64, op_i64_sub  );
-            set_bop_to_wasm(bop_mul , pt_u64, op_i64_mul  );
-            set_bop_to_wasm(bop_div , pt_u64, op_i64_div_u);
-            set_bop_to_wasm(bop_rem , pt_u64, op_i64_rem_u);
-            set_bop_to_wasm(bop_and , pt_u64, op_i64_and  );
-            set_bop_to_wasm(bop_or  , pt_u64, op_i64_or   );
-            set_bop_to_wasm(bop_xor , pt_u64, op_i64_xor  );
-            set_bop_to_wasm(bop_shl , pt_u64, op_i64_shl  );
-            set_bop_to_wasm(bop_shr , pt_u64, op_i64_shr_u);
-            set_bop_to_wasm(bop_rotl, pt_u64, op_i64_rotl );
-            set_bop_to_wasm(bop_rotr, pt_u64, op_i64_rotr );
+            set_bop_to_wasm(bop_eq  , t_u64, op_i64_eq   );
+            set_bop_to_wasm(bop_ne  , t_u64, op_i64_ne   );
+            set_bop_to_wasm(bop_lt  , t_u64, op_i64_lt_u );
+            set_bop_to_wasm(bop_gt  , t_u64, op_i64_gt_u );
+            set_bop_to_wasm(bop_le  , t_u64, op_i64_le_u );
+            set_bop_to_wasm(bop_ge  , t_u64, op_i64_ge_u );
+            set_bop_to_wasm(bop_add , t_u64, op_i64_add  );
+            set_bop_to_wasm(bop_sub , t_u64, op_i64_sub  );
+            set_bop_to_wasm(bop_mul , t_u64, op_i64_mul  );
+            set_bop_to_wasm(bop_div , t_u64, op_i64_div_u);
+            set_bop_to_wasm(bop_rem , t_u64, op_i64_rem_u);
+            set_bop_to_wasm(bop_and , t_u64, op_i64_and  );
+            set_bop_to_wasm(bop_or  , t_u64, op_i64_or   );
+            set_bop_to_wasm(bop_xor , t_u64, op_i64_xor  );
+            set_bop_to_wasm(bop_shl , t_u64, op_i64_shl  );
+            set_bop_to_wasm(bop_shr , t_u64, op_i64_shr_u);
+            set_bop_to_wasm(bop_rotl, t_u64, op_i64_rotl );
+            set_bop_to_wasm(bop_rotr, t_u64, op_i64_rotr );
 
-            set_bop_to_wasm(bop_eq  , pt_f32, op_f32_eq );
-            set_bop_to_wasm(bop_ne  , pt_f32, op_f32_ne );
-            set_bop_to_wasm(bop_lt  , pt_f32, op_f32_lt );
-            set_bop_to_wasm(bop_gt  , pt_f32, op_f32_gt );
-            set_bop_to_wasm(bop_le  , pt_f32, op_f32_le );
-            set_bop_to_wasm(bop_ge  , pt_f32, op_f32_ge );
-            set_bop_to_wasm(bop_add , pt_f32, op_f32_add);
-            set_bop_to_wasm(bop_sub , pt_f32, op_f32_sub);
-            set_bop_to_wasm(bop_mul , pt_f32, op_f32_mul);
-            set_bop_to_wasm(bop_div , pt_f32, op_f32_div);
+            set_bop_to_wasm(bop_eq  , t_f32, op_f32_eq );
+            set_bop_to_wasm(bop_ne  , t_f32, op_f32_ne );
+            set_bop_to_wasm(bop_lt  , t_f32, op_f32_lt );
+            set_bop_to_wasm(bop_gt  , t_f32, op_f32_gt );
+            set_bop_to_wasm(bop_le  , t_f32, op_f32_le );
+            set_bop_to_wasm(bop_ge  , t_f32, op_f32_ge );
+            set_bop_to_wasm(bop_add , t_f32, op_f32_add);
+            set_bop_to_wasm(bop_sub , t_f32, op_f32_sub);
+            set_bop_to_wasm(bop_mul , t_f32, op_f32_mul);
+            set_bop_to_wasm(bop_div , t_f32, op_f32_div);
 
-            set_bop_to_wasm(bop_eq  , pt_f64, op_f64_eq );
-            set_bop_to_wasm(bop_ne  , pt_f64, op_f64_ne );
-            set_bop_to_wasm(bop_lt  , pt_f64, op_f64_lt );
-            set_bop_to_wasm(bop_gt  , pt_f64, op_f64_gt );
-            set_bop_to_wasm(bop_le  , pt_f64, op_f64_le );
-            set_bop_to_wasm(bop_ge  , pt_f64, op_f64_ge );
-            set_bop_to_wasm(bop_add , pt_f64, op_f64_add);
-            set_bop_to_wasm(bop_sub , pt_f64, op_f64_sub);
-            set_bop_to_wasm(bop_mul , pt_f64, op_f64_mul);
-            set_bop_to_wasm(bop_div , pt_f64, op_f64_div);
+            set_bop_to_wasm(bop_eq  , t_f64, op_f64_eq );
+            set_bop_to_wasm(bop_ne  , t_f64, op_f64_ne );
+            set_bop_to_wasm(bop_lt  , t_f64, op_f64_lt );
+            set_bop_to_wasm(bop_gt  , t_f64, op_f64_gt );
+            set_bop_to_wasm(bop_le  , t_f64, op_f64_le );
+            set_bop_to_wasm(bop_ge  , t_f64, op_f64_ge );
+            set_bop_to_wasm(bop_add , t_f64, op_f64_add);
+            set_bop_to_wasm(bop_sub , t_f64, op_f64_sub);
+            set_bop_to_wasm(bop_mul , t_f64, op_f64_mul);
+            set_bop_to_wasm(bop_div , t_f64, op_f64_div);
         }
 
 

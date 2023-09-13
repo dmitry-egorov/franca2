@@ -17,7 +17,7 @@ namespace compute_asts {
 
     namespace codegen {
         using namespace wasm_emit;
-        using enum prim_type;
+        using enum type_t;
         using enum binary_op;
 
         struct macro_context;
@@ -65,7 +65,7 @@ namespace compute_asts {
         void bind(uint fn_index, context&);
         void bind(arr_view<binding>, context&);
 
-        uint add_fn_local(prim_type, context&);
+        uint add_fn_local(type_t, context&);
         uint add_fn_local(local&, context&);
 
         uint add_data(string text, context&);
@@ -74,8 +74,8 @@ namespace compute_asts {
         auto find_local_offset(uint local_index_in_macro, context&) -> uint;
         auto find_local_index (uint local_index_in_macro, context&) -> uint;
 
-        void emit_local_set(uint offset, prim_type, stream&);
-        void emit_local_get(uint offset, prim_type, stream&);
+        void emit_local_set(uint offset, type_t, stream&);
+        void emit_local_get(uint offset, type_t, stream&);
         void emit_local_get(const local&, context&);
 
         void print_macro_contexts(context&);
@@ -230,22 +230,22 @@ namespace compute_asts {
             }
 
             if (node.sem_kind == sk_lit) {
-                if (node.value_type == pt_str) {
+                if (node.value_type == t_str) {
                     let str    = node.text;
                     let offset = add_data(str, ctx);
                     emit_const_get(offset   , wasm);
                     emit_const_get(str.count, wasm);
                     return;
                 }
-                if (node.value_type == pt_u32) {
+                if (node.value_type == t_u32) {
                     emit_const_get(node.uint_value, wasm);
                     return;
                 }
-                if (node.value_type == pt_i32) {
+                if (node.value_type == t_i32) {
                     emit_const_get(node.int_value, wasm);
                     return;
                 }
-                if (node.value_type == pt_f32) {
+                if (node.value_type == t_f32) {
                     emit_const_get(node.float_value, wasm);
                     return;
                 }
@@ -277,7 +277,7 @@ namespace compute_asts {
                 if_ref(init_node, node.init_node); else { node_error(node); return; }
                 emit(init_node, ctx);
                 emit_local_set(fn.local_offsets[index], loc.value_type, wasm);
-                node.value_type = pt_void; // TODO: analyze compatible and cast
+                node.value_type = t_void; // TODO: analyze compatible and cast
                 return;
             }
 
@@ -415,7 +415,7 @@ namespace compute_asts {
                 bind(i, ctx);
         }
 
-        uint add_fn_local(prim_type type, context& ctx) {
+        uint add_fn_local(type_t type, context& ctx) {
             if_ref(fn, ctx.curr_fn); else { dbg_fail_return -1; }
             let index = (uint)fn.local_types.count;
             push(fn.local_types  , type);
@@ -462,13 +462,13 @@ namespace compute_asts {
             return bindings[macro_index];
         }
 
-        void emit_local_set(uint offset, prim_type type, stream& dst) {
+        void emit_local_set(uint offset, type_t type, stream& dst) {
             let size = size_32_of(type);
             for(var i = 0u; i < size; ++i)
                 emit(op_local_set, offset + (size - 1 - i), dst);
         }
 
-        void emit_local_get(uint offset, prim_type type, stream& dst) {
+        void emit_local_get(uint offset, type_t type, stream& dst) {
             let size = size_32_of(type);
             for(var i = 0u; i < size; ++i)
                 emit(op_local_get, offset + i, dst);

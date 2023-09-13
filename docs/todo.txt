@@ -1,5 +1,11 @@
+- [ ] use just a . for param declaration, 'value' kind is the default
+- [ ] use name[mode type] syntax for parameter with 'value' mode by default (e.g. x[# u32], x[u32] etc)
+- [ ] type_t struct
+- [ ] code type
+- [ ] scope context instead of macro context?
 - [ ] implement print
     - [ ] varargs?
+    - [ ] introduce variables into the passed block
 - [ ] multiple value types per node
 - [ ] last element of a block returns
 - [ ] emit a function and a call when needed

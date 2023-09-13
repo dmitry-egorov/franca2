@@ -106,11 +106,11 @@ namespace compute_asts {
         }
 
         void display_node(node& node, context& ctx) {
-            using enum node::type_t;
+            using enum node::lex_kind_t;
             using_display_ctx;
             open_inlay_brackets(ctx); defer { close_brackets(ctx); };
 
-            if (node.type == literal && (node.text_is_quoted || node.can_be_uint || node.can_be_int || node.can_be_float)) { // literal
+            if (node.lex_kind == lk_leaf && (node.text_is_quoted || node.can_be_uint || node.can_be_int || node.can_be_float)) { // literal
                 put_text(node.text_is_quoted ? strings : constants, node.text, ctx);
                 return;
             }
@@ -151,17 +151,17 @@ namespace compute_asts {
         }
 
         void gather_definitions(node& node, context& context) {
-            using enum node::type_t;
+            using enum node::lex_kind_t;
             if (is_func(node, def_id) || is_func(node, def_wasm_id)); else return;
 
             if_var3(id_node, disp_node, type_node, deref3(node.first_child)); else { dbg_fail_return; }
             var id = id_node.text;
 
-            var params = make_arr_dyn<prim_type>(8, context.storage.arena);
+            var params = make_arr_dyn<type_t>(8, context.storage.arena);
             var param_node_p = disp_node.first_child;
             while (param_node_p) {
                 ref param_node = *param_node_p;
-                if (param_node.type == func)
+                if (param_node.lex_kind == lk_subtree)
                     push(params, param_node.value_type);
 
                 param_node_p = param_node.next;
@@ -195,7 +195,7 @@ namespace compute_asts {
             if (fn_id ==          print_id) { display_fn_print  (args, ctx); return; }
             if (fn_id ==           show_id) { display_macro_show(args, ctx); return; }
 
-            var params = make_arr_dyn<prim_type>(8, ctx.storage.arena);
+            var params = make_arr_dyn<type_t>(8, ctx.storage.arena);
             var arg_p = args;
             while (arg_p) {
                 ref arg = *arg_p;
@@ -213,7 +213,7 @@ namespace compute_asts {
         }
 
         void display_func_call(const st_func& fn, node* args, context& ctx) {
-            using enum node::type_t;
+            using enum node::lex_kind_t;
 
             var disp_node_p = fn.display->first_child;
 
@@ -221,12 +221,12 @@ namespace compute_asts {
             //TODO: support evaluating signature?
             while(disp_node_p) {
                 ref disp_node = *disp_node_p;
-                switch (disp_node.type) {
-                    case literal: {
+                switch (disp_node.lex_kind) {
+                    case lk_leaf: {
                         put_text(regulars, disp_node.text, ctx);
                         break;
                     }
-                    case func: {
+                    case lk_subtree: {
                         if(is_func(disp_node, view("$")) || is_func(disp_node, view("&")) || is_func(disp_node, view("#"))); else {
                             printf("Only parameter nodes are supported in display strings: %.*s\n", (int)disp_node.text.count, disp_node.text.data);
                             dbg_fail_return;

@@ -20,25 +20,24 @@ namespace compute_asts {
     using namespace strings;
     using namespace code_views;
 
-    enum class prim_type {
-        pt_unknown,
-        pt_invalid,
-        pt_void,
-        pt_i8 ,
-        pt_i16,
-        pt_i32,
-        pt_i64,
-        pt_u8 ,
-        pt_u16,
-        pt_u32,
-        pt_u64,
-        pt_f32,
-        pt_f64,
-        pt_str,
-        pt_num_literal,
-        pt_enum_size
+    enum class type_t {
+        t_unknown,
+        t_invalid,
+        t_void,
+        t_i8 ,
+        t_i16,
+        t_i32,
+        t_i64,
+        t_u8 ,
+        t_u16,
+        t_u32,
+        t_u64,
+        t_f32,
+        t_f64,
+        t_str,
+        t_enum_size
     };
-    using enum prim_type;
+    using enum type_t;
 
     enum class binary_op {
         bop_invalid,
@@ -86,10 +85,10 @@ namespace compute_asts {
     };
 
     struct node {
-        enum struct type_t {
-            literal,
-            func,
-        } type;
+        enum struct lex_kind_t {
+            lk_leaf,
+            lk_subtree,
+        } lex_kind;
 
         string text;
         bool text_is_quoted;
@@ -102,7 +101,7 @@ namespace compute_asts {
         };
         float float_value;
 
-        prim_type value_type;
+        type_t value_type;
 
         func* declared_func; //TODO: remove with compilation
 
@@ -146,7 +145,7 @@ namespace compute_asts {
             };
             struct { // sk_local_decl
                 local* decled_local;
-                node* init_node; // TODO: remove this when declaration and assignment are separated
+                 node*   init_node ; // TODO: remove this when declaration and assignment are separated
             };
             struct { // sk_macro_decl
                 macro* decled_macro;
@@ -167,7 +166,7 @@ namespace compute_asts {
                 u8 chr_value;
             };
             struct {
-                u32 sub_index;
+                u32   sub_index;
                 node* sub_of_node;
             };
         };
@@ -178,7 +177,7 @@ namespace compute_asts {
         string    id;
         uint      index;
         node*     code_node;
-        prim_type value_type;
+        type_t value_type;
 
         enum struct kind_t {
             vk_unknown    ,
@@ -200,7 +199,7 @@ namespace compute_asts {
         bool is_inline_wasm;
 
         arr_dyn<variable > params ;
-        arr_dyn<prim_type> results;
+        arr_dyn<type_t> results;
         arr_dyn<variable > locals ;
 
         bool   imported;
@@ -234,15 +233,15 @@ namespace compute_asts {
             lk_enum_size,
         } kind;
 
-        prim_type value_type;
+        type_t value_type;
     };
 
     struct fn {
         string id;
         uint index;
 
-        arr_dyn<prim_type> params ;
-        prim_type result_type;
+        arr_dyn<type_t> params ;
+        type_t result_type;
 
         enum struct kind_t {
             fk_unknown,
@@ -253,7 +252,7 @@ namespace compute_asts {
 
         union {
             struct { // local and exported
-                arr_dyn<prim_type> local_types  ;
+                arr_dyn<type_t> local_types  ;
                 arr_dyn<uint     > local_offsets;
                 macro* macro;
                 stream body_wasm;
@@ -270,7 +269,7 @@ namespace compute_asts {
         string id;
 
         uint params_count;
-        prim_type result_type;
+        type_t result_type;
         arr_dyn<local> locals ; // includes parameters
 
         bool has_returns;
@@ -288,9 +287,6 @@ namespace compute_asts {
     static let        code_id = view("#");
     static let         def_id = view("def");
     static let    def_wasm_id = view("def_wasm");
-    static let        disp_id = view("disp");
-    static let        wasm_id = view("wasm");
-    static let          fn_id = view("fn");
     static let       block_id = view("{}");
     static let         ret_id = view("ret");
     static let          as_id = view("as");
@@ -319,11 +315,11 @@ namespace compute_asts {
         .temp_arena = temp_arena
     };}
 
-    inline auto is_func         (const node& node) -> bool { return node.type == node::type_t::func; }
-    inline auto is_int_literal  (const node& node) -> bool { return node.type == node::type_t::literal && node.can_be_int   && !node.text_is_quoted; }
-    inline auto is_uint_literal (const node& node) -> bool { return node.type == node::type_t::literal && node.can_be_uint  && !node.text_is_quoted; }
-    inline auto is_float_literal(const node& node) -> bool { return node.type == node::type_t::literal && node.can_be_float && !node.text_is_quoted; }
-    inline auto is_str_literal  (const node& node) -> bool { return node.type == node::type_t::literal && node.text_is_quoted; }
+    inline auto is_func         (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_subtree; }
+    inline auto is_int_literal  (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.can_be_int && !node.text_is_quoted; }
+    inline auto is_uint_literal (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.can_be_uint && !node.text_is_quoted; }
+    inline auto is_float_literal(const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.can_be_float && !node.text_is_quoted; }
+    inline auto is_str_literal  (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.text_is_quoted; }
     inline auto get_int  (const node& node   ) -> ret1<int  >  { if (is_int_literal  (node)) return ret1_ok(node.  int_value); else return ret1_fail; }
     inline auto get_uint (const node& node   ) -> ret1<uint >  { if (is_uint_literal (node)) return ret1_ok(node. uint_value); else return ret1_fail; }
     inline auto get_float(const node& node   ) -> ret1<float>  { if (is_float_literal(node)) return ret1_ok(node.float_value); else return ret1_fail; }
@@ -375,7 +371,7 @@ namespace compute_asts {
         return add_macro(view(id), parent_scope, body_nodes, ast);
     }
 
-    local& add_local(string id, local::kind_t kind, prim_type type, scope& scope) {
+    local& add_local(string id, local::kind_t kind, type_t type, scope& scope) {
         ref macro = *scope.parent_macro;
         var index = macro.locals.count;
         ref local = push(scope.parent_macro->locals, compute_asts::local {
@@ -388,7 +384,7 @@ namespace compute_asts {
         return local;
     }
 
-    inline local& add_param(string id, local::kind_t kind, prim_type value_type, macro& macro) {
+    inline local& add_param(string id, local::kind_t kind, type_t value_type, macro& macro) {
         assert(macro.locals.count == macro.params_count); // params must be added before locals
         macro.params_count += 1;
         return add_local(id, kind, value_type, *macro.body_scope);
@@ -405,10 +401,10 @@ namespace compute_asts {
         ref fn = push(ast.fns, {
             .id            = macro.id,
             .index         = index,
-            .params        = make_arr_dyn<prim_type>(params .count, ast.data_arena),
+            .params        = make_arr_dyn<type_t>(params .count, ast.data_arena),
             .result_type   = macro.result_type,
             .kind          = fn::kind_t::fk_regular,
-            .local_types   = make_arr_dyn<prim_type>(8, ast.data_arena),
+            .local_types   = make_arr_dyn<type_t>(8, ast.data_arena),
             .local_offsets = make_arr_dyn<uint     >(8, ast.data_arena),
             .macro         = &macro,
             .body_wasm     = make_stream(32, ast.data_arena),
@@ -421,11 +417,11 @@ namespace compute_asts {
         return fn;
     }
 
-    fn& add_import(string module_id, string id, arr_view<prim_type> params, prim_type result_type, ast& ast) {
+    fn& add_import(string module_id, string id, arr_view<type_t> params, type_t result_type, ast& ast) {
         ref fn = push(ast.fns, compute_asts::fn {
             .id      = id,
             .index   = ast.fns.count,
-            .params  = make_arr_dyn<prim_type>(params .count, ast.data_arena),
+            .params  = make_arr_dyn<type_t>(params .count, ast.data_arena),
             .result_type = result_type,
             .kind = fn::kind_t::fk_imported,
             .import_module = module_id,
@@ -436,11 +432,11 @@ namespace compute_asts {
         return fn;
     }
 
-    fn& add_import(cstr module_id, cstr id, init_list<prim_type> params, prim_type result_type, ast& ast) {
+    fn& add_import(cstr module_id, cstr id, init_list<type_t> params, type_t result_type, ast& ast) {
         return add_import(view(module_id), view(id), view(params), result_type, ast);
     }
 
-    arr_ref<fn> find_fn_ptr(string id, arr_view<prim_type> param_types, ast& ast) {
+    arr_ref<fn> find_fn_ptr(string id, arr_view<type_t> param_types, ast& ast) {
         let fns = ast.fns.data;
         for (var i = 0u; i < fns.count; i += 1) {
             ref fn = ast.fns.data[i];
@@ -464,11 +460,11 @@ namespace compute_asts {
         return {(size_t)-1};
     }
 
-    fn* find_fn(string id, arr_view<prim_type> param_types, ast& ast) {
+    fn* find_fn(string id, arr_view<type_t> param_types, ast& ast) {
         return ptr(find_fn_ptr(id, param_types, ast), ast.fns);
     }
 
-    macro* find_macro(string id, arr_view<prim_type> param_types, scope& scope) {
+    macro* find_macro(string id, arr_view<type_t> param_types, scope& scope) {
         for(var scope_p = &scope; scope_p; ) {
             ref sc = *scope_p;
             var macros = sc.macros.data;
@@ -544,49 +540,49 @@ namespace compute_asts {
 
     #define if_chain2(n0, n1, first_node) if_var2(n0, n1, deref2(first_node))
 
-    prim_type primitive_type_by(string name) {
-        if (name == view("void")) return pt_void ;
-        if (name == view("i8"  )) return pt_i8 ;
-        if (name == view("i16" )) return pt_i16;
-        if (name == view("i32" )) return pt_i32;
-        if (name == view("u8 " )) return pt_u8 ;
-        if (name == view("u16" )) return pt_u16;
-        if (name == view("u32" )) return pt_u32;
-        if (name == view("i64" )) return pt_i64;
-        if (name == view("u64" )) return pt_u64;
-        if (name == view("f32" )) return pt_f32;
-        if (name == view("f64" )) return pt_f64;
-        if (name == view("str" )) return pt_str;
+    type_t primitive_type_by(string name) {
+        if (name == view("void")) return t_void ;
+        if (name == view("i8"  )) return t_i8 ;
+        if (name == view("i16" )) return t_i16;
+        if (name == view("i32" )) return t_i32;
+        if (name == view("u8 " )) return t_u8 ;
+        if (name == view("u16" )) return t_u16;
+        if (name == view("u32" )) return t_u32;
+        if (name == view("i64" )) return t_i64;
+        if (name == view("u64" )) return t_u64;
+        if (name == view("f32" )) return t_f32;
+        if (name == view("f64" )) return t_f64;
+        if (name == view("str" )) return t_str;
 
         printf("Type %.*s not found.\n", (int)name.count, name.data);
-        dbg_fail_return pt_invalid;
+        dbg_fail_return t_invalid;
     }
 
-    arr_view<wasm_emit::wasm_type> wasm_types_of(prim_type type, bool void_as_empty = true) {
+    arr_view<wasm_emit::wasm_type> wasm_types_of(type_t type, bool void_as_empty = true) {
         using enum wasm_emit::wasm_type;
 
         static let wasm_types_arr = alloc(gta, {vt_void, vt_i32, vt_i64, vt_f32, vt_f64, /* str */ vt_i32, vt_i32});
 
         switch (type) {
-            case pt_void: return void_as_empty ? sub(wasm_types_arr, 0, 0) : sub(wasm_types_arr, 0, 1);
-            case pt_i8 :
-            case pt_i16:
-            case pt_i32:
-            case pt_u8 :
-            case pt_u16:
-            case pt_u32: return sub(wasm_types_arr, 1, 1);
-            case pt_i64:
-            case pt_u64: return sub(wasm_types_arr, 2, 1);
-            case pt_f32: return sub(wasm_types_arr, 3, 1);
-            case pt_f64: return sub(wasm_types_arr, 4, 1);
+            case t_void: return void_as_empty ? sub(wasm_types_arr, 0, 0) : sub(wasm_types_arr, 0, 1);
+            case t_i8 :
+            case t_i16:
+            case t_i32:
+            case t_u8 :
+            case t_u16:
+            case t_u32: return sub(wasm_types_arr, 1, 1);
+            case t_i64:
+            case t_u64: return sub(wasm_types_arr, 2, 1);
+            case t_f32: return sub(wasm_types_arr, 3, 1);
+            case t_f64: return sub(wasm_types_arr, 4, 1);
 
-            case pt_str: return sub(wasm_types_arr, 5, 2);
+            case t_str: return sub(wasm_types_arr, 5, 2);
 
             default: dbg_fail_return {};
         }
     }
 
-    uint size_32_of(prim_type type, bool void_as_empty = true) {
+    uint size_32_of(type_t type, bool void_as_empty = true) {
         return wasm_types_of(type, void_as_empty).count;
     }
 

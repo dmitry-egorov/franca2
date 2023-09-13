@@ -69,6 +69,8 @@ namespace compute_asts {
     }
 
     namespace parser {
+        using enum node::lex_kind_t;
+
         ret2<node*, node*> parse_file_chain(cstr path, ast& ast) {
             var code = files::read_file_as_string(path, ast.data_arena);
             var path_str = make_string(ast.data_arena, "%s", path);
@@ -132,14 +134,14 @@ namespace compute_asts {
                 if_var2(first_child, last_child, parse_chain(it, file_path, ast)); else { dbg_fail_return nullptr; }
                 if(take(it, ']')); else { dbg_fail_return nullptr; } //TODO: free nodes?
                 set_parent_to_chain(first_child, &result);
-                result.type = node::type_t::func;
+                result.lex_kind = lk_subtree;
                 result.first_child = first_child;
                 result. last_child =  last_child;
                 result.infix  = next_text;
                 result.suffix = take_whitespaces_and_comments(it);
             }
             else {
-                result.type   = node::type_t::literal;
+                result.lex_kind   = lk_leaf;
                 result.suffix = next_text;
             }
 

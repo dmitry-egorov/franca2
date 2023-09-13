@@ -27,7 +27,7 @@ namespace compute_asts {
         node* display;
         node* type;
 
-        arr_view<prim_type> params;
+        arr_view<type_t> params;
     };
 
     struct st_scope {
@@ -51,7 +51,7 @@ namespace compute_asts {
     void push_scope(storage&);
     void  pop_scope(storage&);
     auto find_var  (storage& storage, string id) -> st_variable*;
-    auto find_func (storage& storage, string id, arr_view<prim_type> params) -> st_func*;
+    auto find_func (storage& storage, string id, arr_view<type_t> params) -> st_func*;
 
     static storage make_storage(arena& arena) {
         return {
@@ -97,7 +97,7 @@ namespace compute_asts {
         return nullptr;
     }
 
-    st_func* find_func(storage& storage, const string id, const arr_view<prim_type> params) {
+    st_func* find_func(storage& storage, const string id, const arr_view<type_t> params) {
         using_storage;
         var funcs_view = funcs.data;
         for (var i = (int)funcs_view.count - 1; i >= 0; --i) {
