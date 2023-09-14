@@ -199,13 +199,13 @@ namespace compute_asts {
         }
 
         void gather_defs(node* chain, context& ctx) {
-            for (var node_p = chain; node_p; node_p = node_p->next) {
-                ref node = *node_p;
+            for_chain (chain) {
+                ref node = *it;
                 let is_regular_func = is_func(node, def_id);
                 let is_wasm_func = is_func(node, def_wasm_id);
                 if (is_regular_func || is_wasm_func); else continue;
 
-                if_var3(id_node, disp_node, type_node, deref3(node.first_child)); else { dbg_fail_return; }
+                if_chain3(id_node, disp_node, type_node, node.first_child); else { dbg_fail_return; }
                 let body_node = type_node.next;
 
                 let id_text = id_node.text;
@@ -214,8 +214,8 @@ namespace compute_asts {
                 node.declared_func = &func;
                 func.is_inline_wasm = is_wasm_func;
 
-                for (var prm_node_p = disp_node.first_child; prm_node_p; prm_node_p = prm_node_p->next) {
-                    ref prm_node = *prm_node_p;
+                for_chain2(prm_p, disp_node.first_child) {
+                    ref prm_node = *prm_p;
                     let is_in   = is_func(prm_node,   in_id);
                     let is_ref  = is_func(prm_node,  ref_id);
                     let is_code = is_func(prm_node, code_id);
@@ -223,16 +223,16 @@ namespace compute_asts {
                     if (is_ref  && !is_wasm_func) { printf("Ref parameters only supported in wasm functions!\n"); dbg_fail_return; }
                     if (is_code && !is_wasm_func) { printf("Code parameters only supported in wasm functions!\n"); dbg_fail_return; }
                     if (is_in || is_ref || is_code); else continue;
-                    if_var2(prm_id_node, prm_type_node, deref2(prm_node.first_child)); else { dbg_fail_return; }
+                    if_chain2(prm_id_node, prm_type_node, prm_node.first_child); else { dbg_fail_return; }
 
-                    let type = primitive_type_by(prm_type_node.text);
+                    if_let1(type, primitive_type_by(prm_type_node.text)); else { dbg_fail_return; }
                     using enum variable::kind_t;
                     var kind = is_in ? vk_param_value : is_ref ? vk_param_ref : vk_param_code;
-                    add_param(prm_id_node.text, prm_node_p, type, kind, func);
+                    add_param(prm_id_node.text, &prm_node, type, kind, func);
                     prm_node.value_type = type;
                 }
 
-                let res_type = primitive_type_by(type_node.text);
+                if_let1(res_type, primitive_type_by(type_node.text)); else { dbg_fail_return; }
                 if (res_type != t_void)
                     add_result(res_type, func);
 
@@ -247,7 +247,7 @@ namespace compute_asts {
             // for (var node_p = chain; node_p; node_p = node_p->next) {
             //     ref node = *node_p;
             //     if (node.type == literal) {
-            //         if (node.text_is_quoted) { node.type = t_str; continue; }
+            //         if (node.is_string) { node.type = t_str; continue; }
             //         node.type = pt_num_literal;
             //         continue;
             //     }
@@ -269,16 +269,16 @@ namespace compute_asts {
             gather_defs(chain, ctx); // TODO: comptime here?
             //type_check_chain (chain, ctx);
 
-            for(var node = chain; node; node = node->next)
-                emit_node(*node, ctx);
+            for_chain(chain)
+                emit_node(*it, ctx);
         }
 
         void emit_wasm_op(wasm_opcode op, node* args, context& ctx) {
             ref body = curr_func_of(ctx).body_wasm;
             emit(op, body);
 
-            for (var arg_p = args; arg_p; arg_p = arg_p->next) {
-                ref arg = *arg_p;
+            for_chain(args) {
+                ref arg = *it;
                 if_var1(vu, get_uint (arg)) { emit(vu, body); continue; }
                 if_var1(vi, get_int  (arg)) { emit(vi, body); continue; }
                 if_var1(vf, get_float(arg)) { emit(vf, body); continue; }
@@ -321,8 +321,7 @@ namespace compute_asts {
                 return;
             }
 
-            var op = find_op(node.text);
-            if (op != op_invalid) {
+            if_var1 (op, find_op(node.text)) {
                 emit_wasm_op(op, node.first_child, ctx);
                 return;
             }
@@ -357,10 +356,10 @@ namespace compute_asts {
                 }
 
                 if (node_id == as_id) {
-                    if_var2(arg_node, type_node, deref2(args_node_p)); else { dbg_fail_return; }
+                    if_chain2(arg_node, type_node, args_node_p); else { dbg_fail_return; }
                     emit_node(arg_node, ctx);
                     var src_type = arg_node.value_type;
-                    var dst_type = primitive_type_by(type_node.text);
+                    if_let1(dst_type, primitive_type_by(type_node.text)); else { dbg_fail_return; }
                     if (src_type == t_f32 && dst_type == t_u32)
                         emit(op_i32_trunc_f32_u, body);
                     if (src_type == t_f32 && dst_type == t_i32)
@@ -371,8 +370,9 @@ namespace compute_asts {
                 }
 
                 if (node_id == decl_local_id) {
-                    if_var2(id_node, type_node, deref2(args_node_p)); else { dbg_fail_return; }
-                    ref local = add_local(id_node.text, primitive_type_by(type_node.text), ctx);
+                    if_chain2(id_node, type_node, args_node_p); else { dbg_fail_return; }
+                    if_let1(type, primitive_type_by(type_node.text)); else { dbg_fail_return; }
+                    ref local = add_local(id_node.text, type, ctx);
                     if_ref(init_node, type_node.next) {
                         emit_node(init_node, ctx);
                         emit(op_local_set, local.index, body);
@@ -402,7 +402,7 @@ namespace compute_asts {
                 }
 
                 if (node_id == if_id) {
-                    if_var2(cond_node, then_node, deref2(args_node_p)); else { dbg_fail_return; }
+                    if_chain2(cond_node, then_node, args_node_p); else { dbg_fail_return; }
                     emit_node(cond_node, ctx);
 
                     emit(op_if, (u8)0x40, body);
@@ -416,7 +416,7 @@ namespace compute_asts {
 
                 if (node_id == while_id) {
                     emit_while_scope(body);
-                    if_var2(cond_node, body_node, deref2(args_node_p)); else { dbg_fail_return; }
+                    if_chain2(cond_node, body_node, args_node_p); else { dbg_fail_return; }
 
                     emit_node(cond_node, ctx);
                     emit(op_i32_eqz  , body);
@@ -438,9 +438,8 @@ namespace compute_asts {
                 tmp_compilation_scope(ctx);
 
                 var args = make_arr_dyn<type_t>(4, ctx.arena);
-                var arg_node_p = args_node_p;
-                for (; arg_node_p; arg_node_p = arg_node_p->next) {
-                    ref arg = *arg_node_p;
+                for_chain (args_node_p) {
+                    ref arg = *it;
                     emit_node(arg, ctx);
                     push(args, arg.value_type);
                 }
@@ -448,8 +447,8 @@ namespace compute_asts {
                 if_ref(func, find_func(node_id, args.data, ctx)); else { error_func_not_found(node_id); return; }
                 node.value_type = func.results.count == 0 ? t_void : func.results.data[0]; //TODO: support multiple return values
 
-                arg_node_p = args_node_p;
                 let params = func.params.data;
+                var arg_node_p = args_node_p;
                 for (var i = 0u; i < params.count; ++i, arg_node_p = arg_node_p->next) {
                     ref arg_node = *arg_node_p;
                     let param = params[i];
@@ -500,8 +499,7 @@ namespace compute_asts {
                 dbg_fail_return;
             }
 
-            let op = find_op(node.text);
-            if (op != op_invalid); else { printf("Wasm opcode not found: %.*s\n", (int)node.text.count, node.text.data); dbg_fail_return; }
+            if_var1 (op, find_op(node.text)); else { printf("Wasm opcode not found: %.*s\n", (int)node.text.count, node.text.data); dbg_fail_return; }
             emit_wasm_op(op, node.first_child, ctx);
         }
 
@@ -511,8 +509,8 @@ namespace compute_asts {
             if (is_func(body, block_id))
                 node = node->first_child;
 
-            for (; node; node = node->next)
-                emit_wasm_node(*node, ctx);
+            for_chain(node)
+                emit_wasm_node(*it, ctx);
         }
 
         void emit_body(node& node, context& ctx) {
@@ -528,22 +526,23 @@ namespace compute_asts {
             using enum wasm_type;
             using enum variable::kind_t;
 
-            if_var4(id_node, disp_node, type_node, body_node, deref4(node.first_child)); else { dbg_fail_return; }
+            if_chain4(id_node, disp_node, type_node, body_node, node.first_child); else { dbg_fail_return; }
             if_ref (func, node.declared_func); else { dbg_fail_return; }
 
             tmp_func_definition_scope(func, ctx);
 
             var param_index = 0u;
-            for (var param_node_p = disp_node.first_child; param_node_p; param_node_p = param_node_p->next) {
-                ref param_node = *param_node_p;
+            for_chain(disp_node.first_child) {
+                ref param_node = *it;
                 if (is_func(param_node, in_id)); else continue;
 
-                if_var2(param_id_node, param_type_node, deref2(param_node.first_child)); else { dbg_fail_return; }
+                if_chain2(param_id_node, param_type_node, param_node.first_child); else { dbg_fail_return; }
+                if_let1(type, primitive_type_by(param_type_node.text)); else { dbg_fail_return; }
                 push(ctx.locals_in_scope, {
                     .id    = param_id_node.text,
                     .index = param_index,
-                    .code_node  = param_node_p,
-                    .value_type = primitive_type_by(param_type_node.text),
+                    .code_node  = &param_node,
+                    .value_type = type,
                     .kind  = vk_param_value,
                 });
                 param_index++;
@@ -557,9 +556,9 @@ namespace compute_asts {
             ref curr_func = curr_func_of(ctx);
             // TODO: implement with string builder
             if_var1(push_str, find_func_index(view("push"), view({t_u32, t_u32, t_u32}), ctx)); else { dbg_fail_return; }
-            if_var1(push_u32, find_func_index(view("push"), view({t_u32        , t_u32}), ctx)); else { dbg_fail_return; }
-            if_var1(push_i32, find_func_index(view("push"), view({t_i32        , t_u32}), ctx)); else { dbg_fail_return; }
-            if_var1(push_f32, find_func_index(view("push"), view({t_f32        , t_u32}), ctx)); else { dbg_fail_return; }
+            if_var1(push_u32, find_func_index(view("push"), view({t_u32       , t_u32}), ctx)); else { dbg_fail_return; }
+            if_var1(push_i32, find_func_index(view("push"), view({t_i32       , t_u32}), ctx)); else { dbg_fail_return; }
+            if_var1(push_f32, find_func_index(view("push"), view({t_f32       , t_u32}), ctx)); else { dbg_fail_return; }
 
             ref body = curr_func.body_wasm;
 
@@ -571,8 +570,8 @@ namespace compute_asts {
             emit_const_get(1024, body);
             emit(op_local_set, dst, body);
 
-            for(var node_p = node.first_child; node_p; node_p = node_p->next) {
-                ref arg_node = *node_p;
+            for_chain(node.first_child) {
+                ref arg_node = *it;
 
                 // dst = push_*(fn(), dst);
                 emit_node(arg_node, ctx);
@@ -607,7 +606,7 @@ namespace compute_asts {
             ref curr_func = curr_func_of(ctx);
             ref body      = curr_func.body_wasm;
 
-            if_var2(var_id_node, value_node, deref2(node.first_child)); else { dbg_fail_return; }
+            if_chain2(var_id_node, value_node, node.first_child); else { dbg_fail_return; }
 
             let var_id = var_id_node.text;
             if_ref   (v, find_local(var_id, ctx)); else { error_local_not_found(var_id); return; }

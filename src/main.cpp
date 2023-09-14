@@ -173,7 +173,7 @@ static bool init() {
     parse_files(source_files.data, ast);
     printf("\nAST:\n");
     print_ast(ast);
-    printf("AST parsed. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+    printf("AST parsed. Nodes: %zu. Total memory used: %zu, delta: %zu\n", ast.nodes.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     arr_view<u8> old_wasm = {};
     arr_view<u8> wasm = {};

@@ -25,7 +25,7 @@ public:
 
 #define stx_concat_internal(x,y) x##y
 #define stx_concat(x,y) stx_concat_internal(x,y)
-#define defer [[maybe_unused]]let& stx_concat(stx_concat(defer_, __LINE__), __COUNTER__) = ExitScopeHelp() + [&]
+#define defer [[maybe_unused]]let& stx_concat(line_var(defer_), __COUNTER__) = ExitScopeHelp() + [&]
 
 // release and reset a var_ at the end of the current scope
 #define defer_release(name) defer { release(name); }
@@ -35,7 +35,7 @@ public:
 #define let const auto
 #define def constexpr
 #define ref auto&
-#define ptr_line stx_concat(ptr,__LINE__)
+#define ptr_line line_var(ptr_)
 #define if_ref(name, init) let ptr_line = init; ref name = *(ptr_line); if (ptr_line)
 
 #define tmp(name, initializer) var name = (initializer); defer_release(name)
@@ -45,6 +45,8 @@ public:
 #define dbg_fail_break assert(false); break
 
 #define CODE(...) #__VA_ARGS__
+
+#define dec_set2(n0, n1, init) var[line_var(n0_), line_var(n1_)] = init; n0 = line_var(n0_); n1 = line_var(n1_)
 
 
 #pragma clang diagnostic pop

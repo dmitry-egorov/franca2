@@ -378,32 +378,30 @@ namespace wasm_emit {
     }
 
 
-    wasm_type find_value_type(string op_name) {
+    ret1<wasm_type> find_value_type(string op_name) {
         for (var i = 0u; i < wasm_value_type_count; ++i) {
             ref mapping = wasm_value_type_map[i];
-            if (mapping.name == op_name) return mapping.to;
+            if (mapping.name == op_name) return ret1_ok(mapping.to);
         }
 
-        return vt_invalid;
+        return ret1_fail;
     }
 
-    wasm_opcode find_op(string op_name) {
+    ret1<wasm_opcode> find_op(string op_name) {
         for (u8 i = 0; i < (u8)0xff; ++i)
             if (op_name == opcode_map[i])
-                return (wasm_opcode)i;
+                return ret1_ok((wasm_opcode)i);
 
         for (u8 i = 0; i < (u8)0x12; ++i) {
             if (op_name == opcode_fc_map[i])
-                return (wasm_opcode)(i + 0xfc00);
+                return ret1_ok((wasm_opcode)(i + 0xfc00));
         }
 
-        return op_invalid;
+        return ret1_fail;
     }
 
     void emit_op(string op_name, stream& dst) {
-        let op = find_op(op_name);
-        if (op != op_invalid); else { printf("Unknown opcode: %.*s\n", (int)op_name.count, op_name.data); dbg_fail_return;}
-
+        if_var1(op, find_op(op_name)); else { printf("Unknown opcode: %.*s\n", (int)op_name.count, op_name.data); dbg_fail_return;}
         emit(op, dst);
     }
 

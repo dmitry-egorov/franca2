@@ -1,0 +1,30 @@
+universal var types
+
+- get & var by default?
+    - builtin '&' macro (emit var index)
+
+$ -- immutable value
+& -- mutable value
+# -- embedded code
+
+same in body as in the parameter list
+
+def[print_str .[ptr[#[. .[u32]]] len[#[. .[u32]]]] void print_str[make_str[ptr len]]]
+def[print_str .[ptr[u32 #] len[u32 #]] . print_str[make_str[ptr len]]]
+
+def[print_str .[ptr[->[. u32] #] len[->[. u32] #]] . print_str[make_str[ptr len]]]
+
+# - constant
+$ - value
+& - ref
+
+if we naivly generalize:
+[u32 #] - contant num
+[->[. .[u32]] #] - this is a lamda passed at compile time (not the same as code!)
+[->[. u32] #]
+
+We probably need a separate type to represent code (or an expression in C# terms)
+
+def[print_str .[ptr[# code[u32]] len[# code[u32]]] .[] print_str[make_str[ptr len]]]
+
+- one caveat is that it might be easy to forget #, and then we're passing code at runtime

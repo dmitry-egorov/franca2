@@ -106,27 +106,20 @@ namespace compute_asts {
                 text_is_quoted = false;
             }
 
-            var text_copy = text;
-            var [ int_value, can_be_int]  = take_int (text_copy);
-            text_copy = text;
-            var [uint_value, can_be_uint] = take_uint(text_copy);
-            text_copy = text;
-            var [float_value, can_be_float] = take_float(text_copy);
-
             // TODO: record line and column
-            // a clean way to do that is to make a separate iterator
+            // TODO: a clean way to do that is to make a separate iterator
             ref result = make_node(ast, node {
-                .text           = text,
-                .text_is_quoted = text_is_quoted,
-                .can_be_int     = can_be_int,
-                .can_be_uint    = can_be_uint,
-                .can_be_float   = can_be_float,
-                .file_path      = file_path
+                .text      = text,
+                .is_string = text_is_quoted,
+                .file_path = file_path
             });
 
-            if (can_be_int  ) result.  int_value =   int_value;
-            if (can_be_uint ) result. uint_value =  uint_value;
-            if (can_be_float) result.float_value = float_value;
+            if (!text_is_quoted) {
+                var text_copy = text;
+                dec_set2(result.  int_value, result.can_be_int  , take_int  (text_copy)); text_copy = text;
+                dec_set2(result. uint_value, result.can_be_uint , take_uint (text_copy)); text_copy = text;
+                dec_set2(result.float_value, result.can_be_float, take_float(text_copy));
+            }
 
             let next_text = take_whitespaces_and_comments(it);
 
@@ -134,7 +127,7 @@ namespace compute_asts {
                 if_var2(first_child, last_child, parse_chain(it, file_path, ast)); else { dbg_fail_return nullptr; }
                 if(take(it, ']')); else { dbg_fail_return nullptr; } //TODO: free nodes?
                 set_parent_to_chain(first_child, &result);
-                result.lex_kind = lk_subtree;
+                result.  lex_kind  = lk_subtree;
                 result.first_child = first_child;
                 result. last_child =  last_child;
                 result.infix  = next_text;

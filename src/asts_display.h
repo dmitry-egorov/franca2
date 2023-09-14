@@ -110,13 +110,12 @@ namespace compute_asts {
             using_display_ctx;
             open_inlay_brackets(ctx); defer { close_brackets(ctx); };
 
-            if (node.lex_kind == lk_leaf && (node.text_is_quoted || node.can_be_uint || node.can_be_int || node.can_be_float)) { // literal
-                put_text(node.text_is_quoted ? strings : constants, node.text, ctx);
+            if (node.lex_kind == lk_leaf && (node.is_string || node.can_be_uint || node.can_be_int || node.can_be_float)) { // literal
+                put_text(node.is_string ? strings : constants, node.text, ctx);
                 return;
             }
 
-            var op = wasm_emit::find_op(node.text);
-            if (op != wasm_emit::wasm_opcode::op_invalid) {
+            if_var1 (op, wasm_emit::find_op(node.text)) {
                 display_wasm_node(node, ctx);
                 return;
             }
@@ -299,7 +298,7 @@ namespace compute_asts {
         void display_decl_local(node* args, context& ctx) {
             using_display_ctx;
 
-            if_var2(id_node, type_node, deref2(args)); else { dbg_fail_return; }
+            if_chain2(id_node, type_node, args); else { dbg_fail_return; }
             var id   = id_node.text;
             var type_name = type_node.text;
             var name = id;
@@ -326,7 +325,7 @@ namespace compute_asts {
         void display_decl_param(node* args, context& ctx) {
             using_display_ctx;
 
-            if_var2(id_node, type_node, deref2(args)); else { dbg_fail_return; }
+            if_chain2(id_node, type_node, args); else { dbg_fail_return; }
             var id = id_node.text;
             var type_name = type_node.text;
             var name = id;
@@ -357,13 +356,12 @@ namespace compute_asts {
         }
 
         void display_def_wasm(node* args, context& ctx) {
-            using_display_ctx;
-
             if_var3(__, disp_node, type_node, deref3(args)); else { dbg_fail_return; }
             var type_name = type_node.text;
 
             put_text(definitions, view("wasm "), ctx);
 
+            ref storage = ctx.storage;
             tmp_scope(storage);
             display_node(disp_node, ctx);
             put_text(regulars, view(": "), ctx);
@@ -373,9 +371,10 @@ namespace compute_asts {
 
             if (is_func(body_node, block_id)) {
                 tmp_scope(storage);
-                for (var node_p = body_node.first_child; node_p; node_p = node_p->next) {
-                    display_wasm_node(*node_p, ctx);
-                    put_text(inlays, sub_past_last(node_p->suffix, '\n'), ctx);
+                for_chain(body_node.first_child) {
+                    ref node = *it;
+                    display_wasm_node(node, ctx);
+                    put_text(inlays, sub_past_last(node.suffix, '\n'), ctx);
                 }
                 return;
             }
@@ -384,7 +383,7 @@ namespace compute_asts {
         }
 
         void display_as(node* args, context& ctx) {
-            if_var2(arg_node, type_node, deref2(args)); else { dbg_fail_return; }
+            if_chain2(arg_node, type_node, args); else { dbg_fail_return; }
 
             display_node(arg_node, ctx);
             put_text(regulars, " as ", ctx);
@@ -394,7 +393,7 @@ namespace compute_asts {
         void display_if(node* args, context& ctx) {
             using_display_ctx;
 
-            if_var2(cond_node, body_node, deref2(args)); else { dbg_fail_return; }
+            if_chain2(cond_node, body_node, args); else { dbg_fail_return; }
             put_text(controls, view("if "), ctx);
 
             display_node(cond_node, ctx);
@@ -405,7 +404,7 @@ namespace compute_asts {
         void display_loop(node* args, context& ctx) {
             using_display_ctx;
 
-            if_var2(cond_node, body_node, deref2(args)); else { dbg_fail_return; }
+            if_chain2(cond_node, body_node, args); else { dbg_fail_return; }
             put_text(controls, view("while "), ctx);
 
             display_node(cond_node, ctx);
@@ -429,10 +428,10 @@ namespace compute_asts {
             put_text(strings, "'", ctx);
         }
 
-        void display_bop_a(node * args, const string& infix_text, context & ctx) {
+        void display_bop_a(node* args, const string& infix_text, context & ctx) {
             using_display_ctx;
 
-            if_var2(name_node, b_node, deref2(args)); else { dbg_fail_return; }
+            if_chain2(name_node, b_node, args); else { dbg_fail_return; }
             put_text(identifiers, name_node.text, ctx);
             put_text(regulars   , infix_text    , ctx);
             display_node(b_node, ctx);

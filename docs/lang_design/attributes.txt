@@ -1,0 +1,5 @@
+- need a way to augment nodes with attributes
+
+def[
+    fib_at[.[n[$ u32]] u32 ..]:[disp["fibonacci number at " n]]
+]

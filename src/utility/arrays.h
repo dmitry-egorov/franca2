@@ -49,6 +49,7 @@ namespace arrays {
     tt arr_ref<t> ref_in(const t*, const arr_view<t>&);
 
 }
+#define for_arr(arr) for(var i = 0u; i < arr.count; i += 1)
 #endif //FRANCA2_ARRAYS_H
 
 #ifdef FRANCA2_IMPLS

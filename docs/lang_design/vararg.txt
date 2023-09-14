@@ -1,0 +1,47 @@
+- example print implementation:
+def[print[.[a[# .]] . print_str[istr[a]]]]
+
+def[istr[.[a[# .]] str .[
+    var[buf u32 1024]
+    var[dst u32 buf ]
+    each[a push_str[it dst]]
+    print_str[buf -[dst buf]]
+]]]
+
+- to type-check locally 'push_str[it dst]'
+    - union of types:
+        - check each type separately, generate a list of possible macros to invoke
+        - show error at call site if an element is not one of those types
+        - downside: can't extend the print macro to support new types
+    - structural types:
+        - specify that there must be push_str, accepting 'it' (elements of 'a') and u32
+        - show error at call site, if there's no push_str for the given type
+        - downside: verbose constraint on the parameter
+    - interfaces (nominal):
+        - print_str is part of an interface, require parameters to implement it
+        - show error at call site, if an argument doesn't implement the interface
+        - downside: need to explicitly specify implementation of the interface
+
+- union of types (with generics):
+    def[istr[.[a[# .]:[check_each[a one_of[it u32 i32 f32 str]]]] str .[...]]]
+- structural types:
+    def[istr[.[a[# .]:[check_each[a exists[it print_str[it dst[u32]]]]]] str .[...]]]
+- interfaces (nominal):
+    def[istr[.[a[# .]:[check_each[a impl[it printable]]]] str .[...]]]
+
+- too complex...
+
+- alternatively we can execute runtime code, that generates a sequence of embeds of the body and type-check them
+    - requires iterative compilation
+
+    def[
+        print[a[# .] .   print_str[istr[a]]
+        istr [a[# .] str .[
+            var[buf u32 1024]
+            var[dst u32 buf ]
+            each[a push_str[it dst]]
+            print_str[buf -[dst buf]]
+        ]]
+    ]
+
+-

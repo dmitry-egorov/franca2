@@ -55,9 +55,9 @@ namespace compute_asts {
             begin_macro_ctx(macro, ctx); \
             defer { end_macro_ctx(ctx); }
         #define tmp_switch_macro_ctx(ptr, ctx) \
-            let stx_concat(return_ctx_, __LINE__) = ctx.curr_macro_ctx; \
+            let line_var(return_ctx_) = ctx.curr_macro_ctx; \
             ctx.curr_macro_ctx = ptr; \
-            defer { ctx.curr_macro_ctx = stx_concat(return_ctx_, __LINE__); }
+            defer { ctx.curr_macro_ctx = line_var(return_ctx_); }
 
         auto curr_macro_ctx(context&) -> macro_context*;
 
@@ -115,8 +115,6 @@ namespace compute_asts {
         var func_specs = make_arr_dyn<wasm_func       >(256, temp_arena);
 
         push(exports, wasm_export {.name = view("memory"), .kind = ek_mem, .obj_index = 0});
-
-
 
         for (var i = 0u; i < count_of(fns); ++i) {
             ref fn = fns[i];
@@ -201,8 +199,8 @@ namespace compute_asts {
         }
 
         void emit_chain(node* chain, context& ctx) {
-            for(var node_p = chain; node_p; node_p = node_p->next)
-                emit(*node_p, ctx);
+            for_chain(chain)
+                emit(*it, ctx);
         }
 
         void emit(node& node, context& ctx) {
@@ -222,7 +220,7 @@ namespace compute_asts {
             }
 
             if (node.sem_kind == sk_ret) {
-                if_ref(value_node, node.first_child)
+                if_ref(value_node, node.value_node)
                     emit(value_node, ctx);
 
                 emit(op_br, macro_ctx.block_depth, wasm);
@@ -262,8 +260,8 @@ namespace compute_asts {
                 if (node.wasm_op == op_block || node.wasm_op == op_loop || node.wasm_op == op_if) macro_ctx.block_depth += 1;
                 if (node.wasm_op == op_end) macro_ctx.block_depth -= 1;
 
-                for (var arg_p = node.first_child; arg_p; arg_p = arg_p->next) {
-                    ref arg = *arg_p;
+                for_chain(node.first_child) {
+                    ref arg = *it;
                     assert(arg.sem_kind == sk_lit);
                     wasm_emit::emit(arg.uint_value, wasm);
                 }
@@ -282,13 +280,13 @@ namespace compute_asts {
             }
 
             if (node.sem_kind == sk_local_get) {
-                if_ref (l, node.local); else { node_error(node); return; }
+                if_ref (l, node.refed_local); else { node_error(node); return; }
                 emit_local_get(l, ctx);
                 return;
             }
 
             if (node.sem_kind == sk_local_ref) {
-                if_ref (l, node.local); else { node_error(node); return; }
+                if_ref (l, node.refed_local); else { node_error(node); return; }
 
                 //TODO: support multi-word locals
                 var offset = find_local_offset(l.index_in_macro, ctx);
@@ -297,7 +295,7 @@ namespace compute_asts {
             }
 
             if (node.sem_kind == sk_code_embed) {
-                if_ref (l, node.local); else { node_error(node); return; }
+                if_ref (l, node.refed_local); else { node_error(node); return; }
                 let binding = find_binding(l.index_in_macro, ctx);
                 if_ref (code, binding.code); else { node_error(node); return; }
 
@@ -318,13 +316,28 @@ namespace compute_asts {
             if (node.sem_kind == sk_sub_of) {
                 if_ref(n, node.sub_of_node); else { node_error(node); return; }
                 if (n.sem_kind == sk_local_get) {
-                    if_ref(l, n.local); else { node_error(node); return; }
+                    if_ref(l, n.refed_local); else { node_error(node); return; }
                     let offset = find_local_offset(l.index_in_macro, ctx);
                     emit(op_local_get, offset + node.sub_index, wasm);
                     return;
                 }
 
                 dbg_fail_return;
+            }
+
+            if (node.sem_kind == sk_each) {
+                if_ref (l, node.each_list_local); else { node_error(node); return; }
+                let binding = find_binding(l.index_in_macro, ctx);
+                if_ref (code, binding.code); else { node_error(node); return; }
+                //if (code.sem_kind == sk_block); else { printf("Only blocks can be used as arguments to 'each'\n"); node_error(node); return; }
+
+                for_chain(code.first_child) {
+                    //emit(*it, ctx);
+                    //TODO: bind 'it', embed body
+                    //TODO: need to type-check here...
+                }
+
+                return;
             }
 
             if (node.sem_kind == sk_macro_invoke) {
@@ -344,7 +357,7 @@ namespace compute_asts {
                     }
 
                     if (arg_node.sem_kind == sk_local_get && param.kind != lk_code) {
-                        if_ref(refed_local, arg_node.local); else { dbg_fail_return; }
+                        if_ref(refed_local, arg_node.refed_local); else { dbg_fail_return; }
                         let fn_index = find_local_index(refed_local.index_in_macro, ctx);
                         buffer[i] = {.index_in_fn = fn_index};
                         continue;
@@ -374,10 +387,8 @@ namespace compute_asts {
 
             if (node.sem_kind == sk_fn_call) {
                 if_ref(refed_fn, ptr(node.refed_fn, ctx.ast.fns)); else { node_error(node); return; }
-                for (var arg_p = node.first_child; arg_p; arg_p = arg_p->next) {
-                    ref arg = *arg_p;
-                    emit(arg, ctx);
-                }
+                for_chain(node.first_child)
+                    emit(*it, ctx);
 
                 emit(op_call, refed_fn.index, wasm);
                 return;

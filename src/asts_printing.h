@@ -26,9 +26,9 @@ namespace compute_asts {
 
     inline void print_node(const node& node) {
         var text = node.text;
-        if (node.text_is_quoted) printf("\"");
+        if (node.is_string) printf("\"");
         printf("%.*s", (int) text.count, text.data);
-        if (node.text_is_quoted) printf("\"");
+        if (node.is_string) printf("\"");
 
         if (is_func(node)) {
             printf("[");

@@ -91,7 +91,7 @@ namespace compute_asts {
         } lex_kind;
 
         string text;
-        bool text_is_quoted;
+        bool is_string   ;
         bool can_be_int  ;
         bool can_be_uint ;
         bool can_be_float;
@@ -134,6 +134,7 @@ namespace compute_asts {
             sk_code_embed,
             sk_chr,
             sk_sub_of,
+            sk_each
         } sem_kind;
 
         union {
@@ -148,7 +149,7 @@ namespace compute_asts {
                  node*   init_node ; // TODO: remove this when declaration and assignment are separated
             };
             struct { // sk_macro_decl
-                macro* decled_macro;
+                arr_dyn<macro*> decled_macros;
             };
             struct { // sk_macro_invoke
                 macro* refed_macro;
@@ -157,7 +158,7 @@ namespace compute_asts {
                 arr_ref<fn> refed_fn;
             };
             struct { // sk_local_get & sk_local_ref
-                local* local;
+                local* refed_local;
             };
             struct { // sk_ret
                 node* value_node;
@@ -168,6 +169,10 @@ namespace compute_asts {
             struct {
                 u32   sub_index;
                 node* sub_of_node;
+            };
+            struct { // each
+                local* each_list_local;
+                node*  each_body_node;
             };
         };
     };
@@ -181,7 +186,7 @@ namespace compute_asts {
 
         enum struct kind_t {
             vk_unknown    ,
-            vk_local  ,
+            vk_local      ,
             vk_param_value,
             vk_param_ref  ,
             vk_param_code ,
@@ -198,9 +203,9 @@ namespace compute_asts {
 
         bool is_inline_wasm;
 
-        arr_dyn<variable > params ;
-        arr_dyn<type_t> results;
-        arr_dyn<variable > locals ;
+        arr_dyn<variable> params ;
+        arr_dyn<type_t  > results;
+        arr_dyn<variable> locals ;
 
         bool   imported;
         string import_module;
@@ -211,7 +216,7 @@ namespace compute_asts {
 
     struct scope {
         macro* parent_macro;
-        node*  body_chain;
+        node*    body_chain;
         arr_dyn<local*> locals;
         arr_dyn<macro*> macros;
 
@@ -240,7 +245,7 @@ namespace compute_asts {
         string id;
         uint index;
 
-        arr_dyn<type_t> params ;
+        arr_dyn<type_t> params;
         type_t result_type;
 
         enum struct kind_t {
@@ -253,7 +258,7 @@ namespace compute_asts {
         union {
             struct { // local and exported
                 arr_dyn<type_t> local_types  ;
-                arr_dyn<uint     > local_offsets;
+                arr_dyn<uint  > local_offsets;
                 macro* macro;
                 stream body_wasm;
                 uint next_local_offset;
@@ -268,7 +273,7 @@ namespace compute_asts {
     struct macro {
         string id;
 
-        uint params_count;
+        uint   params_count;
         type_t result_type;
         arr_dyn<local> locals ; // includes parameters
 
@@ -279,6 +284,7 @@ namespace compute_asts {
     };
 
 #define for_chain(first_node) for (var it = first_node; it; it = it->next)
+#define for_chain2(it_name, first_node) for (var it_name = first_node; it_name; it_name = it_name->next)
 
     static let emit_local_get_id = view("emit_local_get");
     static let  decl_local_id = view("var");
@@ -288,6 +294,7 @@ namespace compute_asts {
     static let         def_id = view("def");
     static let    def_wasm_id = view("def_wasm");
     static let       block_id = view("{}");
+    static let        list_id = view(".");
     static let         ret_id = view("ret");
     static let          as_id = view("as");
     static let          if_id = view("if");
@@ -302,6 +309,8 @@ namespace compute_asts {
     static let       print_id = view("print");
     static let        show_id = view("show");
     static let      sub_of_id = view("sub_of");
+    static let        each_id = view("each");
+
 
     ast make_ast(arena& data_arena, arena& temp_arena = gta) {
         return {
@@ -316,10 +325,10 @@ namespace compute_asts {
     };}
 
     inline auto is_func         (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_subtree; }
-    inline auto is_int_literal  (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.can_be_int && !node.text_is_quoted; }
-    inline auto is_uint_literal (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.can_be_uint && !node.text_is_quoted; }
-    inline auto is_float_literal(const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.can_be_float && !node.text_is_quoted; }
-    inline auto is_str_literal  (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.text_is_quoted; }
+    inline auto is_int_literal  (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.can_be_int && !node.is_string; }
+    inline auto is_uint_literal (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.can_be_uint && !node.is_string; }
+    inline auto is_float_literal(const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.can_be_float && !node.is_string; }
+    inline auto is_str_literal  (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.is_string; }
     inline auto get_int  (const node& node   ) -> ret1<int  >  { if (is_int_literal  (node)) return ret1_ok(node.  int_value); else return ret1_fail; }
     inline auto get_uint (const node& node   ) -> ret1<uint >  { if (is_uint_literal (node)) return ret1_ok(node. uint_value); else return ret1_fail; }
     inline auto get_float(const node& node   ) -> ret1<float>  { if (is_float_literal(node)) return ret1_ok(node.float_value); else return ret1_fail; }
@@ -539,23 +548,24 @@ namespace compute_asts {
 #pragma clang diagnostic pop
 
     #define if_chain2(n0, n1, first_node) if_var2(n0, n1, deref2(first_node))
+    #define if_chain3(n0, n1, n2, first_node) if_var3(n0, n1, n2, deref3(first_node))
+    #define if_chain4(n0, n1, n2, n3, first_node) if_var4(n0, n1, n2, n3, deref4(first_node))
 
-    type_t primitive_type_by(string name) {
-        if (name == view("void")) return t_void ;
-        if (name == view("i8"  )) return t_i8 ;
-        if (name == view("i16" )) return t_i16;
-        if (name == view("i32" )) return t_i32;
-        if (name == view("u8 " )) return t_u8 ;
-        if (name == view("u16" )) return t_u16;
-        if (name == view("u32" )) return t_u32;
-        if (name == view("i64" )) return t_i64;
-        if (name == view("u64" )) return t_u64;
-        if (name == view("f32" )) return t_f32;
-        if (name == view("f64" )) return t_f64;
-        if (name == view("str" )) return t_str;
+    ret1<type_t> primitive_type_by(string name) {
+        if (name == view("void")) return ret1_ok(t_void);
+        if (name == view("i8"  )) return ret1_ok(t_i8  );
+        if (name == view("i16" )) return ret1_ok(t_i16 );
+        if (name == view("i32" )) return ret1_ok(t_i32 );
+        if (name == view("u8 " )) return ret1_ok(t_u8  );
+        if (name == view("u16" )) return ret1_ok(t_u16 );
+        if (name == view("u32" )) return ret1_ok(t_u32 );
+        if (name == view("i64" )) return ret1_ok(t_i64 );
+        if (name == view("u64" )) return ret1_ok(t_u64 );
+        if (name == view("f32" )) return ret1_ok(t_f32 );
+        if (name == view("f64" )) return ret1_ok(t_f64 );
+        if (name == view("str" )) return ret1_ok(t_str );
 
-        printf("Type %.*s not found.\n", (int)name.count, name.data);
-        dbg_fail_return t_invalid;
+        return ret1_fail;
     }
 
     arr_view<wasm_emit::wasm_type> wasm_types_of(type_t type, bool void_as_empty = true) {
