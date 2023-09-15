@@ -49,7 +49,8 @@ namespace arrays {
     tt arr_ref<t> ref_in(const t*, const arr_view<t>&);
 
 }
-#define for_arr(arr) for(var i = 0u; i < arr.count; i += 1)
+#define for_arr(arr) for(var i = (size_t)0u; i < arr.count; i += 1)
+#define for_arr2(i_name, arr) for(var i_name = 0u; i_name < arr.count; i_name += 1)
 #endif //FRANCA2_ARRAYS_H
 
 #ifdef FRANCA2_IMPLS
@@ -75,17 +76,15 @@ namespace arrays {
     }
 
     tt bool contains(const arr_view<t>& view, const t &item) {
-        for (var i = 0u; i < view.count; i += 1) {
+        for_arr(view)
             if (view[i] == item) return true;
-        }
         return false;
     }
 
     tt size_t count(const arr_view<t>& view, const t& item) {
         var count = (size_t)0;
-        for (var i = 0u; i < view.count; i += 1) {
+        for_arr(view)
             if (view[i] == item) count++;
-        }
         return count;
     }
 
@@ -105,9 +104,8 @@ namespace arrays {
 
     tt arr_view<t> sub_past_last(const arr_view<t>& view, const t& item) {
         var last = (size_t)0;
-        for (var i = 0u; i < view.count; i += 1) {
+        for_arr(view)
             if (view[i] == item) last = i + 1;
-        }
         return {view.data, last};
     }
 
@@ -153,7 +151,10 @@ namespace arrays {
     }
 
     tt arr_ref<t> ref_in(const t* p, const arr_view<t>& v) {
-        let offset = (size_t)p - (size_t)v.data;
+        let op = (size_t)p;
+        let od = (size_t)v.data;
+        if (op >= od); else return {(size_t)-1};
+        let offset = op - od;
         if (offset < v.count); else return {(size_t)-1};
         return {offset};
     }

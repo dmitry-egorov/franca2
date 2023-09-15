@@ -24,7 +24,7 @@ namespace arrays {
         arenas::arena* arena;
         uint align;
 
-        t& operator[](size_t index);
+              t& operator[](size_t index);
         const t& operator[](size_t index) const;
     };
 
@@ -125,6 +125,11 @@ namespace arrays {
     tt arr_ref<t> last_ref_of(arr_dyn<t>& s) {
         if (s.count > 0); else return {(size_t)-1};
         return {s.count - 1};
+    }
+
+    tt bool equals(const arr_dyn<t>& a0, const arr_dyn<t>& a1) {
+        if (a0.count == a1.count); else return false;
+        return memcmp(a0.bytes, a1.bytes, a0.count * sizeof(t)) == 0;
     }
 
 }

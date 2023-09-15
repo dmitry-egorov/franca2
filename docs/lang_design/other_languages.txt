@@ -1,0 +1,3 @@
+- Jai: 
+- Zig: https://ziglang.org/
+- XL : https://xlr.sourceforge.io/#factorial

@@ -12,7 +12,7 @@ def[istr[.[a[# .]] str .[
     - union of types:
         - check each type separately, generate a list of possible macros to invoke
         - show error at call site if an element is not one of those types
-        - downside: can't extend the print macro to support new types
+        - downside: can't extend the macro to support new types
     - structural types:
         - specify that there must be push_str, accepting 'it' (elements of 'a') and u32
         - show error at call site, if there's no push_str for the given type
@@ -35,7 +35,7 @@ def[istr[.[a[# .]] str .[
     - requires iterative compilation
 
     def[
-        print[a[# .] .   print_str[istr[a]]
+        print[a[# .] . print_str[istr[a]]
         istr [a[# .] str .[
             var[buf u32 1024]
             var[dst u32 buf ]

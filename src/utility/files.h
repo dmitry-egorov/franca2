@@ -35,7 +35,7 @@ namespace files {
 
     string read_files_as_string(const arr_view<cstr>& paths, string separator, arena& arena) {
         var length = (size_t)0;
-        for (var i = 0u; i < paths.count; ++i) {
+        for_arr(paths) {
             tmp(f, fopen (paths[i], "rb"));
             if (f); else { printf("Failed to open file %s\n", paths[i]); continue; }
 
@@ -47,7 +47,7 @@ namespace files {
 
         var loaded_bytes = 0u;
         var buffer = arenas::alloc_g<char>(arena, length);
-        for (var i = 0u; i < paths.count; ++i) {
+        for_arr(paths) {
             tmp(f, fopen (paths[i], "rb"));
             if (f); else return {};
             loaded_bytes += fread(buffer.data + loaded_bytes, 1, length - loaded_bytes, f);

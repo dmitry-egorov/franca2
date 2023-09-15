@@ -122,7 +122,7 @@ namespace compute_asts {
         push(exports, wasm_export {.name = view("memory"), .kind = ek_mem, .obj_index = 0});
 
         var func_i = 0u;
-        for (var i = 0u; i < ctx.funcs.count; ++i) {
+        for_arr(ctx.funcs) {
             let func = ctx.funcs.data[i];
             if (!func.is_inline_wasm); else continue;
             defer { func_i += 1; };
@@ -132,10 +132,10 @@ namespace compute_asts {
                 .results = alloc_g<wasm_type>(ast.temp_arena, func.results.count),
             };
 
-            for (var pi = 0u; pi < func.params.count; pi += 1)
+            for_arr2(pi, func.params)
                 func_types[func_i].params[pi] = wasm_types_of(func.params.data[pi].value_type)[0]; // NOTE: multi-value not supported
 
-            for (var ri = 0u; ri < func.results.count; ri += 1)
+            for_arr2(ri, func.results)
                 func_types[func_i].results[ri] = wasm_types_of(func.results.data[ri])[0];
 
             if (func.imported) {
@@ -150,7 +150,7 @@ namespace compute_asts {
                 .body       = func.body_wasm.data,
             };
 
-            for (var li = 0u; li < func.locals.count; li += 1)
+            for_arr2(li, func.locals)
                 wasm_func.locals[li] = wasm_types_of(func.locals.data[li].value_type)[0];
 
             push(func_specs, wasm_func);
@@ -267,7 +267,7 @@ namespace compute_asts {
         void emit_scoped_chain(node* chain, context& ctx) {
             //TODO: maybe need to rethink this and gather definitions when creating a new scope?
             gather_defs(chain, ctx); // TODO: comptime here?
-            //type_check_chain (chain, ctx);
+            //analyze_chain (chain, ctx);
 
             for_chain(chain)
                 emit_node(*it, ctx);
@@ -449,7 +449,8 @@ namespace compute_asts {
 
                 let params = func.params.data;
                 var arg_node_p = args_node_p;
-                for (var i = 0u; i < params.count; ++i, arg_node_p = arg_node_p->next) {
+                for_arr(params) {
+                    defer { arg_node_p = arg_node_p->next; };
                     ref arg_node = *arg_node_p;
                     let param = params[i];
                     if (param.kind == vk_param_ref) {

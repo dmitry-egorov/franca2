@@ -471,7 +471,7 @@ namespace wasm_emit {
 
     void emit(wasm_opcode op, arr_view<wasm_type> types, stream& dst) {
         emit(op, dst);
-        for (var i = (size_t)0; i < types.count; ++i)
+        for_arr(types)
             emit(types[i], dst);
     }
 
@@ -515,9 +515,8 @@ namespace wasm_emit {
 
     void emit_type_list(const arr_view<wasm_type>& types, stream& dst) {
         emit(types.count, dst);
-        for (var i = (size_t)0; i < types.count; ++i) {
+        for_arr(types)
             emit(types[i], dst);
-        }
     }
 
     void emit(const string& data, stream& dst) {
@@ -556,7 +555,7 @@ namespace wasm_emit {
         using_emitter emitter;
 
         emit(types.count, section); // num types
-        for (var i = (size_t)0; i < types.count; ++i) {
+        for_arr(types) {
             let type = types[i];
             emit_func_sig(type.params, type.results, section);
         }
@@ -575,7 +574,7 @@ namespace wasm_emit {
         using_emitter emitter;
 
         emit(func_imports.count, section); // num func_imports
-        for (var i = (size_t)0; i < func_imports.count; ++i) {
+        for_arr(func_imports) {
             let import = func_imports[i];
             emit_func_import(import.module, import.name, import.type_index, section);
         }
@@ -587,7 +586,7 @@ namespace wasm_emit {
         using_emitter emitter;
 
         emit(funcs.count, section); // num funcs_specs
-        for (var i = (size_t)0; i < funcs.count; ++i) {
+        for_arr(funcs) {
             let func = funcs[i];
             emit(func.type_index, section);
         }
@@ -615,7 +614,7 @@ namespace wasm_emit {
 
         emit(exports.count, section);
 
-        for (var i = (size_t)0; i < exports.count; ++i) {
+        for_arr(exports) {
             let export_ = exports[i];
             emit(export_.name, section);
             emit((u8)export_.kind , section); // export kind
@@ -628,7 +627,7 @@ namespace wasm_emit {
     void emit_code_section(const arr_view<wasm_func>& funcs, wasm_emitter& emitter) {
         using_emitter emitter;
         emit(funcs.count, section); // num funcs_specs
-        for (var i = (size_t)0; i < funcs.count; ++i) {
+        for_arr(funcs) {
             let func = funcs[i];
             let locals = func.locals;
             let body_wasm = func.body;
@@ -636,7 +635,7 @@ namespace wasm_emit {
             //TODO: wrong if locals size is > 127!!!
             emit(body_wasm.count + 2 + 2 * locals.count, section); // size of the section
             emit(locals.count, section); // num locals
-            for (var local_i = 0u; local_i < locals.count; ++local_i) {
+            for_arr2(local_i, locals) {
                 let local = locals[local_i];
                 //TODO: group locals
                 emit(1, section); // local type count
@@ -655,7 +654,7 @@ namespace wasm_emit {
 
         var offset = 0u;
 
-        for (var i = (size_t)0; i < datas.count; ++i) {
+        for_arr(datas) {
             let data = datas[i];
 
             emit((u8)0x00    , section); // segment flags

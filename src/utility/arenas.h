@@ -29,10 +29,10 @@ namespace arenas {
     inline size_t bytes_left (const arena&, uint align = sizeof(size_t));
 
     tt arr_view<t> free_space_of(arena&, uint align = sizeof(size_t));
-    inline void*     alloc_g(arena&, size_t size_bytes, uint align = sizeof(size_t));
+    inline void*   alloc_g(arena&, size_t size_bytes, uint align = sizeof(size_t));
     tt arr_view<t> alloc_g(arena&, size_t count, uint align = sizeof(size_t));
 
-    inline void*     alloc(arena&, size_t size_bytes, uint align = sizeof(size_t));
+    inline void*   alloc(arena&, size_t size_bytes, uint align = sizeof(size_t));
     tt arr_view<t> alloc(arena&, size_t count, uint align = sizeof(size_t));
     tt arr_view<t> alloc(arena& arena, init_list<t> list, uint align = sizeof(size_t));
 

@@ -1,8 +1,8 @@
 //print_str["Hello, world!"]
 
-var [dst u32 1024]
+var[dst u32 1024]
 
-var [x u32 123]
+var[x u32 123]
 push_str["x = "dst]
 push_str[x dst]
 

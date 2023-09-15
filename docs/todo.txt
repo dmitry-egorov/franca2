@@ -78,6 +78,7 @@
 - [ ] wasm jit?
 
 done
+- [+] analysis pipeline
 - [+] +=, -=, *=, /=, %= ...
 - [+] multiple wasm types per semantic type
 - [+] handle return in macro scope!

@@ -15,6 +15,8 @@
 #include "utility/transforms.h"
 #include "utility/arrays.h"
 #include "utility/arenas.h"
+#include "utility/arr_dyns.h"
+#include "utility/arr_bucks.h"
 
 #include "utility/wgpu_ex.h"
 #include "utility/wgpu_png.h"
@@ -173,7 +175,7 @@ static bool init() {
     parse_files(source_files.data, ast);
     printf("\nAST:\n");
     print_ast(ast);
-    printf("AST parsed. Nodes: %zu. Total memory used: %zu, delta: %zu\n", ast.nodes.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+    printf("AST parsed. Nodes: %zu. Total memory used: %zu, delta: %zu\n", count_of(ast.nodes), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     arr_view<u8> old_wasm = {};
     arr_view<u8> wasm = {};
@@ -195,7 +197,7 @@ static bool init() {
         let compile_start = std::chrono::high_resolution_clock::now();
         printf("\nAnalyzing...\n");
         analyze(ast);
-        printf("Analyzing in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+        printf("Analyzed in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
         let generate_start = std::chrono::high_resolution_clock::now();
         printf("\nGenerating WASM...\n");

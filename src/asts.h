@@ -7,9 +7,11 @@
 #include "utility/results.h"
 #include "utility/maths2.h"
 #include "utility/arrays.h"
+#include "utility/arr_bucks.h"
 #include "utility/strings.h"
 #include "utility/arenas.h"
 #include "utility/iterators.h"
+#include "utility/swap_queuess.h"
 #include "utility/files.h"
 #include "asts.h"
 #include "utility/wasm_emit.h"
@@ -18,6 +20,7 @@ namespace compute_asts {
     using namespace arenas;
     using namespace arrays;
     using namespace strings;
+    using namespace swap_queuess;
     using namespace code_views;
 
     enum class type_t {
@@ -74,11 +77,12 @@ namespace compute_asts {
     struct ast {
         node* root;
 
-        array<node > nodes;
-        array<macro> macros;
-        array<scope> scopes;
+        arr_buck<node > nodes;
+        arr_buck<macro> macros;
+        arr_buck<scope> scopes;
+        arr_buck<fn   > fns;
 
-        arr_dyn<fn> fns;
+        swap_queues<node*> pipeline;
 
         arena& data_arena;
         arena& temp_arena;
@@ -115,6 +119,9 @@ namespace compute_asts {
         node* next;
 
         string file_path;
+
+        //// semantics
+        bool queued;
 
         scope* parent_scope;
 
@@ -155,7 +162,7 @@ namespace compute_asts {
                 macro* refed_macro;
             };
             struct {
-                arr_ref<fn> refed_fn;
+                fn* refed_fn;
             };
             struct { // sk_local_get & sk_local_ref
                 local* refed_local;
@@ -179,9 +186,9 @@ namespace compute_asts {
 
 //---- old ----
     struct variable {
-        string    id;
-        uint      index;
-        node*     code_node;
+        string id;
+        uint   index;
+        node*  code_node;
         type_t value_type;
 
         enum struct kind_t {
@@ -314,15 +321,16 @@ namespace compute_asts {
 
     ast make_ast(arena& data_arena, arena& temp_arena = gta) {
         return {
-        .nodes  = alloc_array<node >(data_arena, 2048),
-        .macros = alloc_array<macro>(data_arena, 1024),
-        .scopes = alloc_array<scope>(data_arena, 1024),
+            .nodes  = make_arr_buck<node >(1024, data_arena),
+            .macros = make_arr_buck<macro>(1024, data_arena),
+            .scopes = make_arr_buck<scope>(1024, data_arena),
+            .fns    = make_arr_buck<fn   >(1024, data_arena),
 
-        .fns = make_arr_dyn<fn>(32, data_arena),
-
-        .data_arena = data_arena,
-        .temp_arena = temp_arena
-    };}
+            .pipeline = make_swap_queue<node*>(temp_arena),
+            .data_arena = data_arena,
+            .temp_arena = temp_arena
+        };
+    }
 
     inline auto is_func         (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_subtree; }
     inline auto is_int_literal  (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.can_be_int && !node.is_string; }
@@ -349,29 +357,29 @@ namespace compute_asts {
     inline bool value_is(const node& node,  int value) { return is_int_literal(node)  && node. int_value == value; }
     inline bool value_is(const node& node, uint value) { return is_uint_literal(node) && node.uint_value == value; }
 
-    inline node& make_node(ast& ast, const node& node) { return push(ast.nodes, node); }
+    inline node& make_node(ast& ast, const node& node) { return push(node, ast.nodes); }
 
     inline scope& make_scope(macro& parent_macro, scope* parent_scope, node* body_nodes, ast& ast) {
-        return push(ast.scopes, scope {
+        return push(scope {
             .parent_macro = &parent_macro,
             .body_chain   = body_nodes,
             .locals = make_arr_dyn<local*>(16, ast.data_arena),
             .macros = make_arr_dyn<macro*>( 4, ast.data_arena),
             .parent = parent_scope,
-        });
+        }, ast.scopes);
     }
 
     macro& add_macro(string id, scope* parent_scope, node* body_chain, ast& ast) {
-        ref macro = push(ast.macros, compute_asts::macro {
+        ref macro = push(compute_asts::macro {
             .id           = id,
             .locals       = make_arr_dyn<local    >(16, ast.data_arena),
             .parent_scope = parent_scope,
-        });
+        }, ast.macros);
 
         macro.body_scope = &make_scope(macro, nullptr, body_chain, ast);
 
         if_ref(scope, parent_scope) push(scope.macros, &macro);
-        if_ref(node , body_chain ) node.parent_scope = parent_scope;
+        if_ref(node , body_chain  ) node.parent_scope = parent_scope;
 
         return macro;
     }
@@ -404,10 +412,10 @@ namespace compute_asts {
     }
 
     fn& add_fn(macro& macro, bool exported, ast& ast) {
-        let index   = ast.fns.count;
+        let index   = count_of(ast.fns);
         let params  = params_of(macro);
 
-        ref fn = push(ast.fns, {
+        ref fn = push({
             .id            = macro.id,
             .index         = index,
             .params        = make_arr_dyn<type_t>(params .count, ast.data_arena),
@@ -418,25 +426,26 @@ namespace compute_asts {
             .macro         = &macro,
             .body_wasm     = make_stream(32, ast.data_arena),
             .exported      = exported,
-        });
+        }, ast.fns);
 
-        for (var i = 0u; i < params.count; ++i)
+        for_arr(params)
             push(fn.params, params[i].value_type);
 
         return fn;
     }
 
     fn& add_import(string module_id, string id, arr_view<type_t> params, type_t result_type, ast& ast) {
-        ref fn = push(ast.fns, compute_asts::fn {
+        let index = count_of(ast.fns);
+        ref fn = push(compute_asts::fn {
             .id      = id,
-            .index   = ast.fns.count,
+            .index   = index,
             .params  = make_arr_dyn<type_t>(params .count, ast.data_arena),
             .result_type = result_type,
             .kind = fn::kind_t::fk_imported,
             .import_module = module_id,
-        });
+        }, ast.fns);
 
-        push(fn.params , params);
+        push(fn.params, params);
 
         return fn;
     }
@@ -445,17 +454,15 @@ namespace compute_asts {
         return add_import(view(module_id), view(id), view(params), result_type, ast);
     }
 
-    arr_ref<fn> find_fn_ptr(string id, arr_view<type_t> param_types, ast& ast) {
-        let fns = ast.fns.data;
-        for (var i = 0u; i < fns.count; i += 1) {
-            ref fn = ast.fns.data[i];
+    fn* find_fn(string id, arr_view<type_t> param_types, ast& ast) {
+        for_arr_buck_begin(ast.fns, fn, fn_i) {
             if (fn.id == id); else continue;
 
             let params = fn.params.data;
             if (params.count == param_types.count); else continue;
 
             var found = true;
-            for (var prm_i = 0u; prm_i < param_types.count; ++prm_i)
+            for_arr2(prm_i, param_types)
                 if (params[prm_i] != param_types[prm_i]) {
                     found = false;
                     break;
@@ -463,14 +470,10 @@ namespace compute_asts {
 
             if (found); else continue;
 
-            return {i};
-        }
+            return &fn;
+        } for_arr_buck_end
 
-        return {(size_t)-1};
-    }
-
-    fn* find_fn(string id, arr_view<type_t> param_types, ast& ast) {
-        return ptr(find_fn_ptr(id, param_types, ast), ast.fns);
+        return nullptr;
     }
 
     macro* find_macro(string id, arr_view<type_t> param_types, scope& scope) {
@@ -490,7 +493,7 @@ namespace compute_asts {
                 if (params.count == param_types.count); else continue;
 
                 var found = true;
-                for (var prm_i = 0u; prm_i < param_types.count; ++prm_i)
+                for_arr2(prm_i, param_types)
                     if (params[prm_i].value_type != param_types[prm_i]) {
                         found = false;
                         break;
@@ -574,7 +577,7 @@ namespace compute_asts {
         static let wasm_types_arr = alloc(gta, {vt_void, vt_i32, vt_i64, vt_f32, vt_f64, /* str */ vt_i32, vt_i32});
 
         switch (type) {
-            case t_void: return void_as_empty ? sub(wasm_types_arr, 0, 0) : sub(wasm_types_arr, 0, 1);
+            case t_void: return sub(wasm_types_arr, 0, void_as_empty ? 0 : 1);
             case t_i8 :
             case t_i16:
             case t_i32:

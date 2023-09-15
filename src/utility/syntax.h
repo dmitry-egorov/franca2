@@ -31,6 +31,8 @@ public:
 #define defer_release(name) defer { release(name); }
 #define defer_release2(name0, name1) defer { release(name1); release(name0); }
 
+#define line_var(prefix) stx_concat(prefix, __LINE__)
+
 #define var auto
 #define let const auto
 #define def constexpr

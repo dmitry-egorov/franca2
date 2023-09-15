@@ -39,7 +39,6 @@ tt4 struct ret4 {
 #define ret3_fail {{}, {}, {}, false}
 #define ret4_fail {{}, {}, {}, false}
 
-#define line_var(prefix) stx_concat(prefix, __LINE__)
 #define line_res line_var(res_)
 #define line_ok  line_var(ok_)
 #define var1(name0, initializer) var [name0, line_ok] = (initializer)

@@ -7,6 +7,7 @@
 #include "utility/arrays.h"
 #include "utility/arenas.h"
 #include "utility/arr_dyns.h"
+#include "utility/arr_bucks.h"
 #include "utility/hex_ex.h"
 #include "utility/wasm_emit.h"
 
@@ -31,7 +32,7 @@ namespace compute_asts {
             macro* macro;
             uint block_depth;
 
-            arr_ref<macro_context> parent_ctx;
+            macro_context* parent_ctx;
             arr_dyn<binding> bindings;
         };
 
@@ -39,8 +40,8 @@ namespace compute_asts {
             ast& ast;
             fn*  curr_fn;
 
-            arr_ref<macro_context> curr_macro_ctx;
-            arr_dyn<macro_context> macro_ctx_stack;
+            macro_context* curr_macro_ctx;
+            arr_buck<macro_context> macro_ctxs;
 
             stream data;
         };
@@ -51,15 +52,15 @@ namespace compute_asts {
 
         auto  begin_macro_ctx(macro&, context&) -> void;
         auto    end_macro_ctx(context&) -> void;
-        #define tmp_macro_ctx(macro, ctx) \
+
+        #define tmp_new_macro_ctx(macro, ctx) \
             begin_macro_ctx(macro, ctx); \
             defer { end_macro_ctx(ctx); }
+
         #define tmp_switch_macro_ctx(ptr, ctx) \
             let line_var(return_ctx_) = ctx.curr_macro_ctx; \
             ctx.curr_macro_ctx = ptr; \
             defer { ctx.curr_macro_ctx = line_var(return_ctx_); }
-
-        auto curr_macro_ctx(context&) -> macro_context*;
 
         void bind_fn_params(context&);
         void bind(uint fn_index, context&);
@@ -70,9 +71,9 @@ namespace compute_asts {
 
         uint add_data(string text, context&);
 
-        auto find_binding (uint macro_index, context&) -> binding;
-        auto find_local_offset(uint local_index_in_macro, context&) -> uint;
-        auto find_local_index (uint local_index_in_macro, context&) -> uint;
+        auto find_binding     (uint index_in_macro, context&) -> binding;
+        auto find_local_offset(uint index_in_macro, context&) -> uint;
+        auto find_local_index (uint index_in_macro, context&) -> uint;
 
         void emit_local_set(uint offset, type_t, stream&);
         void emit_local_get(uint offset, type_t, stream&);
@@ -89,22 +90,21 @@ namespace compute_asts {
         ref temp_arena = ast.temp_arena;
 
         var ctx = codegen::context {
-            .ast  = ast,
-            .curr_macro_ctx = {(uint)-1},
-            .macro_ctx_stack = make_arr_dyn<macro_context>(32, temp_arena),
-            .data = make_stream(1024, temp_arena),
+            .ast        = ast,
+            .macro_ctxs = make_arr_buck<macro_context>(1024, temp_arena),
+            .data       = make_stream(1024, temp_arena),
         };
 
         ref fns = ast.fns;
-        for(var i = 0u; i < count_of(fns); ++i) {
-            ref fn = fns[i];
+
+        for_arr_buck_begin(fns, fn, __fn_i) {
             emit(fn, ctx);
             if (fn.id == view("main")) {
                 ref body = fn.body_wasm;
                 emit(op_i32_const, 0u, body);
                 emit(op_return       , body);
             }
-        }
+        } for_arr_buck_end
 
         // emit wasm
         var emitter = make_emitter(temp_arena);
@@ -116,36 +116,34 @@ namespace compute_asts {
 
         push(exports, wasm_export {.name = view("memory"), .kind = ek_mem, .obj_index = 0});
 
-        for (var i = 0u; i < count_of(fns); ++i) {
-            ref fn = fns[i];
-            let params  = fn.params .data;
-
+        for_arr_buck_begin(fns, fn, fn_i) {
             var w_params  = make_arr_dyn<wasm_type>(4, temp_arena);
             var w_results = make_arr_dyn<wasm_type>(4, temp_arena);
 
-            for (var pi = 0u; pi < params.count; pi += 1)
+            let params = fn.params.data;
+            for_arr2(pi, params)
                 push(w_params, wasm_types_of(params[pi]));
 
             push(w_results, wasm_types_of(fn.result_type));
 
-            func_types[i] = { // TODO: distinct
+            func_types[fn_i] = { // TODO: distinct
                 .params  = w_params .data,
                 .results = w_results.data,
             };
 
             if (fn.kind == fk_imported) {
-                push(imports, {.module = fn.import_module, .name = fn.id, .type_index = i});
+                push(imports, {.module = fn.import_module, .name = fn.id, .type_index = fn_i});
                 continue;
             }
 
             let locals = fn.local_types.data;
 
             var w_locals = make_arr_dyn<wasm_type>(16, temp_arena);
-            for (var li = 0u; li < locals.count; li += 1)
+            for_arr2(li, locals)
                 push(w_locals, wasm_types_of(locals[li]));
 
             var wasm_func = wasm_emit::wasm_func {
-                .type_index = i,
+                .type_index = fn_i,
                 .locals     = w_locals.data,
                 .body       = fn.body_wasm.data,
             };
@@ -154,7 +152,7 @@ namespace compute_asts {
 
             if (fn.exported)
                 push(exports, wasm_export {.name = fn.id, .kind = ek_func, .obj_index = fn.index});
-        }
+        } for_arr_buck_end
 
         var mem = wasm_memory {1,1};
 
@@ -190,7 +188,7 @@ namespace compute_asts {
             ctx.curr_fn = &fn;
 
             if_ref(macro, fn.macro); else { dbg_fail_return; }
-            tmp_macro_ctx(macro, ctx);
+            tmp_new_macro_ctx(macro, ctx);
             bind_fn_params(ctx);
 
             let body_ptr = macro.body_scope;
@@ -207,8 +205,8 @@ namespace compute_asts {
             using enum local::kind_t;
             using enum node::sem_kind_t;
 
-            if_ref(fn       , ctx.curr_fn        ); else { node_error(node); return; }
-            if_ref(macro_ctx, curr_macro_ctx(ctx)); else { node_error(node); return; }
+            if_ref(fn       , ctx.curr_fn       ); else { node_error(node); return; }
+            if_ref(macro_ctx, ctx.curr_macro_ctx); else { node_error(node); return; }
             ref wasm = fn.body_wasm;
 
             if (node.sem_kind == sk_macro_decl) { return; }
@@ -301,7 +299,7 @@ namespace compute_asts {
 
                 let block_depth = macro_ctx.block_depth;
                 tmp_switch_macro_ctx(macro_ctx.parent_ctx, ctx);
-                if_ref(new_macro_ctx, curr_macro_ctx(ctx)); else { node_error(node); return; }
+                if_ref(new_macro_ctx, ctx.curr_macro_ctx); else { node_error(node); return; }
                 new_macro_ctx.block_depth += block_depth; defer { new_macro_ctx.block_depth -= block_depth; };
 
                 emit(code, ctx);
@@ -347,7 +345,9 @@ namespace compute_asts {
                 let params = params_of(refed_macro);
                 var buffer = alloc<binding>(ctx.ast.temp_arena, params.count);
                 var arg_node_p = node.first_child;
-                for (var i = 0u; i < params.count; ++i, arg_node_p = arg_node_p->next) {
+                for_arr(params) {
+                    defer { arg_node_p = arg_node_p->next; };
+
                     let param = params[i];
                     if_ref(arg_node, arg_node_p); else { dbg_fail_return; }
 
@@ -366,9 +366,9 @@ namespace compute_asts {
                     if (arg_node.sem_kind != sk_local_get && param.kind == lk_value) {
                         emit(arg_node, ctx);
                         let type = arg_node.value_type;
-                        let fn_index = add_fn_local(type, ctx);
-                        buffer[i] = {.index_in_fn = fn_index};
-                        emit_local_set(fn.local_offsets[fn_index], type, wasm);
+                        let index_in_fn = add_fn_local(type, ctx);
+                        buffer[i] = {.index_in_fn = index_in_fn};
+                        emit_local_set(fn.local_offsets[index_in_fn], type, wasm);
                         continue;
                     }
 
@@ -376,7 +376,7 @@ namespace compute_asts {
                     dbg_fail_return;
                 }
 
-                tmp_macro_ctx(refed_macro, ctx);
+                tmp_new_macro_ctx(refed_macro, ctx);
                 bind(buffer, ctx);
                 if (refed_macro.has_returns) emit(op_block, wasm_types_of(refed_macro.result_type, false), wasm);
                 defer { if (refed_macro.has_returns) emit(op_end, wasm); };
@@ -386,10 +386,8 @@ namespace compute_asts {
             }
 
             if (node.sem_kind == sk_fn_call) {
-                if_ref(refed_fn, ptr(node.refed_fn, ctx.ast.fns)); else { node_error(node); return; }
-                for_chain(node.first_child)
-                    emit(*it, ctx);
-
+                if_ref(refed_fn, node.refed_fn); else { node_error(node); return; }
+                emit_chain(node.first_child, ctx);
                 emit(op_call, refed_fn.index, wasm);
                 return;
             }
@@ -404,18 +402,16 @@ namespace compute_asts {
         }
 
         void begin_macro_ctx(macro& macro, context& ctx) {
-            push(ctx.macro_ctx_stack, {.macro = &macro, .parent_ctx = ctx.curr_macro_ctx, .bindings = make_arr_dyn<binding>(4, ctx.ast.temp_arena)});
-            ctx.curr_macro_ctx = last_ref_of(ctx.macro_ctx_stack);
+            ctx.curr_macro_ctx = &push({
+                .macro = &macro,
+                .parent_ctx = ctx.curr_macro_ctx,
+                .bindings = make_arr_dyn<binding>(4, ctx.ast.temp_arena)
+            }, ctx.macro_ctxs);
         }
 
         void end_macro_ctx(context & ctx) {
-            let scope = pop(ctx.macro_ctx_stack);
-            ctx.curr_macro_ctx = scope.parent_ctx;
-        }
-
-        auto curr_macro_ctx(context& ctx) -> macro_context* {
-            if (ctx.curr_macro_ctx.offset != (size_t)-1); else { dbg_fail_return nullptr; }
-            return ptr(ctx.curr_macro_ctx, ctx.macro_ctx_stack);
+            if_ref(curr_ctx, ctx.curr_macro_ctx) ; else { dbg_fail_return; }
+            ctx.curr_macro_ctx = curr_ctx.parent_ctx;
         }
 
         void bind_fn_params(context& ctx) {
@@ -443,34 +439,34 @@ namespace compute_asts {
 
         void bind(uint fn_index, context& ctx) {
             assert(   fn_index != (uint)-1);
-            if_ref(macro_ctx, curr_macro_ctx(ctx)); else { dbg_fail_return; }
+            if_ref(macro_ctx, ctx.curr_macro_ctx); else { dbg_fail_return; }
             push(macro_ctx.bindings, {.index_in_fn = fn_index});
         }
 
         void bind(arr_view<binding> bindings, context& ctx) {
-            if_ref(scope, curr_macro_ctx(ctx)); else { dbg_fail_return; }
+            if_ref(scope, ctx.curr_macro_ctx); else { dbg_fail_return; }
             push(scope.bindings, bindings);
         }
 
-        auto find_local_index (uint local_index_in_macro, context& ctx) -> uint {
-            return find_binding(local_index_in_macro, ctx).index_in_fn;
+        auto find_local_index(uint index_in_macro, context& ctx) -> uint {
+            return find_binding(index_in_macro, ctx).index_in_fn;
         }
 
-        uint find_local_offset(uint local_index_in_macro, context& ctx) {
+        uint find_local_offset(uint index_in_macro, context& ctx) {
             if_ref(fn, ctx.curr_fn); else { dbg_fail_return -1; }
-            return fn.local_offsets[find_local_index(local_index_in_macro, ctx)];
+            return fn.local_offsets[find_local_index(index_in_macro, ctx)];
         }
 
-        binding find_binding(uint macro_index, context& ctx) {
-            if_ref(scope, curr_macro_ctx(ctx)); else { dbg_fail_return {}; }
+        binding find_binding(uint index_in_macro, context& ctx) {
+            if_ref(scope, ctx.curr_macro_ctx); else { dbg_fail_return {}; }
             let bindings = scope.bindings.data;
-            if (macro_index < bindings.count); else {
-                printf("Failed to find binding for macro local %u\n", macro_index);
+            if (index_in_macro < bindings.count); else {
+                printf("Failed to find binding for macro local %u\n", index_in_macro);
                 print_macro_contexts(ctx);
                 dbg_fail_return {};
             }
 
-            return bindings[macro_index];
+            return bindings[index_in_macro];
         }
 
         void emit_local_set(uint offset, type_t type, stream& dst) {
@@ -493,22 +489,15 @@ namespace compute_asts {
         void print_macro_contexts(context& ctx) {
             if_ref(fn, ctx.curr_fn); else { dbg_fail_return; }
 
-            let scopes = ctx.macro_ctx_stack.data;
-            for (var i = 0u; i < scopes.count; i += 1) {
-                ref scope    = scopes[i];
-                if_ref(macro, scope.macro); else { dbg_fail_return; }
-                let bindings = scopes[i].bindings.data;
+            for_arr_buck_begin(ctx.macro_ctxs, macro_ctx, macro_ctx_i) {
+                if_ref(macro, macro_ctx.macro); else { dbg_fail_return; }
+                let bindings = macro_ctx.bindings.data;
                 printf("Macro expansion scope ");
-                if (i == ctx.curr_macro_ctx.offset) printf("*"); else printf(" ");
+                if (&macro_ctx == ctx.curr_macro_ctx) printf("*"); else printf(" ");
 
-                printf("%u", i);
-                if (scope.parent_ctx.offset != (size_t)-1)
-                    printf("[%zu]", scope.parent_ctx.offset);
-                else
-                    printf("[-]");
+                printf("%zu", macro_ctx_i);
                 printf(". %.*s: [%u] ", (int)macro.id.count, macro.id.data, (uint)bindings.count);
-                for (var j = 0u; j < bindings.count; j += 1) {
-
+                for_arr2(j, bindings) {
                     if (j < count_of(macro.locals)) {
                         let local_id = macro.locals[j].id;
                         printf("%.*s", (int)local_id.count, local_id.data);
@@ -531,12 +520,12 @@ namespace compute_asts {
                     if (j != bindings.count - 1) printf(", ");
                 }
                 printf("\n");
-            }
+            } for_arr_buck_end
         }
     }
 }
 
-#undef tmp_macro_ctx
+#undef tmp_new_macro_ctx
 
 #pragma clang diagnostic pop
 

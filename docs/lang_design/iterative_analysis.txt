@@ -1,0 +1,2 @@
+- definitions are visible at the same scope or lower (not higher)
+    - therefore we can process definitions top down, and not enter a scope to find them

@@ -2911,7 +2911,7 @@ static void stbi__idct_simd(stbi_uc *out, int out_stride, short wasm_data[64])
 #endif // STBI_NEON
 
 #define STBI__MARKER_none  0xff
-// if there's a pending marker from the entropy stream, return that
+// if there's a queued marker from the entropy stream, return that
 // otherwise, fetch from the stream and get a marker. if there's no
 // marker, return 0xff, which is never a valid marker value
 static stbi_uc stbi__get_marker(stbi__jpeg *j)
