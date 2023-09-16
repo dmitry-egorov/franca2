@@ -122,7 +122,7 @@ EM_JS(int, run_wasm, (u8* ptr, size_t size), {
 });
 
 static bool init() {
-    using namespace compute_asts;
+    using namespace asts;
     using namespace std::chrono;
 
     gta_init(8 * 1024 * 1024); // 16 MB of global temp storage
@@ -185,7 +185,6 @@ static bool init() {
         printf("\n(WASM) Compiling...\n");
         old_wasm = compile(ast);
         printf("(WASM) Compiled in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - old_compile_start).count(), old_wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
-        let view_start = std::chrono::high_resolution_clock::now();
 
         let old_view_gen_start = std::chrono::high_resolution_clock::now();
         printf("\nGenerating code view...\n");
@@ -203,7 +202,6 @@ static bool init() {
         printf("\nGenerating WASM...\n");
         wasm = emit_wasm(ast);
         printf("Generated in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - generate_start).count(), wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
-
     }
 
 

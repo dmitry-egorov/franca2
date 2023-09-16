@@ -37,6 +37,7 @@ public:
 #define let const auto
 #define def constexpr
 #define ref auto&
+#define cref const auto&
 #define ptr_line line_var(ptr_)
 #define if_ref(name, init) let ptr_line = init; ref name = *(ptr_line); if (ptr_line)
 

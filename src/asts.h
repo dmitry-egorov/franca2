@@ -1,5 +1,5 @@
-#ifndef FRANCA2_COMPUTE_AST_H
-#define FRANCA2_COMPUTE_AST_H
+#ifndef FRANCA2_ASTS_H
+#define FRANCA2_ASTS_H
 
 #include <cstring>
 #include "utility/syntax.h"
@@ -16,7 +16,7 @@
 #include "asts.h"
 #include "utility/wasm_emit.h"
 
-namespace compute_asts {
+namespace asts {
     using namespace arenas;
     using namespace arrays;
     using namespace strings;
@@ -115,13 +115,16 @@ namespace compute_asts {
 
         node* parent;
         node* first_child;
-        node*  last_child;
         node* next;
 
         string file_path;
 
         //// semantics
-        bool queued;
+        enum struct stage_t {
+            ns_pending = 0,
+            ns_queued,
+            ns_analyzed
+        } stage;
 
         scope* parent_scope;
 
@@ -134,7 +137,7 @@ namespace compute_asts {
             sk_wasm_op,
             sk_local_decl,
             sk_macro_decl,
-            sk_macro_invoke,
+            sk_macro_expand,
             sk_fn_call,
             sk_local_get,
             sk_local_ref,
@@ -148,7 +151,7 @@ namespace compute_asts {
             struct { // sk_wasm_op
                 wasm_emit::wasm_opcode wasm_op;
             };
-            struct { // sk_wasm_op
+            struct { // sk_wasm_type
                 wasm_emit::wasm_type wasm_type;
             };
             struct { // sk_local_decl
@@ -158,22 +161,19 @@ namespace compute_asts {
             struct { // sk_macro_decl
                 arr_dyn<macro*> decled_macros;
             };
-            struct { // sk_macro_invoke
-                macro* refed_macro;
+            struct { // sk_macro_expand
+                macro* refed_macro; // TODO: can depend on the expansion
             };
-            struct {
-                fn* refed_fn;
+            struct { // sk_fn_call
+                fn* refed_fn; // TODO: can depend on the expansion
             };
             struct { // sk_local_get & sk_local_ref
                 local* refed_local;
             };
-            struct { // sk_ret
-                node* value_node;
-            };
-            struct {
+            struct { // sk_chr
                 u8 chr_value;
             };
-            struct {
+            struct { // sk_sub_of
                 u32   sub_index;
                 node* sub_of_node;
             };
@@ -223,13 +223,11 @@ namespace compute_asts {
 
     struct scope {
         macro* parent_macro;
-        node*    body_chain;
+        node*  chain;
         arr_dyn<local*> locals;
         arr_dyn<macro*> macros;
 
         scope* parent;
-        scope* next;
-        scope* first_child;
     };
 
     struct local {
@@ -288,6 +286,22 @@ namespace compute_asts {
 
         scope* parent_scope;
         scope*   body_scope;
+    };
+
+    struct binding {
+        union {
+            node* code;
+            uint index_in_fn;
+        };
+    };
+
+
+    struct exp {
+        arr_dyn<binding> bindings;
+
+        exp* parent;
+        exp* first_child;
+        exp* next;
     };
 
 #define for_chain(first_node) for (var it = first_node; it; it = it->next)
@@ -357,12 +371,12 @@ namespace compute_asts {
     inline bool value_is(const node& node,  int value) { return is_int_literal(node)  && node. int_value == value; }
     inline bool value_is(const node& node, uint value) { return is_uint_literal(node) && node.uint_value == value; }
 
-    inline node& make_node(ast& ast, const node& node) { return push(node, ast.nodes); }
+    inline node& add_node(ast& ast, const node& node) { return push(node, ast.nodes); }
 
-    inline scope& make_scope(macro& parent_macro, scope* parent_scope, node* body_nodes, ast& ast) {
+    inline scope& add_scope(macro& parent_macro, scope* parent_scope, node* body_nodes, ast& ast) {
         return push(scope {
             .parent_macro = &parent_macro,
-            .body_chain   = body_nodes,
+            .chain   = body_nodes,
             .locals = make_arr_dyn<local*>(16, ast.data_arena),
             .macros = make_arr_dyn<macro*>( 4, ast.data_arena),
             .parent = parent_scope,
@@ -370,13 +384,13 @@ namespace compute_asts {
     }
 
     macro& add_macro(string id, scope* parent_scope, node* body_chain, ast& ast) {
-        ref macro = push(compute_asts::macro {
+        ref macro = push(asts::macro {
             .id           = id,
             .locals       = make_arr_dyn<local    >(16, ast.data_arena),
             .parent_scope = parent_scope,
         }, ast.macros);
 
-        macro.body_scope = &make_scope(macro, nullptr, body_chain, ast);
+        macro.body_scope = &add_scope(macro, nullptr, body_chain, ast);
 
         if_ref(scope, parent_scope) push(scope.macros, &macro);
         if_ref(node , body_chain  ) node.parent_scope = parent_scope;
@@ -389,9 +403,10 @@ namespace compute_asts {
     }
 
     local& add_local(string id, local::kind_t kind, type_t type, scope& scope) {
-        ref macro = *scope.parent_macro;
+        if_ref(macro, scope.parent_macro); else { assert(false); }
+
         var index = macro.locals.count;
-        ref local = push(scope.parent_macro->locals, compute_asts::local {
+        ref local = push(macro.locals, asts::local {
             .id = id,
             .index_in_macro = index,
             .kind = kind,
@@ -436,7 +451,7 @@ namespace compute_asts {
 
     fn& add_import(string module_id, string id, arr_view<type_t> params, type_t result_type, ast& ast) {
         let index = count_of(ast.fns);
-        ref fn = push(compute_asts::fn {
+        ref fn = push(asts::fn {
             .id      = id,
             .index   = index,
             .params  = make_arr_dyn<type_t>(params .count, ast.data_arena),
@@ -511,8 +526,8 @@ namespace compute_asts {
     local* find_local(string id, scope& scope) {
         for(var scope_p = &scope; scope_p; scope_p = scope_p->parent) {
             var locals = scope_p->locals.data;
-            for(var i = 0u; i < locals.count; i++) {
-                ref v = *locals[i];
+            for_arr(locals) {
+                if_ref(v, locals[i]); else { dbg_fail_return nullptr; }
                 if (v.id == id) return &v;
             }
         }
@@ -523,7 +538,7 @@ namespace compute_asts {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wnull-dereference"
     inline ret2<node&, node&> deref2(node* n) {
-        using namespace compute_asts;
+        using namespace asts;
         static let fail = ret2<node&, node&>{*((node*) nullptr), *((node*) nullptr), false};
         if_ref(node0, n         ); else return fail;
         if_ref(node1, node0.next); else return fail;
@@ -531,7 +546,7 @@ namespace compute_asts {
     }
 
     inline ret3<node&, node&, node&> deref3(node* n) {
-        using namespace compute_asts;
+        using namespace asts;
         static let fail = ret3<node&, node&, node&>{*((node*) nullptr), *((node*) nullptr), *((node*) nullptr), false};
         if_ref(node0, n         ); else return fail;
         if_ref(node1, node0.next); else return fail;
@@ -540,7 +555,7 @@ namespace compute_asts {
     }
 
     inline ret4<node&, node&, node&, node&> deref4(node* n) {
-        using namespace compute_asts;
+        using namespace asts;
         static let fail = ret4<node&, node&, node&, node&>{*((node*) nullptr), *((node*) nullptr), *((node*) nullptr), *((node*) nullptr), false};
         if_ref(node0, n         ); else return fail;
         if_ref(node1, node0.next); else return fail;
@@ -605,4 +620,4 @@ namespace compute_asts {
     }
 }
 
-#endif //FRANCA2_COMPUTE_AST_H
+#endif //FRANCA2_ASTS_H

@@ -2,8 +2,8 @@
 #pragma ide diagnostic ignored "misc-no-recursion"
 #pragma clang diagnostic ignored "-Wunused-variable"
 
-#ifndef FRANCA2_COMPUTE_VIEW_GEN_H
-#define FRANCA2_COMPUTE_VIEW_GEN_H
+#ifndef FRANCA2_VIEW_GEN_H
+#define FRANCA2_VIEW_GEN_H
 
 #include <cstring>
 #include "utility/syntax.h"
@@ -19,13 +19,13 @@
 #include "asts.h"
 #include "asts_storage.h"
 
-namespace compute_asts {
+namespace asts {
 
     inline void display(ast &ast, code_view_iterator &it, arena& arena = gta);
 
     namespace displaying {
         using namespace iterators;
-        using namespace compute_asts;
+        using namespace asts;
         using namespace code_views;
         using enum palette_color;
         using enum inlay_type;
@@ -503,5 +503,5 @@ namespace compute_asts {
     }
 }
 
-#endif //FRANCA2_COMPUTE_VIEW_GEN_H
+#endif //FRANCA2_VIEW_GEN_H
 #pragma clang diagnostic pop

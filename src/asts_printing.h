@@ -1,13 +1,13 @@
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "misc-no-recursion"
 
-#ifndef FRANCA2_COMPUTE_DEBUG_H
-#define FRANCA2_COMPUTE_DEBUG_H
+#ifndef FRANCA2_ASTS_PRINTING_H
+#define FRANCA2_ASTS_PRINTING_H
 
 #include "strings.h"
 #include "asts.h"
 
-namespace compute_asts {
+namespace asts {
     inline void print_ast (const ast& ast);
     inline void print_node(const node& node);
 
@@ -53,6 +53,6 @@ namespace compute_asts {
     }
 }
 
-#endif //FRANCA2_COMPUTE_DEBUG_H
+#endif //FRANCA2_ASTS_PRINTING_H
 
 #pragma clang diagnostic pop

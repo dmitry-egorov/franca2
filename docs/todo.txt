@@ -1,3 +1,5 @@
+- [+] reimplement scopes
+- [ ] move macro expansion and binding into analysis
 - [ ] implement print
     - [+] use name[mode type] syntax for parameters
     - [+] def takes a list of definitions

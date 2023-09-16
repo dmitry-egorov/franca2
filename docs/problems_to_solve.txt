@@ -2,3 +2,24 @@
     - disallow different order
     - that means no need for a separate list of arguments
     - what about several alternative displays for the same function?
+
+
+- due to overloading, we have to analyze node parameters before the node itself,
+    - what if the node needs to treat parameters differently?
+    - solutions
+        - disallow overloading (unique node ids), then we just wait for the node to resolve, before analyzing its children
+        - disallow treating parameters differently, analyze depth-first always
+            - we have a problem with 'def' node, since we must analyze the body in a different scope
+                - we can make block a builtin, and wire its scope to the macro later
+        - don't allow overloading for both regular macro, and a macro, that changes meaning,
+            - wait for the first overload, and only then analyze the children
+    - maybe disallow overloading, but allow generics?
+
+- implementing varargs
+    - we need either overloading or generics to implement print (with varargs), so that we can select the proper push method
+
+
+- extensible core functions
+    - simple generic are hard to extend with new functionality
+        foo[.[t[# type] a[# t] .[...]]]
+    - overloading is extensible to a degree (at least can control the internals with types)

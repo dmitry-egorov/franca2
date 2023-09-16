@@ -13,7 +13,7 @@
 
 #include "asts.h"
 
-namespace compute_asts {
+namespace asts {
     arr_view<u8> emit_wasm(ast &);
 
     namespace codegen {
@@ -21,27 +21,26 @@ namespace compute_asts {
         using enum type_t;
         using enum binary_op;
 
-        struct macro_context;
-
-        struct binding {
+        struct param_binding {
             uint index_in_fn;
             node* code;
         };
 
-        struct macro_context {
+        struct macro_expansion {
             macro* macro;
-            uint block_depth;
+            arr_dyn<param_binding> bindings;
 
-            macro_context* parent_ctx;
-            arr_dyn<binding> bindings;
+            uint block_depth; // dynamic for now
+
+            macro_expansion* parent;
         };
 
         struct context {
             ast& ast;
             fn*  curr_fn;
 
-            macro_context* curr_macro_ctx;
-            arr_buck<macro_context> macro_ctxs;
+            macro_expansion* curr_exp;
+            arr_buck<macro_expansion> exps;
 
             stream data;
         };
@@ -50,28 +49,28 @@ namespace compute_asts {
         void emit_chain(node*, context&);
         void emit      (node&, context&);
 
-        auto  begin_macro_ctx(macro&, context&) -> void;
-        auto    end_macro_ctx(context&) -> void;
+        auto  begin_expansion(macro&, context&) -> void;
+        auto    end_expansion(context &) -> void;
 
-        #define tmp_new_macro_ctx(macro, ctx) \
-            begin_macro_ctx(macro, ctx); \
-            defer { end_macro_ctx(ctx); }
+        #define tmp_new_exp(macro, ctx) \
+            begin_expansion(macro, ctx); \
+            defer { end_expansion(ctx); }
 
-        #define tmp_switch_macro_ctx(ptr, ctx) \
-            let line_var(return_ctx_) = ctx.curr_macro_ctx; \
-            ctx.curr_macro_ctx = ptr; \
-            defer { ctx.curr_macro_ctx = line_var(return_ctx_); }
+        #define tmp_switch_exp_ctx(ptr, ctx) \
+            let line_var(return_exp_) = ctx.curr_exp; \
+            ctx.curr_exp = ptr; \
+            defer { ctx.curr_exp = line_var(return_exp_); }
 
         void bind_fn_params(context&);
         void bind(uint fn_index, context&);
-        void bind(arr_view<binding>, context&);
+        void bind(arr_view<param_binding>, context&);
 
         uint add_fn_local(type_t, context&);
         uint add_fn_local(local&, context&);
 
         uint add_data(string text, context&);
 
-        auto find_binding     (uint index_in_macro, context&) -> binding;
+        auto find_binding     (uint index_in_macro, context&) -> param_binding;
         auto find_local_offset(uint index_in_macro, context&) -> uint;
         auto find_local_index (uint index_in_macro, context&) -> uint;
 
@@ -89,9 +88,9 @@ namespace compute_asts {
 
         ref temp_arena = ast.temp_arena;
 
-        var ctx = codegen::context {
+        var ctx = context {
             .ast        = ast,
-            .macro_ctxs = make_arr_buck<macro_context>(1024, temp_arena),
+            .exps = make_arr_buck<macro_expansion>(1024, temp_arena),
             .data       = make_stream(1024, temp_arena),
         };
 
@@ -188,12 +187,12 @@ namespace compute_asts {
             ctx.curr_fn = &fn;
 
             if_ref(macro, fn.macro); else { dbg_fail_return; }
-            tmp_new_macro_ctx(macro, ctx);
+            tmp_new_exp(macro, ctx);
             bind_fn_params(ctx);
 
             let body_ptr = macro.body_scope;
             if_ref(body , body_ptr); else { dbg_fail_return; }
-            emit_chain(body.body_chain, ctx);
+            emit_chain(body.chain, ctx);
         }
 
         void emit_chain(node* chain, context& ctx) {
@@ -205,8 +204,8 @@ namespace compute_asts {
             using enum local::kind_t;
             using enum node::sem_kind_t;
 
-            if_ref(fn       , ctx.curr_fn       ); else { node_error(node); return; }
-            if_ref(macro_ctx, ctx.curr_macro_ctx); else { node_error(node); return; }
+            if_ref(fn , ctx.curr_fn ); else { node_error(node); return; }
+            if_ref(exp, ctx.curr_exp); else { node_error(node); return; }
             ref wasm = fn.body_wasm;
 
             if (node.sem_kind == sk_macro_decl) { return; }
@@ -218,10 +217,10 @@ namespace compute_asts {
             }
 
             if (node.sem_kind == sk_ret) {
-                if_ref(value_node, node.value_node)
+                if_ref(value_node, node.first_child)
                     emit(value_node, ctx);
 
-                emit(op_br, macro_ctx.block_depth, wasm);
+                emit(op_br, exp.block_depth, wasm);
                 return;
             }
 
@@ -255,8 +254,8 @@ namespace compute_asts {
             if (node.sem_kind == sk_wasm_op) {
                 emit(node.wasm_op, wasm);
 
-                if (node.wasm_op == op_block || node.wasm_op == op_loop || node.wasm_op == op_if) macro_ctx.block_depth += 1;
-                if (node.wasm_op == op_end) macro_ctx.block_depth -= 1;
+                if (node.wasm_op == op_block || node.wasm_op == op_loop || node.wasm_op == op_if) exp.block_depth += 1;
+                if (node.wasm_op == op_end) exp.block_depth -= 1;
 
                 for_chain(node.first_child) {
                     ref arg = *it;
@@ -297,10 +296,10 @@ namespace compute_asts {
                 let binding = find_binding(l.index_in_macro, ctx);
                 if_ref (code, binding.code); else { node_error(node); return; }
 
-                let block_depth = macro_ctx.block_depth;
-                tmp_switch_macro_ctx(macro_ctx.parent_ctx, ctx);
-                if_ref(new_macro_ctx, ctx.curr_macro_ctx); else { node_error(node); return; }
-                new_macro_ctx.block_depth += block_depth; defer { new_macro_ctx.block_depth -= block_depth; };
+                let block_depth = exp.block_depth;
+                tmp_switch_exp_ctx(exp.parent, ctx);
+                if_ref(new_exp, ctx.curr_exp); else { node_error(node); return; }
+                new_exp.block_depth += block_depth; defer { new_exp.block_depth -= block_depth; };
 
                 emit(code, ctx);
                 return;
@@ -338,12 +337,12 @@ namespace compute_asts {
                 return;
             }
 
-            if (node.sem_kind == sk_macro_invoke) {
+            if (node.sem_kind == sk_macro_expand) {
                 // bind arguments and embed the function
 
                 if_ref(refed_macro, node.refed_macro); else { node_error(node); return; }
                 let params = params_of(refed_macro);
-                var buffer = alloc<binding>(ctx.ast.temp_arena, params.count);
+                var buffer = alloc<param_binding>(ctx.ast.temp_arena, params.count);
                 var arg_node_p = node.first_child;
                 for_arr(params) {
                     defer { arg_node_p = arg_node_p->next; };
@@ -376,12 +375,13 @@ namespace compute_asts {
                     dbg_fail_return;
                 }
 
-                tmp_new_macro_ctx(refed_macro, ctx);
+                tmp_new_exp(refed_macro, ctx);
                 bind(buffer, ctx);
                 if (refed_macro.has_returns) emit(op_block, wasm_types_of(refed_macro.result_type, false), wasm);
                 defer { if (refed_macro.has_returns) emit(op_end, wasm); };
 
-                emit_chain(refed_macro.body_scope->body_chain, ctx);
+                if_ref(body_scope, refed_macro.body_scope); else { node_error(node); return; }
+                emit_chain(body_scope.chain, ctx);
                 return;
             }
 
@@ -401,17 +401,17 @@ namespace compute_asts {
             return offset;
         }
 
-        void begin_macro_ctx(macro& macro, context& ctx) {
-            ctx.curr_macro_ctx = &push({
+        void begin_expansion(macro & macro, context& ctx) {
+            ctx.curr_exp = &push({
                 .macro = &macro,
-                .parent_ctx = ctx.curr_macro_ctx,
-                .bindings = make_arr_dyn<binding>(4, ctx.ast.temp_arena)
-            }, ctx.macro_ctxs);
+                .bindings = make_arr_dyn<param_binding>(4, ctx.ast.temp_arena),
+                .parent = ctx.curr_exp,
+            }, ctx.exps);
         }
 
-        void end_macro_ctx(context & ctx) {
-            if_ref(curr_ctx, ctx.curr_macro_ctx) ; else { dbg_fail_return; }
-            ctx.curr_macro_ctx = curr_ctx.parent_ctx;
+        void end_expansion(context & ctx) {
+            if_ref(curr_ctx, ctx.curr_exp) ; else { dbg_fail_return; }
+            ctx.curr_exp = curr_ctx.parent;
         }
 
         void bind_fn_params(context& ctx) {
@@ -439,12 +439,12 @@ namespace compute_asts {
 
         void bind(uint fn_index, context& ctx) {
             assert(   fn_index != (uint)-1);
-            if_ref(macro_ctx, ctx.curr_macro_ctx); else { dbg_fail_return; }
-            push(macro_ctx.bindings, {.index_in_fn = fn_index});
+            if_ref(exp, ctx.curr_exp); else { dbg_fail_return; }
+            push(exp.bindings, {.index_in_fn = fn_index});
         }
 
-        void bind(arr_view<binding> bindings, context& ctx) {
-            if_ref(scope, ctx.curr_macro_ctx); else { dbg_fail_return; }
+        void bind(arr_view<param_binding> bindings, context& ctx) {
+            if_ref(scope, ctx.curr_exp); else { dbg_fail_return; }
             push(scope.bindings, bindings);
         }
 
@@ -457,8 +457,8 @@ namespace compute_asts {
             return fn.local_offsets[find_local_index(index_in_macro, ctx)];
         }
 
-        binding find_binding(uint index_in_macro, context& ctx) {
-            if_ref(scope, ctx.curr_macro_ctx); else { dbg_fail_return {}; }
+        param_binding find_binding(uint index_in_macro, context& ctx) {
+            if_ref(scope, ctx.curr_exp); else { dbg_fail_return {}; }
             let bindings = scope.bindings.data;
             if (index_in_macro < bindings.count); else {
                 printf("Failed to find binding for macro local %u\n", index_in_macro);
@@ -487,15 +487,13 @@ namespace compute_asts {
         }
 
         void print_macro_contexts(context& ctx) {
-            if_ref(fn, ctx.curr_fn); else { dbg_fail_return; }
-
-            for_arr_buck_begin(ctx.macro_ctxs, macro_ctx, macro_ctx_i) {
-                if_ref(macro, macro_ctx.macro); else { dbg_fail_return; }
-                let bindings = macro_ctx.bindings.data;
+            for_arr_buck_begin(ctx.exps, exp, exp_i) {
+                if_ref(macro, exp.macro); else { dbg_fail_return; }
+                let bindings = exp.bindings.data;
                 printf("Macro expansion scope ");
-                if (&macro_ctx == ctx.curr_macro_ctx) printf("*"); else printf(" ");
+                if (&exp == ctx.curr_exp) printf("*"); else printf(" ");
 
-                printf("%zu", macro_ctx_i);
+                printf("%zu", exp_i);
                 printf(". %.*s: [%u] ", (int)macro.id.count, macro.id.data, (uint)bindings.count);
                 for_arr2(j, bindings) {
                     if (j < count_of(macro.locals)) {
@@ -525,7 +523,8 @@ namespace compute_asts {
     }
 }
 
-#undef tmp_new_macro_ctx
+#undef tmp_new_exp
+#undef tmp_switch_exp_ctx
 
 #pragma clang diagnostic pop
 

@@ -1,8 +1,8 @@
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "misc-no-recursion"
 
-#ifndef FRANCA2_COMPUTE_COMPILATION_H
-#define FRANCA2_COMPUTE_COMPILATION_H
+#ifndef FRANCA2_COMPILATION_H
+#define FRANCA2_COMPILATION_H
 #include "utility/arrays.h"
 #include "utility/arenas.h"
 #include "utility/arr_dyns.h"
@@ -11,7 +11,7 @@
 
 #include "asts.h"
 
-namespace compute_asts {
+namespace asts {
     arr_view<u8> compile(const ast&);
 
     namespace compilation {
@@ -698,7 +698,7 @@ namespace compute_asts {
             for (var prm_i = 0u; prm_i < params.count; ++prm_i)
                 push(prms, {.id = view(""), .index = prm_i, .value_type = params[prm_i], .kind = variable::kind_t::vk_param_value});
 
-            ref func  = push(ctx.funcs, compute_asts::func {
+            ref func  = push(ctx.funcs, asts::func {
                 .id      = id,
                 .index   = index,
                 .params  = { .data = prms.data, .capacity = params.count, .arena = &ctx.arena },
@@ -915,6 +915,6 @@ namespace compute_asts {
     }
 }
 
-#endif //FRANCA2_COMPUTE_COMPILATION_H
+#endif //FRANCA2_COMPILATION_H
 
 #pragma clang diagnostic pop

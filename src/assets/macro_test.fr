@@ -1,39 +1,41 @@
-//print_str["Hello, world!"]
-
-var[dst u32 1024]
-
-var[x u32 123]
-push_str["x = "dst]
-push_str[x dst]
-
-print_str[1024 -[dst 1024]]
-
 ret[-[fib_at[40] fib_at[30]]]
 
 ////////////////////////////////////////
+// print_str["Hello, world!"]
+
+// var[dst u32 1024]
+//
+// var[x u32 123]
+// push_str["x = "dst]
+// push_str[x dst]
+//
+// print_str[1024 -[dst 1024]]
+
 // print[.["x = " x]]
+
+// def[print[a[# .] . print_str[istr[a]]]]
+//
+// def[istr[a[# .] str .[
+//     var [buf u32 1024]
+//     var [dst u32 buf ]
+//     each[a push_str[it dst]]
+//     ret [make_str[buf -[dst buf]]]
+// ]]]
+
 // print["x = " x]
 
-def[print[a[# .] . print_str[istr[a]]]]
-
-def[istr[a[# .] str .[
-    var [buf u32 1024]
-    var [dst u32 buf ]
-    each[a push_str[it dst]]
-    ret [make_str[buf -[dst buf]]]
-]]]
-
-// def[print[## . print_str[istr[##]]]]
+// def[print[.[##] . print_str[istr[##]]]]
 //
-// def[istr[## str .[
+// def[istr[.[##] str .[
 //     var[buf u32 1024]
 //     var[dst u32 buf ]
-//     ## [push_str[it dst]]
+//     ## [push_str[  it dst]] // with overloading
+//     ## [push_str[t it dst]] // with generics
 //     ret[make_str[buf -[dst buf]]]
 // ]]]
 
 ////////////////////////////////////////
-def[fib_at[n[$ u32] u32 .[
+def[fib_at[.[n[$ u32]] u32 .[
     if[==[n 0] ret[0]]
     if[==[n 1] ret[1]]
 
@@ -90,7 +92,7 @@ def[
 
     floor[.[a[# f32]] f32 .[a op_f32_nearest]]
 
-    ()[a[# u32] u32 a]
+    ()[.[a[# u32]] u32 a]
 
     + [.[a[# u32] b[# u32]] u32 .[a b op_i32_add  ]]
     - [.[a[# u32] b[# u32]] u32 .[a b op_i32_sub  ]]
@@ -105,7 +107,7 @@ def[
     <=[.[a[# u32] b[# u32]] u32 .[a b op_i32_le_u]]
     >=[.[a[# u32] b[# u32]] u32 .[a b op_i32_ge_u]]
 
-    - [a[# u32] u32 .[0 a op_i32_sub]]
+    - [.[a[# u32]] u32 .[0 a op_i32_sub]]
 
     +=[.[a[& u32] b[# u32]] . =[a +[a b]]]
     -=[.[a[& u32] b[# u32]] . =[a -[a b]]]
@@ -126,11 +128,12 @@ def[
 // const[wasm.local.set u8 0x21]
 // ...
 
-// def[loop disp["loop "#[b u32]] . wasm[wasm.loop scope[b wasm.br 1] wasm.end]]
+// Need 'identifier' parameter kind
+// def[var[.[name[# id] type[# id] init_value[# u32] disp["var "name": "type" = "value] . .[=[local[name type] value]]]
 
-// separate display and signature, because some parameters can be in different order or even missing from view (e.g. type parameters)
-// def[+ ..[#[a u32] #[b u32]] u32 .[a" + "b] .[a b op_i32_add]]
+// No overloading
+// +_u32[.[a[# u32] b[# u32]] u32 .[a b op_i32_add]]
 
-//Need 'identifier' parameter kind
-// def[var disp["var "id[name]": "id[type]" = " #[value u32]] . .[=[local[name type] value]]]
+// Generics, no overloading
+// +[.[t[# type] a[# t] b[# t]] t .[a b op_map[+ t]]]
 

@@ -1,8 +1,8 @@
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "misc-no-recursion"
 
-#ifndef FRANCA2_COMPUTE_DEFINES_H
-#define FRANCA2_COMPUTE_DEFINES_H
+#ifndef FRANCA2_DEFINES_H
+#define FRANCA2_DEFINES_H
 
 #include <cstring>
 #include "utility/syntax.h"
@@ -16,7 +16,7 @@
 #include "code_views.h"
 #include "asts.h"
 
-namespace compute_asts {
+namespace asts {
     struct st_variable {
         string id;
         string display_name;
@@ -123,6 +123,6 @@ namespace compute_asts {
     }
 }
 
-#endif //FRANCA2_COMPUTE_DEFINES_H
+#endif //FRANCA2_DEFINES_H
 
 #pragma clang diagnostic pop

@@ -2,8 +2,8 @@
 #pragma ide diagnostic ignored "misc-no-recursion"
 #pragma clang diagnostic ignored "-Wunused-function"
 
-#ifndef FRANCA2_COMPUTE_PARSER_H
-#define FRANCA2_COMPUTE_PARSER_H
+#ifndef FRANCA2_ASTS_PARSING_H
+#define FRANCA2_ASTS_PARSING_H
 
 #include "utility/syntax.h"
 #include "utility/primitives.h"
@@ -15,7 +15,7 @@
 
 #include "asts.h"
 
-namespace compute_asts {
+namespace asts {
     static bool parse_file (cstr path, ast&);
     static void parse_files(arr_view<cstr> paths, ast&);
     static auto parse_code (string code, ast&) -> bool;
@@ -108,7 +108,7 @@ namespace compute_asts {
 
             // TODO: record line and column
             // TODO: a clean way to do that is to make a separate iterator
-            ref result = make_node(ast, node {
+            ref result = add_node(ast, node{
                 .text      = text,
                 .is_string = text_is_quoted,
                 .file_path = file_path
@@ -129,7 +129,6 @@ namespace compute_asts {
                 set_parent_to_chain(first_child, &result);
                 result.  lex_kind  = lk_subtree;
                 result.first_child = first_child;
-                result. last_child =  last_child;
                 result.infix  = next_text;
                 result.suffix = take_whitespaces_and_comments(it);
             }
@@ -179,6 +178,6 @@ namespace compute_asts {
         }
     }
 }
-#endif //FRANCA2_COMPUTE_PARSER_H
+#endif //FRANCA2_ASTS_PARSING_H
 
 #pragma clang diagnostic pop
