@@ -12,7 +12,6 @@ namespace asts {
     void analyze(ast&);
 
     namespace analysis {
-
         void analyze_chain(node*, scope&, ast&);
         void analyze      (node&, scope&, ast&);
         void gather_param (node&, macro&);
@@ -98,7 +97,7 @@ namespace asts {
                     for_chain2(prm_it, params_node.first_child)
                         gather_param(*prm_it, decl_macro);
 
-                    if_set1(decl_macro.result_type, primitive_type_by(results_node.text)); else decl_macro.result_type = t_void;
+                    if_set1(decl_macro.result_type, find_type(results_node.text)); else decl_macro.result_type = t_void;
 
                     push(node.decled_macros, &decl_macro);
 
@@ -112,7 +111,7 @@ namespace asts {
             if (node.text == ret_id) {
                 analyze_chain(node.first_child, scope, ast);
 
-                if_ref(macro, scope.parent_macro); else { dbg_fail_return; }
+                if_ref(macro, scope.macro); else { dbg_fail_return; }
                 macro.has_returns = true;
 
                 complete(node, sk_ret, t_void);
@@ -147,7 +146,7 @@ namespace asts {
             }
 
             if (node.text == list_id) {
-                if_ref(macro, scope.parent_macro); else { dbg_fail_return; }
+                if_ref(macro, scope.macro); else { dbg_fail_return; }
                 ref new_scope = add_scope(macro, &scope, node.first_child, ast);
                 analyze_chain(node.first_child, new_scope, ast);
                 complete(node, sk_block, t_void);
@@ -156,12 +155,11 @@ namespace asts {
 
             if (node.text == decl_local_id) {
                 if_chain2 (id_node, type_node, node.first_child)   ; else { dbg_fail_return; }
-                if_var1   (type, primitive_type_by(type_node.text)); else { dbg_fail_return; }
+                if_var1   (type, find_type(type_node.text)); else { dbg_fail_return; }
                 let init_node_p = type_node.next;
 
                 if_ref(init_node, init_node_p)
                     analyze(init_node, scope, ast); //TODO: check if types are compatible
-
 
                 ref local         = add_local(id_node.text, lk_value, type, scope);
                 node.decled_local = &local;
@@ -250,7 +248,7 @@ namespace asts {
             let is_code = prm_kind_node.text == code_id;
             if (is_ref || is_val || is_code); else { dbg_fail_return; }
 
-            if_var1(value_type, primitive_type_by(prm_type_node.text)); else value_type = t_void;
+            if_var1(value_type, find_type(prm_type_node.text)); else value_type = t_void;
 
             //TODO: support other kinds
             let kind = is_ref ? lk_ref : is_val ? lk_value : lk_code;

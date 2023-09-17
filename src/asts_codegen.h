@@ -75,8 +75,6 @@ namespace asts {
         auto find_local_index (uint index_in_macro, context&) -> uint;
 
         void emit_local_set(uint offset, type_t, stream&);
-        void emit_local_get(uint offset, type_t, stream&);
-        void emit_local_get(const local&, context&);
 
         void print_macro_contexts(context&);
     }
@@ -89,9 +87,9 @@ namespace asts {
         ref temp_arena = ast.temp_arena;
 
         var ctx = context {
-            .ast        = ast,
+            .ast  = ast,
             .exps = make_arr_buck<macro_expansion>(1024, temp_arena),
-            .data       = make_stream(1024, temp_arena),
+            .data = make_stream(1024, temp_arena),
         };
 
         ref fns = ast.fns;
@@ -278,14 +276,18 @@ namespace asts {
 
             if (node.sem_kind == sk_local_get) {
                 if_ref (l, node.refed_local); else { node_error(node); return; }
-                emit_local_get(l, ctx);
+                var offset = find_local_offset(l.index_in_macro, ctx);
+                let size = size_32_of(l.value_type);
+                for(var i = 0u; i < size; ++i)
+                    emit(op_local_get, offset + i, fn.body_wasm);
+
                 return;
             }
 
             if (node.sem_kind == sk_local_ref) {
                 if_ref (l, node.refed_local); else { node_error(node); return; }
 
-                //TODO: support multi-word locals
+                //TODO: support multi locals
                 var offset = find_local_offset(l.index_in_macro, ctx);
                 wasm_emit::emit(offset, wasm);
                 return;
@@ -471,19 +473,8 @@ namespace asts {
 
         void emit_local_set(uint offset, type_t type, stream& dst) {
             let size = size_32_of(type);
-            for(var i = 0u; i < size; ++i)
+            for_rng(0u, size)
                 emit(op_local_set, offset + (size - 1 - i), dst);
-        }
-
-        void emit_local_get(uint offset, type_t type, stream& dst) {
-            let size = size_32_of(type);
-            for(var i = 0u; i < size; ++i)
-                emit(op_local_get, offset + i, dst);
-        }
-
-        void emit_local_get(const local& l, context& ctx) {
-            if_ref(fn, ctx.curr_fn); else { dbg_fail_return; }
-            emit_local_get(find_local_offset(l.index_in_macro, ctx), l.value_type, fn.body_wasm);
         }
 
         void print_macro_contexts(context& ctx) {

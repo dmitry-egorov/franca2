@@ -1,0 +1,46 @@
+- I want ot be able to extend the behaviour of some lib function, e.g. print
+
+var[x[u32 42]]
+
+print["x = " x]
+def[
+    print[.[##] . print_str[istr[##]]]
+    istr [.[##] str .[
+        var[buf u32 1024]
+        var[dst u32 buf ]
+        ## [push_str[it dst]] // example with overloading
+        ret[make_str[buf -[dst buf]]]
+    ]]
+
+    push_str[.[a[# str] dst[# u32]] . .[...]]
+    push_str[.[a[# u32] dst[# u32]] . .[...]]
+    // etc
+]
+
+- the key thing here is for users of the function to provide an implementation for 'push_str'
+
+- overloading:
+    - provide a function definition, that takes the specific type as a parameter
+- generics
+    - the function takes any argument
+    - how specific implementations are provided?
+        push_str[.[t[# type] a[# str] dst[# u32]] . .[
+            if[==[t u32] .[...]]
+            if[==[t str] .[...]]
+        ]]
+    - how to extend this?
+        - make the function do a lookup?
+        push_str(#t: type, #a: t, #dst: u32) {
+            f :: lookup(#t, push_str);
+            f(a, dst);
+        }
+        - looks identical to overloading?
+    - maybe a template for a function and specify overloads explicitly?
+        push_str(#t: type, #a: str, #dst: u32);
+        push_str for u32 {...}
+
+
+- we can also rely on the context
+    print[.[## context[...]] . .[...]]
+
+    - an implicit parameter, lists all the overloads for the push_str function

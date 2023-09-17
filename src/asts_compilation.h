@@ -225,43 +225,19 @@ namespace asts {
                     if (is_in || is_ref || is_code); else continue;
                     if_chain2(prm_id_node, prm_type_node, prm_node.first_child); else { dbg_fail_return; }
 
-                    if_let1(type, primitive_type_by(prm_type_node.text)); else { dbg_fail_return; }
+                    if_let1(type, find_type(prm_type_node.text)); else { dbg_fail_return; }
                     using enum variable::kind_t;
                     var kind = is_in ? vk_param_value : is_ref ? vk_param_ref : vk_param_code;
                     add_param(prm_id_node.text, &prm_node, type, kind, func);
                     prm_node.value_type = type;
                 }
 
-                if_let1(res_type, primitive_type_by(type_node.text)); else { dbg_fail_return; }
+                if_let1(res_type, find_type(type_node.text)); else { dbg_fail_return; }
                 if (res_type != t_void)
                     add_result(res_type, func);
 
                 //TODO: recurse to allow for function definitions inside expressions
             }
-        }
-
-        void type_check(node*, context&) {
-            //TODO: implement
-            //
-            // using enum node::lex_kind_t;
-            // for (var node_p = chain; node_p; node_p = node_p->next) {
-            //     ref node = *node_p;
-            //     if (node.type == literal) {
-            //         if (node.is_string) { node.type = t_str; continue; }
-            //         node.type = pt_num_literal;
-            //         continue;
-            //     }
-            //
-            //     if (node.type == func) {
-            //
-            //     }
-            //     else {
-            //         //TODO: need to define locals
-            //         // For that, need to store scopes, because we will reuse them on the emit stage
-            //         if_ref(local, find_local(node.text, ctx)); else { error_local_not_found(node.text); return; }
-            //         node.type = local.type;
-            //     }
-            // }
         }
 
         void emit_scoped_chain(node* chain, context& ctx) {
@@ -359,7 +335,7 @@ namespace asts {
                     if_chain2(arg_node, type_node, args_node_p); else { dbg_fail_return; }
                     emit_node(arg_node, ctx);
                     var src_type = arg_node.value_type;
-                    if_let1(dst_type, primitive_type_by(type_node.text)); else { dbg_fail_return; }
+                    if_let1(dst_type, find_type(type_node.text)); else { dbg_fail_return; }
                     if (src_type == t_f32 && dst_type == t_u32)
                         emit(op_i32_trunc_f32_u, body);
                     if (src_type == t_f32 && dst_type == t_i32)
@@ -371,7 +347,7 @@ namespace asts {
 
                 if (node_id == decl_local_id) {
                     if_chain2(id_node, type_node, args_node_p); else { dbg_fail_return; }
-                    if_let1(type, primitive_type_by(type_node.text)); else { dbg_fail_return; }
+                    if_let1(type, find_type(type_node.text)); else { dbg_fail_return; }
                     ref local = add_local(id_node.text, type, ctx);
                     if_ref(init_node, type_node.next) {
                         emit_node(init_node, ctx);
@@ -538,7 +514,7 @@ namespace asts {
                 if (is_func(param_node, in_id)); else continue;
 
                 if_chain2(param_id_node, param_type_node, param_node.first_child); else { dbg_fail_return; }
-                if_let1(type, primitive_type_by(param_type_node.text)); else { dbg_fail_return; }
+                if_let1(type, find_type(param_type_node.text)); else { dbg_fail_return; }
                 push(ctx.locals_in_scope, {
                     .id    = param_id_node.text,
                     .index = param_index,
@@ -669,7 +645,7 @@ namespace asts {
                 if (f_params.count == params.count); else continue;
 
                 var found = true;
-                for (var prm_i = 0u; prm_i < params.count; ++prm_i)
+                for_arr2(prm_i, params)
                     if (f_params[prm_i].value_type != params[prm_i]) {
                         found = false;
                         break;
@@ -695,7 +671,7 @@ namespace asts {
         func& declare_import(string module_id, string id, arr_view<type_t> params, arr_view<type_t> results, context& ctx) {
             let index = ctx.funcs.count;
             var prms = make_arr_dyn<variable>(params.count, ctx.arena);
-            for (var prm_i = 0u; prm_i < params.count; ++prm_i)
+            for_arr2(prm_i, params)
                 push(prms, {.id = view(""), .index = prm_i, .value_type = params[prm_i], .kind = variable::kind_t::vk_param_value});
 
             ref func  = push(ctx.funcs, asts::func {

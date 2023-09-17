@@ -40,6 +40,7 @@ public:
 #define cref const auto&
 #define ptr_line line_var(ptr_)
 #define if_ref(name, init) let ptr_line = init; ref name = *(ptr_line); if (ptr_line)
+#define for_rng(start, end) for(var i = start; i < end; ++i)
 
 #define tmp(name, initializer) var name = (initializer); defer_release(name)
 

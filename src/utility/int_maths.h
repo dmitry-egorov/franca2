@@ -6,7 +6,7 @@
 
 inline uint pow(uint value, uint exponent) {
     var result = 1u;
-    for (var i = 0u; i < exponent; i++) result *= value;
+    for_rng(0u, exponent) result *= value;
     return result;
 }
 

@@ -222,10 +222,10 @@ namespace asts {
 //---- old end ----
 
     struct scope {
-        macro* parent_macro;
+        macro* macro;
         node*  chain;
         arr_dyn<local*> locals;
-        arr_dyn<macro*> macros;
+        arr_dyn<asts::macro*> macros;
 
         scope* parent;
     };
@@ -294,7 +294,6 @@ namespace asts {
             uint index_in_fn;
         };
     };
-
 
     struct exp {
         arr_dyn<binding> bindings;
@@ -375,7 +374,7 @@ namespace asts {
 
     inline scope& add_scope(macro& parent_macro, scope* parent_scope, node* body_nodes, ast& ast) {
         return push(scope {
-            .parent_macro = &parent_macro,
+            .macro = &parent_macro,
             .chain   = body_nodes,
             .locals = make_arr_dyn<local*>(16, ast.data_arena),
             .macros = make_arr_dyn<macro*>( 4, ast.data_arena),
@@ -403,7 +402,7 @@ namespace asts {
     }
 
     local& add_local(string id, local::kind_t kind, type_t type, scope& scope) {
-        if_ref(macro, scope.parent_macro); else { assert(false); }
+        if_ref(macro, scope.macro); else { assert(false); }
 
         var index = macro.locals.count;
         ref local = push(macro.locals, asts::local {
@@ -497,7 +496,7 @@ namespace asts {
             var macros = sc.macros.data;
             defer {
                 ref parent = sc.parent;
-                scope_p = parent ? parent : sc.parent_macro->parent_scope;
+                scope_p = parent ? parent : sc.macro->parent_scope;
             };
 
             for(var i = 0u; i < macros.count; i++) {
@@ -569,7 +568,7 @@ namespace asts {
     #define if_chain3(n0, n1, n2, first_node) if_var3(n0, n1, n2, deref3(first_node))
     #define if_chain4(n0, n1, n2, n3, first_node) if_var4(n0, n1, n2, n3, deref4(first_node))
 
-    ret1<type_t> primitive_type_by(string name) {
+    ret1<type_t> find_type(string name) {
         if (name == view("void")) return ret1_ok(t_void);
         if (name == view("i8"  )) return ret1_ok(t_i8  );
         if (name == view("i16" )) return ret1_ok(t_i16 );

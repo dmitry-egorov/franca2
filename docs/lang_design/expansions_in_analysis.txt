@@ -1,0 +1,21 @@
+- analysis generates expansion data in the asts
+
+- alternatively generate a whole new tree?
+    - probably required for the general case of arbitrary execution at compile time
+
+- the type relationships look like this:
+    expansion * -> 1 fn
+              * -> 1 parent expansion
+              * -> 1 node (within macro)
+
+    - we have an expansion for each macro invocation en another expansion
+
+    (1)+[(2)+[1 2] (3)+[2 3]]
+
+
+struct fn_exp {
+    fn: fn
+}
+
+- for macro invocation node, I need the refed macro for each expansion
+- it can also be fixed for all expansions?
