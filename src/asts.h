@@ -126,7 +126,7 @@ namespace asts {
             ns_analyzed
         } stage;
 
-        scope* parent_scope;
+        scope* scope;
 
         enum struct sem_kind_t {
             sk_unknown,
@@ -250,7 +250,7 @@ namespace asts {
         string id;
         uint index;
 
-        arr_dyn<type_t> params;
+        arr_dyn<type_t> param_types;
         type_t result_type;
 
         enum struct kind_t {
@@ -262,12 +262,13 @@ namespace asts {
 
         union {
             struct { // local and exported
-                arr_dyn<type_t> local_types  ;
-                arr_dyn<uint  > local_offsets;
                 macro* macro;
-                stream body_wasm;
-                uint next_local_offset;
+                arr_dyn<type_t> local_types;
                 bool   exported;
+
+                stream body_wasm;
+                arr_dyn<uint  > local_offsets;
+                uint next_local_offset;
             };
             struct { // imported
                 string import_module;
@@ -392,7 +393,7 @@ namespace asts {
         macro.body_scope = &add_scope(macro, nullptr, body_chain, ast);
 
         if_ref(scope, parent_scope) push(scope.macros, &macro);
-        if_ref(node , body_chain  ) node.parent_scope = parent_scope;
+        if_ref(node , body_chain  ) node.scope = parent_scope;
 
         return macro;
     }
@@ -432,7 +433,7 @@ namespace asts {
         ref fn = push({
             .id            = macro.id,
             .index         = index,
-            .params        = make_arr_dyn<type_t>(params .count, ast.data_arena),
+            .param_types   = make_arr_dyn<type_t>(params .count, ast.data_arena),
             .result_type   = macro.result_type,
             .kind          = fn::kind_t::fk_regular,
             .local_types   = make_arr_dyn<type_t>(8, ast.data_arena),
@@ -443,7 +444,7 @@ namespace asts {
         }, ast.fns);
 
         for_arr(params)
-            push(fn.params, params[i].value_type);
+            push(fn.param_types, params[i].value_type);
 
         return fn;
     }
@@ -453,13 +454,13 @@ namespace asts {
         ref fn = push(asts::fn {
             .id      = id,
             .index   = index,
-            .params  = make_arr_dyn<type_t>(params .count, ast.data_arena),
+            .param_types  = make_arr_dyn<type_t>(params .count, ast.data_arena),
             .result_type = result_type,
             .kind = fn::kind_t::fk_imported,
             .import_module = module_id,
         }, ast.fns);
 
-        push(fn.params, params);
+        push(fn.param_types, params);
 
         return fn;
     }
@@ -472,7 +473,7 @@ namespace asts {
         for_arr_buck_begin(ast.fns, fn, fn_i) {
             if (fn.id == id); else continue;
 
-            let params = fn.params.data;
+            let params = fn.param_types.data;
             if (params.count == param_types.count); else continue;
 
             var found = true;

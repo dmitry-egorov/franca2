@@ -33,8 +33,8 @@ namespace asts {
         add_fn(macro_main, true, ast);
 
         if_ref(root_scope, macro_main.body_scope); else { dbg_fail_return; }
-
         analyze_chain(root_scope.chain, root_scope, ast);
+
         while(true) {
             if_var1(node_p, try_pop(ast.pipeline)); else {
                 if (push_queue_is_empty(ast.pipeline))
@@ -52,8 +52,8 @@ namespace asts {
                 swap(ast.pipeline);
                 continue;
             }
-            if_ref (node , node_p); else { dbg_fail_return; }
-            if_ref (scope, node.parent_scope); else { dbg_fail_return; }
+            if_ref (node , node_p    ); else { dbg_fail_return; }
+            if_ref (scope, node.scope); else { dbg_fail_return; }
 
             node.stage = ns_pending;
             analyze(node, scope, ast);
@@ -77,12 +77,20 @@ namespace asts {
         void analyze(node& node, scope& scope, ast& ast) {
             if (node.stage == ns_pending); else return;
 
-            node.parent_scope = &scope;
+            node.scope = &scope;
 
             if (node.is_string   ) { complete(node, sk_lit, t_str); return; }
             if (node.can_be_uint ) { complete(node, sk_lit, t_u32); return; }
             if (node.can_be_int  ) { complete(node, sk_lit, t_i32); return; }
             if (node.can_be_float) { complete(node, sk_lit, t_f32); return; }
+
+            if (node.text == list_id) {
+                if_ref(macro, scope.macro); else { dbg_fail_return; }
+                ref new_scope = add_scope(macro, &scope, node.first_child, ast);
+                analyze_chain(node.first_child, new_scope, ast);
+                complete(node, sk_block, t_void);
+                return;
+            }
 
             if (node.text == def_id) {
                 node.decled_macros = make_arr_dyn<asts::macro*>(128, ast.data_arena);
@@ -92,7 +100,7 @@ namespace asts {
                     if_chain3(params_node, results_node, body_node, id_node.first_child); else { dbg_fail_return; }
 
                     let body_chain = body_node.text == list_id ? body_node.first_child : &body_node;
-                    ref decl_macro = add_macro(id_node.text, node.parent_scope, body_chain, ast);
+                    ref decl_macro = add_macro(id_node.text, node.scope, body_chain, ast);
 
                     for_chain2(prm_it, params_node.first_child)
                         gather_param(*prm_it, decl_macro);
@@ -142,14 +150,6 @@ namespace asts {
                 let sem_kind = refed_local.kind == lk_code ? sk_code_embed : sk_local_get;
                 node.refed_local = &refed_local;
                 complete(node, sem_kind, refed_local.value_type);
-                return;
-            }
-
-            if (node.text == list_id) {
-                if_ref(macro, scope.macro); else { dbg_fail_return; }
-                ref new_scope = add_scope(macro, &scope, node.first_child, ast);
-                analyze_chain(node.first_child, new_scope, ast);
-                complete(node, sk_block, t_void);
                 return;
             }
 

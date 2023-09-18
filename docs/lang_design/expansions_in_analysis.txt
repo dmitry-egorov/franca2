@@ -2,6 +2,7 @@
 
 - alternatively generate a whole new tree?
     - probably required for the general case of arbitrary execution at compile time
+    - but it's not very meaningful, since we need expansion data for each macro invocation (for display)
 
 - the type relationships look like this:
     expansion * -> 1 fn

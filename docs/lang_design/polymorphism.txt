@@ -36,11 +36,12 @@ def[
         }
         - looks identical to overloading?
     - maybe a template for a function and specify overloads explicitly?
-        push_str(#t: type, #a: str, #dst: u32);
-        push_str for u32 {...}
+        push_str<t: type>(#a: str, #dst: u32);
+        push_str<u32> {...}
 
 
 - we can also rely on the context
     print[.[## context[...]] . .[...]]
-
     - an implicit parameter, lists all the overloads for the push_str function
+    - looks cumbersome
+    - the entire program is the context

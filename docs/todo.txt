@@ -1,18 +1,10 @@
-- [ ] transition to separate analysis stage
-    - [ ] istr or just print
-
+- [ ] expansions at analysis stage
     - [ ] generate expansions at analysis stage
     - [ ] emit wasm from generated expansions
     - [ ] implement ##
-- [ ] always go depth first
-    - [ ] create a new scope for each block
-    - [ ] assign the block to macro, when we get to the 'def' node
-- [ ] move macro expansion and binding into analysis
-    - [ ] analysis generates expansions and corresponding data
 - [ ] implement print
     - [+] use name[mode type] syntax for parameters
     - [+] def takes a list of definitions
-    - [ ] type_t struct
     - [ ] code type
     - [ ] scope context instead of macro context?
     - [ ] varargs?
@@ -20,6 +12,7 @@
         - [ ] alternatively, type-check after generating a scope for the vararg
     - [ ] introduce variables into the passed block
     - [ ] multiple return values
+- [ ] type_t struct
 - [ ] last element of a block returns
 - [ ] emit a function and a call when needed
 - [ ] display new format

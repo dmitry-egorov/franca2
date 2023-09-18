@@ -1,25 +1,22 @@
+print_str["Hello, world!"]
+
+var[dst u32 1024]
+
+var[x u32 123]
+push_str["x = "dst]
+push_str[x dst]
+
+print_str[1024 -[dst 1024]]
+
 ret[-[fib_at[40] fib_at[30]]]
 
-////////////////////////////////////////
-// print_str["Hello, world!"]
-
-// var[dst u32 1024]
-//
-// var[x u32 123]
-// push_str["x = "dst]
-// push_str[x dst]
-//
-// print_str[1024 -[dst 1024]]
-
-
-// print["x = " x]
-
+// print["x = "x]
 // def[
 //     print[.[##] . print_str[istr[##]]]
 //     istr [.[##] str .[
 //         var[buf u32 1024]
 //         var[dst u32 buf ]
-//         ## [push_str[it dst]] // with overloading
+//         ## [push_str[arg dst]] // with overloading
 //         ret[make_str[buf -[dst buf]]]
 //     ]]
 // ]

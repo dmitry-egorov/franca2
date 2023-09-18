@@ -117,7 +117,7 @@ namespace asts {
             var w_params  = make_arr_dyn<wasm_type>(4, temp_arena);
             var w_results = make_arr_dyn<wasm_type>(4, temp_arena);
 
-            let params = fn.params.data;
+            let params = fn.param_types.data;
             for_arr2(pi, params)
                 push(w_params, wasm_types_of(params[pi]));
 
@@ -341,7 +341,6 @@ namespace asts {
 
             if (node.sem_kind == sk_macro_expand) {
                 // bind arguments and embed the function
-
                 if_ref(refed_macro, node.refed_macro); else { node_error(node); return; }
                 let params = params_of(refed_macro);
                 var buffer = alloc<param_binding>(ctx.ast.temp_arena, params.count);
@@ -418,7 +417,7 @@ namespace asts {
 
         void bind_fn_params(context& ctx) {
             if_ref(fn, ctx.curr_fn); else { dbg_fail_return; }
-            ref params = fn.params.data;
+            ref params = fn.param_types.data;
 
             for(var i = 0u; i < params.count; ++i)
                 bind(i, ctx);
