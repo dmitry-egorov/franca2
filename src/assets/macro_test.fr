@@ -138,3 +138,7 @@ def[
 // Generics
 //  as[.[a[# u32] t[# type]] t .[a]]
 
+// comptime?
+// const[x u32 +[1 2]]
+// const[y u32 +[x 1]]
+

@@ -128,7 +128,7 @@ namespace asts {
                 if(take(it, ']')); else { dbg_fail_return nullptr; } //TODO: free nodes?
                 set_parent_to_chain(first_child, &result);
                 result.  lex_kind  = lk_subtree;
-                result.first_child = first_child;
+                result.child_chain = first_child;
                 result.infix  = next_text;
                 result.suffix = take_whitespaces_and_comments(it);
             }

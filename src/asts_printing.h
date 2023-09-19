@@ -32,7 +32,7 @@ namespace asts {
 
         if (is_func(node)) {
             printf("[");
-            if_ref(child, node.first_child) {
+            if_ref(child, node.child_chain) {
                 printing::print_node_chain(&child);
             }
             printf("]");

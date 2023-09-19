@@ -25,6 +25,7 @@ namespace asts {
 
     enum class type_t {
         t_unknown,
+        t_any,
         t_invalid,
         t_void,
         t_i8 ,
@@ -70,17 +71,20 @@ namespace asts {
     struct macro;
     struct local;
     struct scope;
+    struct expansion;
 
     struct func ;
     struct variable;
 
+
     struct ast {
         node* root;
 
-        arr_buck<node > nodes;
-        arr_buck<macro> macros;
-        arr_buck<scope> scopes;
-        arr_buck<fn   > fns;
+        arr_buck<node     > nodes;
+        arr_buck<macro    > macros;
+        arr_buck<scope    > scopes;
+        arr_buck<fn       > fns;
+        arr_buck<expansion> expansions;
 
         swap_queues<node*> pipeline;
 
@@ -114,17 +118,21 @@ namespace asts {
         string suffix;
 
         node* parent;
-        node* first_child;
+        node* child_chain;
         node* next;
 
         string file_path;
 
         //// semantics
+        expansion* expansion;
+
         enum struct stage_t {
             ns_pending = 0,
-            ns_queued,
+            ns_scoped,
             ns_analyzed
         } stage;
+
+        bool queued;
 
         scope* scope;
 
@@ -184,7 +192,87 @@ namespace asts {
         };
     };
 
-//---- old ----
+    struct local {
+        string id;
+        uint index_in_macro;
+        uint offset;
+
+        enum struct kind_t {
+            lk_unknown  ,
+            lk_value    ,
+            lk_ref      ,
+            lk_code     ,
+            lk_enum_size,
+        } kind;
+
+        type_t value_type;
+    };
+
+    struct scope {
+        macro* macro;
+        node*  chain;
+        arr_dyn<local*> locals;
+        arr_dyn<asts::macro*> macros;
+
+        scope* parent;
+    };
+
+    struct macro {
+        string id;
+
+        uint   params_count;
+        type_t result_type;
+        arr_dyn<local> locals ; // includes parameters
+
+        bool has_returns;
+
+        scope* parent_scope;
+        scope*   body_scope;
+    };
+
+    struct fn {
+        string id;
+        uint index;
+
+        arr_dyn<type_t> param_types;
+        type_t result_type;
+
+        enum struct kind_t {
+            fk_unknown,
+            fk_imported,
+            fk_regular,
+            fk_enum_size,
+        } kind;
+
+        union {
+            struct { // local and exported
+                expansion* root_expansion;
+                arr_dyn<type_t> local_types;
+                bool exported;
+
+                stream body_wasm;
+                arr_dyn<uint> local_offsets;
+                uint next_local_offset;
+            };
+            struct { // imported
+                string import_module;
+            };
+        };
+    };
+
+    struct expansion {
+        fn   * fn;
+        macro* macro;
+
+        node* source_node;
+        node* generated_nodes;
+
+        expansion* parent;
+        expansion* child_chain;
+        expansion* next;
+    };
+
+//begin ---- old ----
     struct variable {
         string id;
         uint   index;
@@ -219,90 +307,7 @@ namespace asts {
 
         bool exported;
     };
-//---- old end ----
-
-    struct scope {
-        macro* macro;
-        node*  chain;
-        arr_dyn<local*> locals;
-        arr_dyn<asts::macro*> macros;
-
-        scope* parent;
-    };
-
-    struct local {
-        string id;
-        uint index_in_macro;
-        uint offset;
-
-        enum struct kind_t {
-            lk_unknown  ,
-            lk_value    ,
-            lk_ref      ,
-            lk_code     ,
-            lk_enum_size,
-        } kind;
-
-        type_t value_type;
-    };
-
-    struct fn {
-        string id;
-        uint index;
-
-        arr_dyn<type_t> param_types;
-        type_t result_type;
-
-        enum struct kind_t {
-            fk_unknown,
-            fk_imported,
-            fk_regular,
-            fk_enum_size,
-        } kind;
-
-        union {
-            struct { // local and exported
-                macro* macro;
-                arr_dyn<type_t> local_types;
-                bool   exported;
-
-                stream body_wasm;
-                arr_dyn<uint  > local_offsets;
-                uint next_local_offset;
-            };
-            struct { // imported
-                string import_module;
-            };
-        };
-    };
-
-    struct macro {
-        string id;
-
-        uint   params_count;
-        type_t result_type;
-        arr_dyn<local> locals ; // includes parameters
-
-        bool has_returns;
-
-        scope* parent_scope;
-        scope*   body_scope;
-    };
-
-    struct binding {
-        union {
-            node* code;
-            uint index_in_fn;
-        };
-    };
-
-    struct exp {
-        arr_dyn<binding> bindings;
-
-        exp* parent;
-        exp* first_child;
-        exp* next;
-    };
+//end ---- old ----
 
 #define for_chain(first_node) for (var it = first_node; it; it = it->next)
 #define for_chain2(it_name, first_node) for (var it_name = first_node; it_name; it_name = it_name->next)
@@ -332,13 +337,13 @@ namespace asts {
     static let      sub_of_id = view("sub_of");
     static let        each_id = view("each");
 
-
     ast make_ast(arena& data_arena, arena& temp_arena = gta) {
         return {
-            .nodes  = make_arr_buck<node >(1024, data_arena),
-            .macros = make_arr_buck<macro>(1024, data_arena),
-            .scopes = make_arr_buck<scope>(1024, data_arena),
-            .fns    = make_arr_buck<fn   >(1024, data_arena),
+            .nodes      = make_arr_buck<node     >(1024, data_arena),
+            .macros     = make_arr_buck<macro    >( 256, data_arena),
+            .scopes     = make_arr_buck<scope    >( 512, data_arena),
+            .fns        = make_arr_buck<fn       >(  64, data_arena),
+            .expansions = make_arr_buck<expansion>(1024, data_arena),
 
             .pipeline = make_swap_queue<node*>(temp_arena),
             .data_arena = data_arena,
@@ -426,6 +431,14 @@ namespace asts {
         return {macro.locals.data.data, macro.params_count };
     }
 
+    expansion& add_expansion(fn& fn, macro& macro, node* source_node, ast& ast) {
+        return push(expansion{
+            .fn = &fn,
+            .macro = &macro,
+            .source_node = source_node,
+        }, ast.expansions);
+    }
+
     fn& add_fn(macro& macro, bool exported, ast& ast) {
         let index   = count_of(ast.fns);
         let params  = params_of(macro);
@@ -438,13 +451,14 @@ namespace asts {
             .kind          = fn::kind_t::fk_regular,
             .local_types   = make_arr_dyn<type_t>(8, ast.data_arena),
             .local_offsets = make_arr_dyn<uint     >(8, ast.data_arena),
-            .macro         = &macro,
             .body_wasm     = make_stream(32, ast.data_arena),
             .exported      = exported,
         }, ast.fns);
 
         for_arr(params)
             push(fn.param_types, params[i].value_type);
+
+        fn.root_expansion = &add_expansion(fn, macro, nullptr, ast);
 
         return fn;
     }

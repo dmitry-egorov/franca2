@@ -27,12 +27,12 @@ namespace asts {
 
         add_import("env", "print_str", { t_str }, t_void, ast);
 
-        ref macro_main = add_macro("main", nullptr, ast.root, ast);
-        macro_main.result_type = t_u32;
+        ref main_macro = add_macro("main", nullptr, ast.root, ast);
+        main_macro.result_type = t_u32;
 
-        add_fn(macro_main, true, ast);
+        add_fn(main_macro, true, ast);
 
-        if_ref(root_scope, macro_main.body_scope); else { dbg_fail_return; }
+        if_ref(root_scope, main_macro.body_scope); else { dbg_fail_return; }
         analyze_chain(root_scope.chain, root_scope, ast);
 
         while(true) {
@@ -55,7 +55,7 @@ namespace asts {
             if_ref (node , node_p    ); else { dbg_fail_return; }
             if_ref (scope, node.scope); else { dbg_fail_return; }
 
-            node.stage = ns_pending;
+            node.queued = false;
             analyze(node, scope, ast);
         }
     }
@@ -75,9 +75,16 @@ namespace asts {
         }
 
         void analyze(node& node, scope& scope, ast& ast) {
-            if (node.stage == ns_pending); else return;
+            if (!node.queued); else return;
 
-            node.scope = &scope;
+            ref stage = node.stage;
+
+            if (stage == ns_pending){
+                node.scope = &scope;
+                node.stage = ns_scoped;
+            }
+
+            if (stage == ns_scoped); else return;
 
             if (node.is_string   ) { complete(node, sk_lit, t_str); return; }
             if (node.can_be_uint ) { complete(node, sk_lit, t_u32); return; }
@@ -86,8 +93,8 @@ namespace asts {
 
             if (node.text == list_id) {
                 if_ref(macro, scope.macro); else { dbg_fail_return; }
-                ref new_scope = add_scope(macro, &scope, node.first_child, ast);
-                analyze_chain(node.first_child, new_scope, ast);
+                ref new_scope = add_scope(macro, &scope, node.child_chain, ast);
+                analyze_chain(node.child_chain, new_scope, ast);
                 complete(node, sk_block, t_void);
                 return;
             }
@@ -95,14 +102,14 @@ namespace asts {
             if (node.text == def_id) {
                 node.decled_macros = make_arr_dyn<asts::macro*>(128, ast.data_arena);
 
-                for_chain(node.first_child) {
+                for_chain(node.child_chain) {
                     if_ref(id_node, it); else { dbg_fail_return; }
-                    if_chain3(params_node, results_node, body_node, id_node.first_child); else { dbg_fail_return; }
+                    if_chain3(params_node, results_node, body_node, id_node.child_chain); else { dbg_fail_return; }
 
-                    let body_chain = body_node.text == list_id ? body_node.first_child : &body_node;
+                    let body_chain = body_node.text == list_id ? body_node.child_chain : &body_node;
                     ref decl_macro = add_macro(id_node.text, node.scope, body_chain, ast);
 
-                    for_chain2(prm_it, params_node.first_child)
+                    for_chain2(prm_it, params_node.child_chain)
                         gather_param(*prm_it, decl_macro);
 
                     if_set1(decl_macro.result_type, find_type(results_node.text)); else decl_macro.result_type = t_void;
@@ -117,7 +124,7 @@ namespace asts {
             }
 
             if (node.text == ret_id) {
-                analyze_chain(node.first_child, scope, ast);
+                analyze_chain(node.child_chain, scope, ast);
 
                 if_ref(macro, scope.macro); else { dbg_fail_return; }
                 macro.has_returns = true;
@@ -133,9 +140,9 @@ namespace asts {
             }
 
             if_var1(wasm_op, find_op(node.text)) {
-                analyze_chain(node.first_child, scope, ast);
+                analyze_chain(node.child_chain, scope, ast);
 
-                for_chain(node.first_child) {
+                for_chain(node.child_chain) {
                     ref arg = *it;
                     if (arg.sem_kind == sk_lit && arg.value_type == t_u32); else { printf("Only u32 literals are supported as arguments for opcodes.\n"); node_error(arg); return; }
                     complete(arg, sk_lit, t_u32);
@@ -154,7 +161,7 @@ namespace asts {
             }
 
             if (node.text == decl_local_id) {
-                if_chain2 (id_node, type_node, node.first_child)   ; else { dbg_fail_return; }
+                if_chain2 (id_node, type_node, node.child_chain)   ; else { dbg_fail_return; }
                 if_var1   (type, find_type(type_node.text)); else { dbg_fail_return; }
                 let init_node_p = type_node.next;
 
@@ -169,7 +176,7 @@ namespace asts {
             }
 
             if (node.text == ref_id) {
-                if_ref(var_id, node.first_child); else { dbg_fail_return; }
+                if_ref(var_id, node.child_chain); else { dbg_fail_return; }
                 if_ref(local, find_local(var_id.text, scope)); else { dbg_fail_return; }
                 if (local.kind == lk_ref); else { printf("Only mutable variables can be referenced.\n"); node_error(node); return; }
                 node.refed_local = &local;
@@ -178,14 +185,14 @@ namespace asts {
             }
 
             if (node.text == chr_id) {
-                if_ref(value_node, node.first_child); else { dbg_fail_return; }
+                if_ref(value_node, node.child_chain); else { dbg_fail_return; }
                 node.chr_value = (u8)value_node.text[0];
                 complete(node, sk_chr, t_u32);  // TODO: t_u8
                 return;
             }
 
             if (node.text == sub_of_id) {
-                if_chain2(sub_of_index, sub_of_node, node.first_child); else { dbg_fail_return; }
+                if_chain2(sub_of_index, sub_of_node, node.child_chain); else { dbg_fail_return; }
                 if_var1  (idx, get_uint(sub_of_index)); else { dbg_fail_return; }
 
                 analyze(sub_of_node, scope, ast);
@@ -200,7 +207,7 @@ namespace asts {
             }
 
             if (node.text == each_id) {
-                if_chain2(list_node, body_node, node.first_child); else { dbg_fail_return; }
+                if_chain2(list_node, body_node, node.child_chain); else { dbg_fail_return; }
                 analyze(list_node, scope, ast);
 
                 if (list_node.sem_kind == sk_code_embed); else { printf("Only code vars can be used as arguments for 'each'.\n"); node_error(node); return; }
@@ -216,7 +223,7 @@ namespace asts {
             // macro invocation or function call
             {
                 var arg_types = make_arr_dyn<type_t>(4, ast.data_arena);
-                for_chain(node.first_child) {
+                for_chain(node.child_chain) {
                     ref arg = *it;
                     analyze(arg, scope, ast);
                     push(arg_types, arg.value_type);
@@ -241,7 +248,7 @@ namespace asts {
         }
 
         void gather_param(node& prm_node, macro& macro) {
-            if_chain2(prm_kind_node, prm_type_node, prm_node.first_child); else { dbg_fail_return; }
+            if_chain2(prm_kind_node, prm_type_node, prm_node.child_chain); else { dbg_fail_return; }
 
             let is_ref  = prm_kind_node.text ==  ref_id;
             let is_val  = prm_kind_node.text ==   in_id;
@@ -263,8 +270,8 @@ namespace asts {
         }
 
         void enqueue(node& node, ast& ast) {
-            assert(node.stage == ns_pending);
-            node.stage = ns_queued;
+            assert(!node.queued);
+            node.queued = true;
             push(ast.pipeline, &node);
         }
     }

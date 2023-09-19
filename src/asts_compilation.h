@@ -205,7 +205,7 @@ namespace asts {
                 let is_wasm_func = is_func(node, def_wasm_id);
                 if (is_regular_func || is_wasm_func); else continue;
 
-                if_chain3(id_node, disp_node, type_node, node.first_child); else { dbg_fail_return; }
+                if_chain3(id_node, disp_node, type_node, node.child_chain); else { dbg_fail_return; }
                 let body_node = type_node.next;
 
                 let id_text = id_node.text;
@@ -214,7 +214,7 @@ namespace asts {
                 node.declared_func = &func;
                 func.is_inline_wasm = is_wasm_func;
 
-                for_chain2(prm_p, disp_node.first_child) {
+                for_chain2(prm_p, disp_node.child_chain) {
                     ref prm_node = *prm_p;
                     let is_in   = is_func(prm_node,   in_id);
                     let is_ref  = is_func(prm_node,  ref_id);
@@ -223,7 +223,7 @@ namespace asts {
                     if (is_ref  && !is_wasm_func) { printf("Ref parameters only supported in wasm functions!\n"); dbg_fail_return; }
                     if (is_code && !is_wasm_func) { printf("Code parameters only supported in wasm functions!\n"); dbg_fail_return; }
                     if (is_in || is_ref || is_code); else continue;
-                    if_chain2(prm_id_node, prm_type_node, prm_node.first_child); else { dbg_fail_return; }
+                    if_chain2(prm_id_node, prm_type_node, prm_node.child_chain); else { dbg_fail_return; }
 
                     if_let1(type, find_type(prm_type_node.text)); else { dbg_fail_return; }
                     using enum variable::kind_t;
@@ -298,13 +298,13 @@ namespace asts {
             }
 
             if_var1 (op, find_op(node.text)) {
-                emit_wasm_op(op, node.first_child, ctx);
+                emit_wasm_op(op, node.child_chain, ctx);
                 return;
             }
 
             if (is_func(node)) {
                 if_var1(node_id, get_id(node)); else { dbg_fail_return; }
-                var args_node_p = node.first_child;
+                var args_node_p = node.child_chain;
 
                 if (node_id == emit_local_get_id) {
                     if_ref(id_node, args_node_p); else { dbg_fail_return; }
@@ -431,13 +431,13 @@ namespace asts {
                     let param = params[i];
                     if (param.kind == vk_param_ref) {
                         if (is_func(arg_node, ref_id)); else { dbg_fail_return; }
-                        if_ref(name_node, arg_node.first_child); else { dbg_fail_return; }
+                        if_ref(name_node, arg_node.child_chain); else { dbg_fail_return; }
                         if_ref(local, find_local(name_node.text, ctx)); else { error_local_not_found(name_node.text); return; }
                         push(ctx.locals_in_scope, {.id = param.id, .index = local.index, .value_type = param.value_type, .kind = vk_param_ref});
                     }
                     else if (param.kind == vk_param_code) {
                         if (is_func(arg_node, code_id)); else { node_failed_return(arg_node); }
-                        push(ctx.locals_in_scope, {.id = param.id, .index = i, .code_node = arg_node.first_child, .value_type = param.value_type, .kind = vk_param_code});
+                        push(ctx.locals_in_scope, {.id = param.id, .index = i, .code_node = arg_node.child_chain, .value_type = param.value_type, .kind = vk_param_code});
                     }
                 }
 
@@ -477,14 +477,14 @@ namespace asts {
             }
 
             if_var1 (op, find_op(node.text)); else { printf("Wasm opcode not found: %.*s\n", (int)node.text.count, node.text.data); dbg_fail_return; }
-            emit_wasm_op(op, node.first_child, ctx);
+            emit_wasm_op(op, node.child_chain, ctx);
         }
 
         void emit_wasm_body(node* node, context& ctx) {
             if_ref(body, node); else return;
 
             if (is_func(body, block_id))
-                node = node->first_child;
+                node = node->child_chain;
 
             for_chain(node)
                 emit_wasm_node(*it, ctx);
@@ -492,7 +492,7 @@ namespace asts {
 
         void emit_body(node& node, context& ctx) {
             if (is_func(node, block_id)) {
-                emit_scoped_chain(node.first_child, ctx);
+                emit_scoped_chain(node.child_chain, ctx);
             } else {
                 emit_node(node, ctx);
             }
@@ -503,17 +503,17 @@ namespace asts {
             using enum wasm_type;
             using enum variable::kind_t;
 
-            if_chain4(id_node, disp_node, type_node, body_node, node.first_child); else { dbg_fail_return; }
+            if_chain4(id_node, disp_node, type_node, body_node, node.child_chain); else { dbg_fail_return; }
             if_ref (func, node.declared_func); else { dbg_fail_return; }
 
             tmp_func_definition_scope(func, ctx);
 
             var param_index = 0u;
-            for_chain(disp_node.first_child) {
+            for_chain(disp_node.child_chain) {
                 ref param_node = *it;
                 if (is_func(param_node, in_id)); else continue;
 
-                if_chain2(param_id_node, param_type_node, param_node.first_child); else { dbg_fail_return; }
+                if_chain2(param_id_node, param_type_node, param_node.child_chain); else { dbg_fail_return; }
                 if_let1(type, find_type(param_type_node.text)); else { dbg_fail_return; }
                 push(ctx.locals_in_scope, {
                     .id    = param_id_node.text,
@@ -547,7 +547,7 @@ namespace asts {
             emit_const_get(1024, body);
             emit(op_local_set, dst, body);
 
-            for_chain(node.first_child) {
+            for_chain(node.child_chain) {
                 ref arg_node = *it;
 
                 // dst = push_*(fn(), dst);
@@ -572,7 +572,7 @@ namespace asts {
         void emit_chr(node& node, context& ctx) {
             ref curr_func = curr_func_of(ctx);
 
-            if_ref(value_node, node.first_child); else { dbg_fail_return; }
+            if_ref(value_node, node.child_chain); else { dbg_fail_return; }
             if(!is_func(value_node)); else { dbg_fail_return; }
             let c = value_node.text[0];
             emit_const_get((uint) c, curr_func.body_wasm);
@@ -583,7 +583,7 @@ namespace asts {
             ref curr_func = curr_func_of(ctx);
             ref body      = curr_func.body_wasm;
 
-            if_chain2(var_id_node, value_node, node.first_child); else { dbg_fail_return; }
+            if_chain2(var_id_node, value_node, node.child_chain); else { dbg_fail_return; }
 
             let var_id = var_id_node.text;
             if_ref   (v, find_local(var_id, ctx)); else { error_local_not_found(var_id); return; }

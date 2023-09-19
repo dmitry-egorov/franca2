@@ -122,7 +122,7 @@ namespace asts {
 
             //TODO: support strings as fn id
             if (is_func(node)) {
-                display_func_call(node, node.first_child, ctx);
+                display_func_call(node, node.child_chain, ctx);
                 return;
             }
 
@@ -138,7 +138,7 @@ namespace asts {
 
             put_wasm_op(node.text, ctx);
 
-            for_chain(node.first_child) {
+            for_chain(node.child_chain) {
                 ref arg = *it;
 
                 put_text(regulars, view(" "), ctx);
@@ -153,11 +153,11 @@ namespace asts {
             using enum node::lex_kind_t;
             if (is_func(node, def_id) || is_func(node, def_wasm_id)); else return;
 
-            if_var3(id_node, disp_node, type_node, deref3(node.first_child)); else { dbg_fail_return; }
+            if_var3(id_node, disp_node, type_node, deref3(node.child_chain)); else { dbg_fail_return; }
             var id = id_node.text;
 
             var params = make_arr_dyn<type_t>(8, context.storage.arena);
-            var param_node_p = disp_node.first_child;
+            var param_node_p = disp_node.child_chain;
             while (param_node_p) {
                 ref param_node = *param_node_p;
                 if (param_node.lex_kind == lk_subtree)
@@ -214,7 +214,7 @@ namespace asts {
         void display_func_call(const st_func& fn, node* args, context& ctx) {
             using enum node::lex_kind_t;
 
-            var disp_node_p = fn.display->first_child;
+            var disp_node_p = fn.display->child_chain;
 
             if (disp_node_p) put_text(inlays, disp_node_p->prefix, ctx);
             //TODO: support evaluating signature?
@@ -231,7 +231,7 @@ namespace asts {
                             dbg_fail_return;
                         }
                         if_ref(arg_node, args); else {
-                            printf("Missing parameter: %.*s\n", (int)disp_node.first_child->text.count, disp_node.first_child->text.data);
+                            printf("Missing parameter: %.*s\n", (int)disp_node.child_chain->text.count, disp_node.child_chain->text.data);
                             dbg_fail_return;
                         }
                         display_node(arg_node, ctx);
@@ -371,7 +371,7 @@ namespace asts {
 
             if (is_func(body_node, block_id)) {
                 tmp_scope(storage);
-                for_chain(body_node.first_child) {
+                for_chain(body_node.child_chain) {
                     ref node = *it;
                     display_wasm_node(node, ctx);
                     put_text(inlays, sub_past_last(node.suffix, '\n'), ctx);

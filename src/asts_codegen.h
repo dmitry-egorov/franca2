@@ -184,7 +184,8 @@ namespace asts {
 
             ctx.curr_fn = &fn;
 
-            if_ref(macro, fn.macro); else { dbg_fail_return; }
+            if_ref(exp  , fn .root_expansion); else { dbg_fail_return; }
+            if_ref(macro, exp.macro         ); else { dbg_fail_return; }
             tmp_new_exp(macro, ctx);
             bind_fn_params(ctx);
 
@@ -210,12 +211,12 @@ namespace asts {
 
             if (node.sem_kind == sk_block) {
                 emit(op_block, wasm_types_of(node.value_type, false), wasm); defer { emit(op_end, wasm); };
-                emit_chain(node.first_child, ctx);
+                emit_chain(node.child_chain, ctx);
                 return;
             }
 
             if (node.sem_kind == sk_ret) {
-                if_ref(value_node, node.first_child)
+                if_ref(value_node, node.child_chain)
                     emit(value_node, ctx);
 
                 emit(op_br, exp.block_depth, wasm);
@@ -255,7 +256,7 @@ namespace asts {
                 if (node.wasm_op == op_block || node.wasm_op == op_loop || node.wasm_op == op_if) exp.block_depth += 1;
                 if (node.wasm_op == op_end) exp.block_depth -= 1;
 
-                for_chain(node.first_child) {
+                for_chain(node.child_chain) {
                     ref arg = *it;
                     assert(arg.sem_kind == sk_lit);
                     wasm_emit::emit(arg.uint_value, wasm);
@@ -330,7 +331,7 @@ namespace asts {
                 if_ref (code, binding.code); else { node_error(node); return; }
                 //if (code.sem_kind == sk_block); else { printf("Only blocks can be used as arguments to 'each'\n"); node_error(node); return; }
 
-                for_chain(code.first_child) {
+                for_chain(code.child_chain) {
                     //emit(*it, ctx);
                     //TODO: bind 'it', embed body
                     //TODO: need to type-check here...
@@ -344,7 +345,7 @@ namespace asts {
                 if_ref(refed_macro, node.refed_macro); else { node_error(node); return; }
                 let params = params_of(refed_macro);
                 var buffer = alloc<param_binding>(ctx.ast.temp_arena, params.count);
-                var arg_node_p = node.first_child;
+                var arg_node_p = node.child_chain;
                 for_arr(params) {
                     defer { arg_node_p = arg_node_p->next; };
 
@@ -388,7 +389,7 @@ namespace asts {
 
             if (node.sem_kind == sk_fn_call) {
                 if_ref(refed_fn, node.refed_fn); else { node_error(node); return; }
-                emit_chain(node.first_child, ctx);
+                emit_chain(node.child_chain, ctx);
                 emit(op_call, refed_fn.index, wasm);
                 return;
             }
