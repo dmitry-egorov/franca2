@@ -84,7 +84,7 @@ namespace asts {
         var ctx = displaying::context {it, storage, 0 };
 
         tmp_scope(ctx.storage);
-        display_node_chain(ast.root, ctx);
+        display_node_chain(ast.root_chain, ctx);
     }
 
     namespace displaying {
@@ -151,7 +151,7 @@ namespace asts {
 
         void gather_definitions(node& node, context& context) {
             using enum node::lex_kind_t;
-            if (is_func(node, def_id) || is_func(node, def_wasm_id)); else return;
+            if (is_func(node, bi_def_text) || is_func(node, bi_def_wasm_text)); else return;
 
             if_var3(id_node, disp_node, type_node, deref3(node.child_chain)); else { dbg_fail_return; }
             var id = id_node.text;
@@ -170,29 +170,28 @@ namespace asts {
         }
 
         void display_func_call(node& n, node* args, context& ctx) {
-            let fn_id = n.text;
 
             //if (fn_id == "(uint)inactive"     ) { display_inactive     (args_node_p, ctx); return; } //TODO: parse comments as inactive node?
-            if (fn_id == emit_local_get_id) { display_local_get (args, ctx); return; }
-            if (fn_id ==             in_id) { display_decl_param(args, ctx); return; }
-            if (fn_id ==            ref_id) { display_ref       (args, ctx); return; }
-            if (fn_id ==           code_id) { display_code      (args, ctx); return; }
-            if (fn_id ==          block_id) { display_block     (args, ctx); return; }
-            if (fn_id ==     decl_local_id) { display_decl_local(args, ctx); return; }
-            if (fn_id ==            def_id) { display_decl_func (args, ctx); return; }
-            if (fn_id ==       def_wasm_id) { display_def_wasm  (args, ctx); return; }
-            if (fn_id ==             as_id) { display_as        (args, ctx); return; }
-            if (fn_id ==             if_id) { display_if        (args, ctx); return; }
-            if (fn_id ==          while_id) { display_loop      (args, ctx); return; }
-            if (fn_id ==           istr_id) { display_istr      (args, ctx); return; }
-            if (fn_id ==            chr_id) { display_chr       (args, ctx); return; }
-            //if (fn_id ==          add_a_id) { display_bop_a     (args, view(" += "), ctx); return; }
-            if (fn_id ==          sub_a_id) { display_bop_a     (args, view(" -= "), ctx); return; }
-            if (fn_id ==          mul_a_id) { display_bop_a     (args, view(" *= "), ctx); return; }
-            if (fn_id ==          div_a_id) { display_bop_a     (args, view(" /= "), ctx); return; }
-            if (fn_id ==          rem_a_id) { display_bop_a     (args, view(" %= "), ctx); return; }
-            if (fn_id ==          print_id) { display_fn_print  (args, ctx); return; }
-            if (fn_id ==           show_id) { display_macro_show(args, ctx); return; }
+            if (n.text == bi_emit_local_get_text) { display_local_get (args, ctx); return; }
+            if (n.text == bi_in_text            ) { display_decl_param(args, ctx); return; }
+            if (n.text == bi_ref_text           ) { display_ref       (args, ctx); return; }
+            if (n.text == bi_code_text          ) { display_code      (args, ctx); return; }
+            if (n.text == bi_block_old_text     ) { display_block     (args, ctx); return; }
+            if (n.text == bi_decl_local_text    ) { display_decl_local(args, ctx); return; }
+            if (n.text == bi_def_text           ) { display_decl_func (args, ctx); return; }
+            if (n.text == bi_def_wasm_text      ) { display_def_wasm  (args, ctx); return; }
+            if (n.text == bi_as_text            ) { display_as        (args, ctx); return; }
+            if (n.text == bi_if_text            ) { display_if        (args, ctx); return; }
+            if (n.text == bi_while_text         ) { display_loop      (args, ctx); return; }
+            if (n.text == bi_istr_text          ) { display_istr      (args, ctx); return; }
+            if (n.text == bi_chr_text           ) { display_chr       (args, ctx); return; }
+            //if (fn_id ==          bi_add_a_text) { display_bop_a     (args, view(" += "), ctx); return; }
+            if (n.text == bi_sub_a_text         ) { display_bop_a     (args, view(" -= "), ctx); return; }
+            if (n.text == bi_mul_a_text         ) { display_bop_a     (args, view(" *= "), ctx); return; }
+            if (n.text == bi_div_a_text         ) { display_bop_a     (args, view(" /= "), ctx); return; }
+            if (n.text == bi_rem_a_text         ) { display_bop_a     (args, view(" %= "), ctx); return; }
+            if (n.text == bi_print_text         ) { display_fn_print  (args, ctx); return; }
+            if (n.text == bi_show_text          ) { display_macro_show(args, ctx); return; }
 
             var params = make_arr_dyn<type_t>(8, ctx.storage.arena);
             var arg_p = args;
@@ -202,9 +201,9 @@ namespace asts {
                 arg_p = arg.next;
             }
 
-            if_ref(fn, find_func(ctx.storage, fn_id, params.data)); else {
+            if_ref(fn, find_func(ctx.storage, n.text, params.data)); else {
                 put_text_in_brackets(inlays, view(" "), ctx);
-                printf("unknown function: %.*s\n", (int)fn_id.count, fn_id.data);
+                printf("unknown function: %.*s\n", (int) n.text.count, n.text.data);
                 dbg_fail_return;
             }
 
@@ -369,7 +368,7 @@ namespace asts {
             if_ref(body_node, type_node.next); else return;
             put_text(regulars, view(" -> "), ctx);
 
-            if (is_func(body_node, block_id)) {
+            if (is_func(body_node, bi_block_old_text)) {
                 tmp_scope(storage);
                 for_chain(body_node.child_chain) {
                     ref node = *it;

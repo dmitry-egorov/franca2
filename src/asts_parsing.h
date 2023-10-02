@@ -53,7 +53,7 @@ namespace asts {
             last_node = last;
         }
 
-        ast.root = first_node;
+        ast.root_chain = first_node;
     }
 
     static bool parse_code(string code, ast& ast) {
@@ -63,7 +63,7 @@ namespace asts {
         if_var2(first_child, last_child, parse_chain(iterator, view(""), ast)); else { dbg_fail_return false;}
         if(is_empty(iterator)); else { dbg_fail_return false; }
 
-        ast.root = first_child;
+        ast.root_chain = first_child;
 
         return true;
     }
@@ -78,8 +78,8 @@ namespace asts {
         }
 
         ret2<node*, node*> parse_chain(string& it, string file_path, ast& ast) {
-            var first_child = (node*)nullptr;
-            var  last_child = (node*)nullptr;
+            var first_node = (node*)nullptr;
+            var  last_node = (node*)nullptr;
 
             var prefix = take_whitespaces_and_comments(it);
 
@@ -89,13 +89,13 @@ namespace asts {
                 node.prefix = prefix;
                 prefix = node.suffix;
 
-                if (last_child) last_child->next = &node;
-                else            first_child = &node;
+                if (last_node) last_node->next = &node;
+                else first_node = &node;
 
-                last_child = &node;
+                last_node = &node;
             }
 
-            return ret2_ok(first_child, last_child);
+            return ret2_ok(first_node, last_node);
         }
 
         node* parse_node(string& it, string file_path, ast& ast) {
@@ -108,8 +108,9 @@ namespace asts {
 
             // TODO: record line and column
             // TODO: a clean way to do that is to make a separate iterator
-            ref result = add_node(ast, node{
+            ref result = add_node(ast, node {
                 .text      = text,
+                .id = id_of(text, ast),
                 .is_string = text_is_quoted,
                 .file_path = file_path
             });
@@ -133,8 +134,8 @@ namespace asts {
                 result.suffix = take_whitespaces_and_comments(it);
             }
             else {
-                result.lex_kind   = lk_leaf;
-                result.suffix = next_text;
+                result.lex_kind = lk_leaf;
+                result.suffix   = next_text;
             }
 
             return &result;

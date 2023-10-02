@@ -12,6 +12,8 @@
         - [ ] alternatively, type-check after generating a scope for the vararg
     - [ ] introduce variables into the passed block
     - [ ] multiple return values
+- [ ] macro can access variables from external scope
+    - [ ] bind all variables, not just local for the macro
 - [ ] type_t struct
 - [ ] last element of a block returns
 - [ ] emit a function and a call when needed

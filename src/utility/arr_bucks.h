@@ -17,7 +17,30 @@ namespace arrays {
         arr_dyn<t*> buckets;
         size_t bucket_size;
         size_t last_bucket_count;
+
+              t& operator[](size_t index);
+        const t& operator[](size_t index) const;
     };
+
+    tt const t& arr_buck<t>::operator[](size_t index) const {
+        let bucket_i    = index / bucket_size;
+        let in_bucket_i = index % bucket_size;
+
+        assert(bucket_i < buckets.count);
+        assert((bucket_i != buckets.count - 1) || (in_bucket_i < last_bucket_count));
+
+        return buckets[bucket_i][in_bucket_i];
+    }
+
+    tt t& arr_buck<t>::operator[](size_t index) {
+        let bucket_i    = index / bucket_size;
+        let in_bucket_i = index % bucket_size;
+
+        assert(bucket_i < buckets.count);
+        assert((bucket_i != buckets.count - 1) || (in_bucket_i < last_bucket_count));
+
+        return buckets[bucket_i][in_bucket_i];
+    }
 
     tt arr_buck<t> make_arr_buck(size_t bucket_size, arena& arena = gta) {
         var buckets = make_arr_dyn<t*>(32, arena);

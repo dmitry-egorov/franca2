@@ -62,17 +62,17 @@ namespace asts {
             defer { ctx.curr_exp = line_var(return_exp_); }
 
         void bind_fn_params(context&);
-        void bind(uint fn_index, context&);
+        void bind(uint index_in_fn, context&);
         void bind(arr_view<param_binding>, context&);
 
-        uint add_fn_local(type_t, context&);
         uint add_fn_local(local&, context&);
 
         uint add_data(string text, context&);
 
-        auto find_binding     (uint index_in_macro, context&) -> param_binding;
         auto find_local_offset(uint index_in_macro, context&) -> uint;
         auto find_local_index (uint index_in_macro, context&) -> uint;
+        auto find_code        (uint index_in_macro, context&) -> node*;
+        auto find_binding     (uint index_in_macro, context&) -> param_binding;
 
         void emit_local_set(uint offset, type_t, stream&);
 
@@ -96,7 +96,7 @@ namespace asts {
 
         for_arr_buck_begin(fns, fn, __fn_i) {
             emit(fn, ctx);
-            if (fn.id == view("main")) {
+            if (fn.id == bi_main_id) {
                 ref body = fn.body_wasm;
                 emit(op_i32_const, 0u, body);
                 emit(op_return       , body);
@@ -129,7 +129,7 @@ namespace asts {
             };
 
             if (fn.kind == fk_imported) {
-                push(imports, {.module = fn.import_module, .name = fn.id, .type_index = fn_i});
+                push(imports, wasm_func_import{.module = text_of(fn.import_module, ast), .name = text_of(fn.id, ast), .type_index = fn_i});
                 continue;
             }
 
@@ -148,7 +148,7 @@ namespace asts {
             push(func_specs, wasm_func);
 
             if (fn.exported)
-                push(exports, wasm_export {.name = fn.id, .kind = ek_func, .obj_index = fn.index});
+                push(exports, wasm_export {.name = text_of(fn.id, ast), .kind = ek_func, .obj_index = fn.index});
         } for_arr_buck_end
 
         var mem = wasm_memory {1,1};
@@ -184,8 +184,9 @@ namespace asts {
 
             ctx.curr_fn = &fn;
 
-            if_ref(exp  , fn .root_expansion); else { dbg_fail_return; }
-            if_ref(macro, exp.macro         ); else { dbg_fail_return; }
+            //if_ref(exp  , fn .expansion); else { dbg_fail_return; }
+            //if_ref(macro, exp.macro    ); else { dbg_fail_return; }
+            if_ref(macro, fn.macro); else { dbg_fail_return; }
             tmp_new_exp(macro, ctx);
             bind_fn_params(ctx);
 
@@ -266,12 +267,11 @@ namespace asts {
 
             if (node.sem_kind == sk_local_decl) {
                 if_ref (loc, node.decled_local); else { node_error(node); return; }
-                let index = add_fn_local(loc, ctx);
+                let offset = add_fn_local(loc, ctx);
 
                 if_ref(init_node, node.init_node); else { node_error(node); return; }
                 emit(init_node, ctx);
-                emit_local_set(fn.local_offsets[index], loc.value_type, wasm);
-                node.value_type = t_void; // TODO: analyze compatible and cast
+                emit_local_set(offset, loc.value_type, wasm);
                 return;
             }
 
@@ -296,8 +296,7 @@ namespace asts {
 
             if (node.sem_kind == sk_code_embed) {
                 if_ref (l, node.refed_local); else { node_error(node); return; }
-                let binding = find_binding(l.index_in_macro, ctx);
-                if_ref (code, binding.code); else { node_error(node); return; }
+                if_ref (code, find_code(l.index_in_macro, ctx)); else { node_error(node); return; }
 
                 let block_depth = exp.block_depth;
                 tmp_switch_exp_ctx(exp.parent, ctx);
@@ -315,20 +314,17 @@ namespace asts {
 
             if (node.sem_kind == sk_sub_of) {
                 if_ref(n, node.sub_of_node); else { node_error(node); return; }
-                if (n.sem_kind == sk_local_get) {
-                    if_ref(l, n.refed_local); else { node_error(node); return; }
-                    let offset = find_local_offset(l.index_in_macro, ctx);
-                    emit(op_local_get, offset + node.sub_index, wasm);
-                    return;
-                }
+                if_ref(l, n.refed_local); else { node_error(node); return; }
+                let offset = find_local_offset(l.index_in_macro, ctx);
+                emit(op_local_get, offset + node.sub_index, wasm);
+                return;
 
                 dbg_fail_return;
             }
 
             if (node.sem_kind == sk_each) {
                 if_ref (l, node.each_list_local); else { node_error(node); return; }
-                let binding = find_binding(l.index_in_macro, ctx);
-                if_ref (code, binding.code); else { node_error(node); return; }
+                if_ref (code, find_code(l.index_in_macro, ctx)); else { node_error(node); return; }
                 //if (code.sem_kind == sk_block); else { printf("Only blocks can be used as arguments to 'each'\n"); node_error(node); return; }
 
                 for_chain(code.child_chain) {
@@ -367,13 +363,12 @@ namespace asts {
                     if (arg_node.sem_kind != sk_local_get && param.kind == lk_value) {
                         emit(arg_node, ctx);
                         let type = arg_node.value_type;
-                        let index_in_fn = add_fn_local(type, ctx);
+                        let index_in_fn = add_fn_local(type, fn);
                         buffer[i] = {.index_in_fn = index_in_fn};
                         emit_local_set(fn.local_offsets[index_in_fn], type, wasm);
                         continue;
                     }
 
-                    //TODO: support code ref
                     dbg_fail_return;
                 }
 
@@ -424,44 +419,40 @@ namespace asts {
                 bind(i, ctx);
         }
 
-        uint add_fn_local(type_t type, context& ctx) {
+        auto add_fn_local(local& loc, context& ctx) -> uint /* offset */ {
             if_ref(fn, ctx.curr_fn); else { dbg_fail_return -1; }
-            let index = (uint)fn.local_types.count;
-            push(fn.local_types  , type);
-            push(fn.local_offsets, fn.next_local_offset);
-            fn.next_local_offset += size_32_of(type);
-            return index;
-        }
-
-        uint add_fn_local(local& loc, context& ctx) {
-            let index = add_fn_local(loc.value_type, ctx);
+            let index = add_fn_local(loc.value_type, fn);
             bind(index, ctx);
-            return index;
+            return fn.local_offsets[index];
         }
 
-        void bind(uint fn_index, context& ctx) {
-            assert(   fn_index != (uint)-1);
+        void bind(uint index_in_fn, context& ctx) {
+            assert(index_in_fn != (uint)-1);
             if_ref(exp, ctx.curr_exp); else { dbg_fail_return; }
-            push(exp.bindings, {.index_in_fn = fn_index});
+            push(exp.bindings, {.index_in_fn = index_in_fn});
         }
 
         void bind(arr_view<param_binding> bindings, context& ctx) {
-            if_ref(scope, ctx.curr_exp); else { dbg_fail_return; }
-            push(scope.bindings, bindings);
+            if_ref(exp, ctx.curr_exp); else { dbg_fail_return; }
+            push(exp.bindings, bindings);
         }
 
         auto find_local_index(uint index_in_macro, context& ctx) -> uint {
             return find_binding(index_in_macro, ctx).index_in_fn;
         }
 
-        uint find_local_offset(uint index_in_macro, context& ctx) {
+        auto find_local_offset(uint index_in_macro, context& ctx) -> uint {
             if_ref(fn, ctx.curr_fn); else { dbg_fail_return -1; }
             return fn.local_offsets[find_local_index(index_in_macro, ctx)];
         }
 
+        auto find_code(uint index_in_macro, context& ctx) -> node* {
+            return find_binding(index_in_macro, ctx).code;
+        }
+
         param_binding find_binding(uint index_in_macro, context& ctx) {
-            if_ref(scope, ctx.curr_exp); else { dbg_fail_return {}; }
-            let bindings = scope.bindings.data;
+            if_ref(exp, ctx.curr_exp); else { dbg_fail_return {}; }
+            let bindings = exp.bindings.data;
             if (index_in_macro < bindings.count); else {
                 printf("Failed to find binding for macro local %u\n", index_in_macro);
                 print_macro_contexts(ctx);
@@ -481,15 +472,17 @@ namespace asts {
             for_arr_buck_begin(ctx.exps, exp, exp_i) {
                 if_ref(macro, exp.macro); else { dbg_fail_return; }
                 let bindings = exp.bindings.data;
-                printf("Macro expansion scope ");
+                printf("Macro expansion ");
                 if (&exp == ctx.curr_exp) printf("*"); else printf(" ");
 
                 printf("%zu", exp_i);
-                printf(". %.*s: [%u] ", (int)macro.id.count, macro.id.data, (uint)bindings.count);
+                let macro_name = text_of(macro.id, ctx.ast);
+                printf(". %.*s: [%u] ", (int) macro_name.count, macro_name.data, (uint)bindings.count);
                 for_arr2(j, bindings) {
                     if (j < count_of(macro.locals)) {
-                        let local_id = macro.locals[j].id;
-                        printf("%.*s", (int)local_id.count, local_id.data);
+                        let local_name = text_of(macro.locals[j].id, ctx.ast);
+
+                        printf("%.*s", (int)local_name.count, local_name.data);
                     }
                     else {
                         printf("arg_tmp_%zu", (size_t)(j - count_of(macro.locals)));

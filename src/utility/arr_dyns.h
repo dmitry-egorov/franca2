@@ -115,7 +115,7 @@ namespace arrays {
     }
 
     tt const t& arr_dyn<t>::operator[](const size_t index) const { assert(index < data.count); return data[index]; }
-    tt t& arr_dyn<t>::operator[](const size_t index) { assert(index < data.count); return data[index]; }
+    tt       t& arr_dyn<t>::operator[](const size_t index)       { assert(index < data.count); return data[index]; }
 
     tt t* ptr(arr_ref<t> p, const arr_dyn<t>& a) {
         if (p.offset < a.count); else return nullptr;

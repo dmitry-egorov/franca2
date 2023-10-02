@@ -21,7 +21,7 @@ namespace arenas {
     inline void  init   (arena&, size_t capacity);
     inline void  release(arena&);
 
-    inline void reset(arena&);
+    inline void   reset(arena&);
     inline size_t alignment_offset(const arena& arena, uint align);
 
     inline size_t next_offset(const arena&, uint align = sizeof(size_t));

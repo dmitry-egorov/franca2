@@ -377,7 +377,6 @@ namespace wasm_emit {
         if ((u16)op < 0x00ff) emit((u8)op, dst); else emit((u16)op, dst);
     }
 
-
     ret1<wasm_type> find_value_type(string op_name) {
         for (var i = 0u; i < wasm_value_type_count; ++i) {
             ref mapping = wasm_value_type_map[i];

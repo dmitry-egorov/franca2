@@ -38,6 +38,7 @@
 #include "visual_display.h"
 #include "line_view_gen.h"
 
+#include "utility/string_tables.h"
 #include "asts.h"
 #include "asts_parsing.h"
 #include "asts_printing.h"
@@ -172,10 +173,12 @@ static bool init() {
 
     var ast_data_arena = arenas::make(4 * 1024 * 1024);
     var ast = make_ast(ast_data_arena);
+    let parsing_start = std::chrono::high_resolution_clock::now();
     parse_files(source_files.data, ast);
-    printf("\nAST:\n");
+    printf("AST parsed in %lldms. Nodes: %zu. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - parsing_start).count(), count_of(ast.nodes), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+
     print_ast(ast);
-    printf("AST parsed. Nodes: %zu. Total memory used: %zu, delta: %zu\n", count_of(ast.nodes), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+    print_symbols(ast);
 
     arr_view<u8> old_wasm = {};
     arr_view<u8> wasm = {};
@@ -198,13 +201,14 @@ static bool init() {
         analyze(ast);
         printf("Analyzed in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
+        printf("\nExpansion:\n");
+        print_exp(*ast.fns[1].expansion, ast);
+
         let generate_start = std::chrono::high_resolution_clock::now();
         printf("\nGenerating WASM...\n");
         wasm = emit_wasm(ast);
         printf("Generated in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - generate_start).count(), wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
     }
-
-
 
     if_var1(line_view, generate_line_view(code_view.line_count, line_view_size)); else return false;
 
