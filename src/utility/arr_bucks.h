@@ -60,11 +60,17 @@ namespace arrays {
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wnull-dereference"
-        if_ref(last_bucket, last_of(arr.buckets)); else { assert(false); return *(t*)nullptr; }
+        if_ref(last_bucket, last_of(arr.buckets)); else { dbg_fail_return *(t*)nullptr; }
 #pragma clang diagnostic pop
 
         last_bucket[arr.last_bucket_count++] = value;
         return last_bucket[arr.last_bucket_count - 1];
+    }
+
+    tt void push(arr_view<t> values, arr_buck<t>& arr) {
+        //TODO: add in batches
+        for_arr(values)
+            push(values[i], arr);
     }
 
     tt size_t count_of(const arr_buck<t>& arr) {
@@ -91,6 +97,16 @@ namespace arrays {
 
 #define for_arr_buck_end                                \
         }                                               \
+    }
+
+#define for_arr_buck_batch_begin(arr, t, it_view_name)    \
+    var index_name = (size_t)0;                         \
+    for_arr2(line_var(buck_i_), arr.buckets) {          \
+        ref bucket = arr.buckets[line_var(buck_i_)];    \
+        let count = line_var(buck_i_) == arr.buckets.count - 1 ? arr.last_bucket_count : arr.bucket_size; \
+        let it_view_name = arr_view<t>{bucket, count};             \
+
+#define for_arr_buck_batch_end                          \
     }
 
 #endif //FRANCA2_ARR_BUCKS_H

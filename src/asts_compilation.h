@@ -367,7 +367,7 @@ namespace asts {
                 if (node_text ==      bi_def_text) { emit_func_def      (node, ctx); return; }
                 if (node_text == bi_def_wasm_text) { return; }
 
-                if (node_text == bi_block_old_text) {
+                if (node_text == bi_block_text) {
                     tmp_compilation_scope(ctx);
 
                     emit(op_block, vt_void, body);
@@ -483,7 +483,7 @@ namespace asts {
         void emit_wasm_body(node* node, context& ctx) {
             if_ref(body, node); else return;
 
-            if (is_func(body, bi_block_old_text))
+            if (is_func(body, bi_block_text))
                 node = node->child_chain;
 
             for_chain(node)
@@ -491,7 +491,7 @@ namespace asts {
         }
 
         void emit_body(node& node, context& ctx) {
-            if (is_func(node, bi_block_old_text)) {
+            if (is_func(node, bi_block_text)) {
                 emit_scoped_chain(node.child_chain, ctx);
             } else {
                 emit_node(node, ctx);

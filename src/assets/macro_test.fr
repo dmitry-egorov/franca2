@@ -1,14 +1,18 @@
-print_str["Hello, world!"]
+// print_str["Hello, world!"]
+//
+// var[dst u32 1024]
+//
+// var[x u32 123]
+// push_str["x = " dst]
+// push_str[x      dst]
+//
+// print_str[1024 -[dst 1024]]
+//
+// ret[-[fib_at[40] fib_at[30]]]
 
-var[dst u32 1024]
+ret[-[foo[53] 11]]
 
-var[x u32 123]
-push_str["x = " dst]
-push_str[x dst]
-
-print_str[1024 -[dst 1024]]
-
-ret[-[fib_at[40] fib_at[30]]]
+def[foo[.[x[$ u32]] u32 .[if[==[x 53] ret[+[x 1]]] ret[+[x 2]]]]]
 
 // print["x = " x]
 // def[
@@ -59,35 +63,39 @@ def[
             push_chr[()[+[chr[0] %[()[/[n d]] 10]]] dst]
             /=[d 10]]]]]
 
-    push_str[.[s [$ str] dst[& u32]] . .[copy_str[s  dst] +=[dst sub_of[1 s]]]]
+    push_str[.[s [$ str] dst[& u32]] . .[copy_str[s  dst] +=[dst sub[1 s]]]]
     push_chr[.[ch[$ u32] dst[& u32]] . .[store_u8[ch dst] +=[dst 1]]]
 
     make_str[.[ptr[# u32] len[# u32]] str .[ptr len]]
-    copy_str[.[s  [$ str] dst[$ u32]] .   .[mem_copy[sub_of[0 s] sub_of[1 s] dst]]]
+    copy_str[.[s  [$ str] dst[$ u32]] .   .[mem_copy[sub[0 s] sub[1 s] dst]]]
 
     mem_copy[.[src[# u32] count[# u32] dst[# u32]] . .[dst src count op_memory_copy[0 0]]]
     store_u8[.[ch [# u32]              dst[# u32]] . .[dst ch op_i32_store8[0 0]]]
 
     if[.[a[# u32] b[# .]] . .[
         a
-        op_if vt_void
+        .[op_if vt_void
             b
-        op_end]]
+        op_end]]]
 
     while[.[a[# u32] b[# .]] . .[
-        op_block vt_void
-            op_loop vt_void
+        {}[
+            .[op_loop vt_void
                 a
                 op_i32_eqz
                 op_br_if[1]
                     b
                 op_br[0]
-            op_end
-        op_end]]
+            op_end]
+        ]]]
 
     floor[.[a[# f32]] f32 .[a op_f32_nearest]]
 
     ()[.[a[# u32]] u32 a]
+    {}[.[a[# void]] vt_void .[
+        .[op_block vt_void
+            a
+        op_end]]]
 
     + [.[a[# u32] b[# u32]] u32 .[a b op_i32_add  ]]
     - [.[a[# u32] b[# u32]] u32 .[a b op_i32_sub  ]]

@@ -79,7 +79,7 @@ namespace asts {
     struct fn   ;
     struct macro;
     struct local;
-    struct scope;
+    struct lex_scope;
     struct expansion;
 
     struct func;
@@ -92,11 +92,13 @@ namespace asts {
 
         arr_buck<node     > nodes;
         arr_buck<macro    > macros;
-        arr_buck<scope    > scopes;
+        arr_buck<lex_scope> scopes;
         arr_buck<fn       > fns;
         arr_buck<expansion> expansions;
 
         swap_queues<node*> pipeline;
+
+        arr_buck<u8> data;
 
         arena& data_arena;
         arena& temp_arena;
@@ -121,6 +123,7 @@ namespace asts {
             uint uint_value;
         };
         float float_value;
+        uint str_data_offset;
 
         type_t value_type;
 
@@ -148,7 +151,7 @@ namespace asts {
 
         bool queued;
 
-        scope* scope;
+        lex_scope* scope;
 
         enum struct sem_kind_t {
             sk_unknown,
@@ -165,12 +168,15 @@ namespace asts {
             sk_local_ref,
             sk_code_embed,
             sk_chr,
-            sk_sub_of,
+            sk_sub,
             sk_each,
             sk_id
         } sem_kind;
 
         union {
+            struct {
+                uint ret_depth;
+            };
             struct { // sk_wasm_op
                 wasm_emit::wasm_opcode wasm_op;
             };
@@ -180,14 +186,14 @@ namespace asts {
             struct { // sk_local_decl
                 local* decled_local;
                 uint   decl_local_index_in_fn;
-                node*   init_node ; // TODO: remove this when declaration and assignment are separated
+                node*  init_node; // TODO: remove this when declaration and assignment are separated
             };
             struct { // sk_macro_decl
                 arr_dyn<macro*> decled_macros;
             };
             struct { // sk_macro_expand
                 macro* refed_macro; // TODO: can depend on the expansion
-                asts::expansion* macro_expansion; // TODO: move to sk_macro_expand struct
+                asts::expansion* macro_expansion;
             };
             struct { // sk_fn_call
                 fn* refed_fn; // TODO: can depend on the expansion
@@ -200,9 +206,10 @@ namespace asts {
             struct { // sk_chr
                 u8 chr_value;
             };
-            struct { // sk_sub_of
+            struct { // sk_sub
                 u32   sub_index;
-                node* sub_of_node;
+                node* sub_node;
+                uint  sub_fn_offset;
             };
             struct { // each
                 local* each_list_local;
@@ -227,13 +234,14 @@ namespace asts {
         type_t value_type;
     };
 
-    struct scope {
+    struct lex_scope {
         macro* macro;
         node*  chain;
         arr_dyn<local*> locals;
         arr_dyn<asts::macro*> macros;
 
-        scope* parent;
+        lex_scope* parent;
+        uint depth;
     };
 
     struct macro {
@@ -245,8 +253,8 @@ namespace asts {
 
         bool has_returns;
 
-        scope* parent_scope;
-        scope*   body_scope;
+        lex_scope* parent_scope;
+        lex_scope*   body_scope;
     };
 
     struct fn {
@@ -291,16 +299,11 @@ namespace asts {
         fn   * fn;
         macro* macro;
 
-        uint block_depth;
-
         arr_dyn<var_binding> bindings;
 
-        node*    source_node;
         node* generated_chain;
 
         expansion* parent;
-        expansion* child_chain;
-        expansion* next;
     };
 
 //begin ---- old ----
@@ -352,7 +355,7 @@ namespace asts {
     BI(          bi_code, "#"             ) \
     BI(           bi_def, "def"           ) \
     BI(      bi_def_wasm, "def_wasm"      ) \
-    BI(     bi_block_old, "{}"            ) \
+    BI(         bi_block, "{}"            ) \
     BI(          bi_list, "."             ) \
     BI(           bi_ret, "ret"           ) \
     BI(            bi_as, "as"            ) \
@@ -367,7 +370,7 @@ namespace asts {
     BI(         bi_rem_a, "%="            ) \
     BI(         bi_print, "print"         ) \
     BI(          bi_show, "show"          ) \
-    BI(        bi_sub_of, "sub_of"        ) \
+    BI(           bi_sub, "sub"           ) \
     BI(       bi_varargs, "##"            ) \
 
 #define T(id) static uint stx_concat(t_, stx_concat(id, _id));
@@ -390,11 +393,14 @@ namespace asts {
 
             .nodes      = make_arr_buck<node     >(2048, data_arena),
             .macros     = make_arr_buck<macro    >( 256, data_arena),
-            .scopes     = make_arr_buck<scope    >( 512, data_arena),
+            .scopes     = make_arr_buck<lex_scope>( 512, data_arena),
             .fns        = make_arr_buck<fn       >(  64, data_arena),
             .expansions = make_arr_buck<expansion>(1024, data_arena),
 
             .pipeline = make_swap_queue<node*>(temp_arena),
+
+            .data     = make_arr_buck<u8>(2048, data_arena),
+
             .data_arena = data_arena,
             .temp_arena = temp_arena
         };
@@ -444,17 +450,18 @@ namespace asts {
 
     inline node& add_node(ast& ast, const node& node) { return push(node, ast.nodes); }
 
-    inline scope& add_scope(macro& parent_macro, scope* parent_scope, node* body_nodes, ast& ast) {
-        return push(scope {
+    inline lex_scope& add_scope(macro& parent_macro, lex_scope* parent_scope, node* body_nodes, ast& ast) {
+        return push(lex_scope {
             .macro = &parent_macro,
             .chain   = body_nodes,
             .locals = make_arr_dyn<local*>(16, ast.data_arena),
             .macros = make_arr_dyn<macro*>( 4, ast.data_arena),
             .parent = parent_scope,
+            .depth  = parent_scope ? parent_scope->depth + 1 : 0
         }, ast.scopes);
     }
 
-    macro& add_macro(string_id id, scope* parent_scope, node* body_chain, ast& ast) {
+    macro& add_macro(string_id id, lex_scope* parent_scope, node* body_chain, ast& ast) {
         ref macro = push(asts::macro {
             .id           = id,
             .locals       = make_arr_dyn<local    >(16, ast.data_arena),
@@ -468,11 +475,11 @@ namespace asts {
 
         return macro;
     }
-    macro& add_macro(cstr id, scope* parent_scope, node* body_chain, ast& ast) {
+    macro& add_macro(cstr id, lex_scope* parent_scope, node* body_chain, ast& ast) {
         return add_macro(id_of(view(id), ast), parent_scope, body_chain, ast);
     }
 
-    local& add_local(string_id id, local::kind_t kind, type_t type, scope& scope) {
+    local& add_local(string_id id, local::kind_t kind, type_t type, lex_scope& scope) {
         if_ref(macro, scope.macro); else { assert(false); }
 
         var index = macro.locals.count;
@@ -496,12 +503,11 @@ namespace asts {
         return {macro.locals.data.data, macro.params_count };
     }
 
-    expansion& add_expansion(fn& fn, macro& macro, expansion* parent, node* source_node, ast& ast) {
+    expansion& add_expansion(fn& fn, macro& macro, expansion* parent, ast& ast) {
         return push({
             .fn    = &fn,
             .macro = &macro,
             .bindings = make_arr_dyn<var_binding>(16, ast.data_arena),
-            .source_node = source_node,
             .parent = parent,
         }, ast.expansions);
     }
@@ -580,7 +586,7 @@ namespace asts {
         return nullptr;
     }
 
-    macro* find_macro(string_id id, arr_view<type_t> param_types, scope& scope) {
+    macro* find_macro(string_id id, arr_view<type_t> param_types, lex_scope& scope) {
         for(var scope_p = &scope; scope_p; ) {
             ref sc = *scope_p;
             var macros = sc.macros.data;
@@ -612,7 +618,7 @@ namespace asts {
         return nullptr;
     }
 
-    local* find_local(string_id id, scope& scope) {
+    local* find_local(string_id id, lex_scope& scope) {
         for(var scope_p = &scope; scope_p; scope_p = scope_p->parent) {
             var locals = scope_p->locals.data;
             for_arr(locals) {
@@ -756,6 +762,12 @@ namespace asts {
 
     auto find_code_node(uint index_in_macro, expansion& exp) -> node* {
         return find_binding(index_in_macro, exp).code;
+    }
+
+    uint add_data(string text, ast& ast) {
+        var offset = count_of(ast.data);
+        push({(u8*)text.data, text.count}, ast.data);
+        return offset;
     }
 
     void node_error(node& node) {

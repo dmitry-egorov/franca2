@@ -656,13 +656,28 @@ namespace wasm_emit {
         for_arr(datas) {
             let data = datas[i];
 
-            emit((u8)0x00    , section); // segment flags
+            emit((u8)0x00            , section); // segment flags
             emit(op_i32_const, offset, section);
-            emit(op_end      , section);
-            emit(data.data   , section);
+            emit(op_end              , section);
+            emit(data.data           , section);
 
             offset += data.count;
         }
+
+        emit_section(sec_data, emitter);
+    }
+
+    void emit_data_section(const arr_buck<u8>& data, wasm_emitter& emitter) {
+        using_emitter emitter;
+        emit(1, section); // num wasm_data
+
+        emit((u8)0x00        , section); // segment flags
+        emit(op_i32_const, 0u, section);
+        emit(op_end          , section);
+
+        for_arr_buck_batch_begin(data, u8, view) {
+            emit(view, section);
+        } for_arr_buck_batch_end
 
         emit_section(sec_data, emitter);
     }

@@ -176,7 +176,7 @@ namespace asts {
             if (n.text == bi_in_text            ) { display_decl_param(args, ctx); return; }
             if (n.text == bi_ref_text           ) { display_ref       (args, ctx); return; }
             if (n.text == bi_code_text          ) { display_code      (args, ctx); return; }
-            if (n.text == bi_block_old_text     ) { display_block     (args, ctx); return; }
+            if (n.text == bi_block_text         ) { display_block     (args, ctx); return; }
             if (n.text == bi_decl_local_text    ) { display_decl_local(args, ctx); return; }
             if (n.text == bi_def_text           ) { display_decl_func (args, ctx); return; }
             if (n.text == bi_def_wasm_text      ) { display_def_wasm  (args, ctx); return; }
@@ -368,7 +368,7 @@ namespace asts {
             if_ref(body_node, type_node.next); else return;
             put_text(regulars, view(" -> "), ctx);
 
-            if (is_func(body_node, bi_block_old_text)) {
+            if (is_func(body_node, bi_block_text)) {
                 tmp_scope(storage);
                 for_chain(body_node.child_chain) {
                     ref node = *it;

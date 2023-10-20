@@ -17,10 +17,10 @@
 #include "utility/arenas.h"
 #include "utility/arr_dyns.h"
 #include "utility/arr_bucks.h"
-
 #include "utility/wgpu_ex.h"
 #include "utility/wgpu_png.h"
 #include "utility/emsc_ex.h"
+#include "utility/string_tables.h"
 
 #define STBI_ONLY_PNG
 #define STB_IMAGE_IMPLEMENTATION
@@ -38,13 +38,13 @@
 #include "visual_display.h"
 #include "line_view_gen.h"
 
-#include "utility/string_tables.h"
 #include "asts.h"
 #include "asts_parsing.h"
 #include "asts_printing.h"
 #include "asts_storage.h"
 #include "asts_analysis.h"
 #include "asts_codegen.h"
+#include "asts_codegen_old.h"
 #include "asts_compilation.h"
 #include "asts_display.h"
 
@@ -207,6 +207,7 @@ static bool init() {
         let generate_start = std::chrono::high_resolution_clock::now();
         printf("\nGenerating WASM...\n");
         wasm = emit_wasm(ast);
+        //wasm = emit_wasm_old(ast);
         printf("Generated in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - generate_start).count(), wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
     }
 

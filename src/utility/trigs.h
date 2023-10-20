@@ -16,4 +16,4 @@ inline turns operator-(const turns& t0, const turns& t1) { return { t0.v - t1.v 
 inline turns operator+=(turns& t0, const turns& t1) { return t0 = t0 + t1; }
 inline turns operator-=(turns& t0, const turns& t1) { return t0 = t0 - t1; }
 
-#endif //FRANCA2_WEB_TRIGS_H
+#endif //FRANCA2_TRIGS_H

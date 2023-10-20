@@ -58,7 +58,7 @@ namespace arrays {
 #define FRANCA2_ARRAYS_I
 namespace arrays {
     tt const t& arr_view<t>::operator[](const size_t index) const { assert(index < count); return data[index]; }
-    tt t& arr_view<t>::operator[](const size_t index) { assert(index < count); return data[index]; }
+    tt       t& arr_view<t>::operator[](const size_t index)       { assert(index < count); return data[index]; }
 
     tt void enlarge   (arr_view<t>& v) { v.count += 1; }
     tt void enlarge_by(arr_view<t>& v, const size_t count) { v.count += count; }

@@ -12,8 +12,8 @@ namespace asts {
     void analyze(ast&);
 
     namespace analysis {
-        void analyze_chain(node*, scope&, ast&);
-        void analyze      (node&, scope&, ast&);
+        void analyze_chain(node*, lex_scope&, ast&);
+        void analyze      (node&, lex_scope&, ast&);
         void gather_param (node&, macro&);
 
         void complete(node&, node::sem_kind_t, type_t);
@@ -74,12 +74,12 @@ namespace asts {
         using enum node::stage_t;
         using enum local::kind_t;
 
-        void analyze_chain(node* first_node, scope& scope, ast& ast) {
+        void analyze_chain(node* first_node, lex_scope& scope, ast& ast) {
             for_chain(first_node)
                 analyze(*it, scope, ast);
         }
 
-        void analyze(node& node, scope& scope, ast& ast) {
+        void analyze(node& node, lex_scope& scope, ast& ast) {
             if (!node.queued); else return;
 
             ref stage = node.stage;
@@ -91,7 +91,11 @@ namespace asts {
 
             if (stage == ns_analysis); else return;
 
-            if (node.is_string   ) { complete(node, sk_lit, t_str); return; }
+            if (node.is_string) {
+                node.str_data_offset = add_data(node.text, ast);
+                complete(node, sk_lit, t_str);
+                return;
+            }
             if (node.can_be_uint ) { complete(node, sk_lit, t_u32); return; }
             if (node.can_be_int  ) { complete(node, sk_lit, t_i32); return; }
             if (node.can_be_float) { complete(node, sk_lit, t_f32); return; }
@@ -166,7 +170,7 @@ namespace asts {
             }
 
             if (node.id == bi_decl_local_id) {
-                if_chain2 (id_node, type_node, node.child_chain)   ; else { dbg_fail_return; }
+                if_chain2 (id_node, type_node, node.child_chain); else { dbg_fail_return; }
                 if_var1   (type, find_type(type_node.id)); else { dbg_fail_return; }
                 let init_node_p = type_node.next;
 
@@ -197,22 +201,21 @@ namespace asts {
                 return;
             }
 
-            if (node.id == bi_sub_of_id) {
-                if_chain2(sub_of_index, sub_of_node, node.child_chain); else { dbg_fail_return; }
-                if_var1  (idx, get_uint(sub_of_index)); else { dbg_fail_return; }
-                analyze(sub_of_index, scope, ast);
-                if (sub_of_index.sem_kind == sk_lit); else { printf("Only literals can be used as sub-of.\n"); node_error(node); return; }
+            if (node.id == bi_sub_id) {
+                if_chain2(index_node, sub_node, node.child_chain); else { dbg_fail_return; }
+                if_var1  (idx, get_uint(index_node)); else { dbg_fail_return; }
+                analyze(index_node, scope, ast);
+                if (index_node.sem_kind == sk_lit); else { printf("Only literals can be used as sub-of.\n"); node_error(node); return; }
 
-                analyze(sub_of_node, scope, ast);
+                analyze(sub_node, scope, ast);
+                if (sub_node.sem_kind == sk_local_get); else { printf("Only local variables can be used as sub-of.\n"); node_error(node); return; }
 
-                if (sub_of_node.sem_kind == sk_local_get); else { printf("Only local variables can be used as sub-of.\n"); node_error(node); return; }
+                let size = size_32_of(sub_node.value_type);
+                if (idx < size); else { printf("Index %u is out of bounds for type %s.\n", idx, sub_node.text.data); node_error(node); return; }
 
-                let size = size_32_of(sub_of_node.value_type);
-                if (idx < size); else { printf("Index %u is out of bounds for type %s.\n", idx, sub_of_node.text.data); node_error(node); return; }
-
-                node.sub_index   = sub_of_index.uint_value;
-                node.sub_of_node = &sub_of_node;
-                complete(node, sk_sub_of, t_u32);
+                node.sub_index = index_node.uint_value;
+                node.sub_node  = &sub_node;
+                complete(node, sk_sub, t_u32);
                 return;
             }
 
@@ -295,7 +298,7 @@ namespace asts {
 
         void expand(fn& fn, ast& ast) {
             if_ref(macro, fn.macro); else { dbg_fail_return; }
-            ref exp = add_expansion(fn, macro, nullptr, nullptr, ast);
+            ref exp = add_expansion(fn, macro, nullptr, ast);
             fn.expansion = &exp;
             bind_fn_params(exp);
 
@@ -331,9 +334,17 @@ namespace asts {
             node.exp_source  = &src_node;
             node.expansion   = &exp;
 
-            if_ref (fn, exp.fn); else { node_error(node); return nullptr; }
 
             switch (src_node.sem_kind) {
+                case sk_ret: {
+                    if_ref(scope, node.scope); else { node_error(node); break; }
+                    // TODO: fix depth!!!
+                    // need to include expansion/embedding depth as well
+                    node.ret_depth = scope.depth;
+
+                    node.child_chain = expand(*src_node.child_chain, &node, exp, ast);
+                    break;
+                }
                 case sk_local_decl: {
                     if_ref(loc, node.decled_local); else { node_error(node); break; }
                     node.decl_local_index_in_fn = add_and_bind_fn_local(loc.value_type, exp);
@@ -357,7 +368,8 @@ namespace asts {
                     }
 
                     // We embed the code in the context of parent expansion.
-                    node.embedded_code = expand(code, parent_p, *exp.parent, ast);
+                    if_ref(parent_exp, exp.parent); else { node_error(node); break; }
+                    node.embedded_code = expand(code, parent_p, parent_exp, ast);
                     break;
                 }
                 case sk_macro_expand: {
@@ -367,7 +379,8 @@ namespace asts {
                         node_error(src_node); break;
                     }
 
-                    ref new_exp = add_expansion(fn, refed_macro, &exp, parent_p, ast);
+                    if_ref (fn, exp.fn); else { node_error(node); return nullptr; }
+                    ref new_exp = add_expansion(fn, refed_macro, &exp, ast);
 
                     let params = params_of(refed_macro);
                     var arg_node_p = src_node.child_chain;
@@ -403,6 +416,12 @@ namespace asts {
                     if_ref(body_scope, refed_macro.body_scope); else { node_error(src_node); break; }
                     node.macro_expansion = &new_exp;
                     new_exp.generated_chain = expand_chain(body_scope.chain, parent_p, new_exp, ast);
+                    break;
+                }
+                case sk_sub: {
+                    if_ref(n, node.sub_node); else { node_error(node); break; }
+                    if_ref(l, n.refed_local); else { node_error(node); break; }
+                    node.sub_fn_offset = find_local_offset(l.index_in_macro, exp) + node.sub_index;
                     break;
                 }
 

@@ -8,17 +8,15 @@
 #include "asts.h"
 
 namespace asts {
-    inline void print_ast (const ast& ast);
-    inline void print_node(const node& node);
-    inline void print_exp(const expansion& exp, const ast& ast);
+    inline void print_ast (const ast&);
+    inline void print_node(const node&);
+    inline void print_exp (const expansion&, const ast&);
 
     namespace printing {
-
         void print_node_chain(const node*);
 
-        void print_exp           (const expansion& exp, uint level, const ast& ast);
-        void print_exp_node_chain(const node*, uint level, const ast& ast);
-        void print_exp_node      (const node&, uint level, const ast& ast);
+        void print_exp_node_chain(const node*, uint level, const ast&);
+        void print_exp_node      (const node&, uint level, const ast&);
     }
 
     inline void print_ast(const ast& ast) {
@@ -69,13 +67,6 @@ namespace asts {
             }
         }
 
-        void print_exp(const expansion& exp, uint level, const ast& ast) {
-            if_ref(macro, exp.macro); else { dbg_fail_return; }
-            let macro_id = text_of(macro.id, ast);
-            printf("%*cexpanded: %.*s\n", level * 4, ' ', (int) macro_id.count, macro_id.data);
-            print_exp_node_chain(exp.generated_chain, level + 1, ast);
-        }
-
         void print_exp_node_chain(const node* chain, uint level, const ast& ast) {
             for_chain(chain)
                 print_exp_node(*it, level, ast);
@@ -90,6 +81,13 @@ namespace asts {
             if (node.is_string) printf("\"");
 
             switch (node.sem_kind) {
+                case sk_ret: {
+                    if_ref(scope, node.scope); else { dbg_fail_return; }
+                    printf("^%u\n", scope.depth);
+                    if_ref(ret_node, node.child_chain)
+                        print_exp_node(ret_node, level + 1, ast);
+                    break;
+                }
                 case sk_macro_expand: {
                     printf(" ->\n");
                     if_ref(exp  , node.macro_expansion); else { dbg_fail_return; }
@@ -117,7 +115,7 @@ namespace asts {
                     if_ref(loc, node.decled_local); else { dbg_fail_return; }
                     let id = text_of(loc.id, ast);
                     printf(" %.*s $%u\n", (int) id.count, id.data, node.decl_local_index_in_fn);
-                    print_exp_node_chain(node.init_node, level + 1, ast);
+                    print_exp_node(*node.init_node, level + 1, ast);
                     break;
                 }
                 case sk_local_get: {
