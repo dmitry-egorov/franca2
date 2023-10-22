@@ -140,8 +140,7 @@ namespace asts {
         string file_path;
 
         //// semantics
-        expansion* expansion;
-        node     * exp_source;
+        expansion* exp;
 
         enum struct stage_t {
             ns_scoping = 0,
@@ -156,7 +155,8 @@ namespace asts {
         enum struct sem_kind_t {
             sk_unknown,
             sk_lit,
-            sk_block,
+            sk_list,
+            sk_scope,
             sk_ret,
             sk_wasm_type,
             sk_wasm_op,
@@ -174,9 +174,6 @@ namespace asts {
         } sem_kind;
 
         union {
-            struct {
-                uint ret_depth;
-            };
             struct { // sk_wasm_op
                 wasm_emit::wasm_opcode wasm_op;
             };
@@ -201,7 +198,6 @@ namespace asts {
             struct { // sk_local_get & sk_local_ref & sk_code_embed
                 local* refed_local;
                 uint   local_index_in_fn;
-                node* embedded_code;
             };
             struct { // sk_chr
                 u8 chr_value;
@@ -302,8 +298,12 @@ namespace asts {
         arr_dyn<var_binding> bindings;
 
         node* generated_chain;
+        node* source_node;
 
         expansion* parent;
+
+        // wasm gen
+        uint wasm_block_depth;
     };
 
 //begin ---- old ----
@@ -347,6 +347,9 @@ namespace asts {
 #define for_chain2(it_name, first_node) for (var it_name = first_node; it_name; it_name = it_name->next)
 
 #define BUILTINS \
+    BI(          bi_list, "."             ) \
+    BI(         bi_scope, "scope"         ) \
+    BI(         bi_block, "{}"            ) \
     BI(          bi_main, "main"          ) \
     BI(bi_emit_local_get, "emit_local_get") \
     BI(    bi_decl_local, "var"           ) \
@@ -355,8 +358,6 @@ namespace asts {
     BI(          bi_code, "#"             ) \
     BI(           bi_def, "def"           ) \
     BI(      bi_def_wasm, "def_wasm"      ) \
-    BI(         bi_block, "{}"            ) \
-    BI(          bi_list, "."             ) \
     BI(           bi_ret, "ret"           ) \
     BI(            bi_as, "as"            ) \
     BI(            bi_if, "if"            ) \
@@ -391,7 +392,7 @@ namespace asts {
         var ast = asts::ast {
             .symbols    = make_string_table(32, data_arena),
 
-            .nodes      = make_arr_buck<node     >(2048, data_arena),
+            .nodes      = make_arr_buck<node     >(4096, data_arena),
             .macros     = make_arr_buck<macro    >( 256, data_arena),
             .scopes     = make_arr_buck<lex_scope>( 512, data_arena),
             .fns        = make_arr_buck<fn       >(  64, data_arena),
@@ -448,10 +449,10 @@ namespace asts {
         return ast.symbols.strings_in_order[id];
     }
 
-    inline node& add_node(ast& ast, const node& node) { return push(node, ast.nodes); }
+    inline node& add_node(const node& node, ast& ast) { return push(node, ast.nodes); }
 
     inline lex_scope& add_scope(macro& parent_macro, lex_scope* parent_scope, node* body_nodes, ast& ast) {
-        return push(lex_scope {
+        return push({
             .macro = &parent_macro,
             .chain   = body_nodes,
             .locals = make_arr_dyn<local*>(16, ast.data_arena),

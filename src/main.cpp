@@ -161,11 +161,14 @@ static bool init() {
     //push(source_files, (cstr)"embedded/test0.fr");
     //push(source_files, (cstr)"embedded/primitives_test.fr");
     //push(source_files, (cstr)"embedded/fib.fr");
-    //push(source_files, (cstr)"embedded/prelude.fr");
+    //push(source_files, (cstr)"embedded/prelude_old.fr");
 
     //push(source_files, (cstr)"embedded/scope_vars_test.fr");
     //push(source_files, (cstr)"embedded/ref_test.fr");
-    push(source_files, (cstr)"embedded/macro_test.fr");
+
+    //push(source_files, (cstr)"embedded/prelude.fr");
+    //push(source_files, (cstr)"embedded/macro_test.fr");
+    push(source_files, (cstr)"embedded/ret_depth.fr");
 
     let old_compiler = false;
 

@@ -1,0 +1,20 @@
+returns are lexical, meaning they return from the macro they are lexically in
+
+foo();
+
+foo :: fn {
+    bar({
+        return;
+    }); // means we return from the foo
+    print("after bar");
+}
+
+bar :: fn (a: () => ()) {
+    a();
+    print("after a");
+}
+
+// none of the prints should trigger
+
+implementation:
+- the depth is the sum of the depth of the lexical node and the depth of the embedding

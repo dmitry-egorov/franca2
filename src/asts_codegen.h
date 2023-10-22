@@ -21,9 +21,12 @@ namespace asts {
         using enum type_t;
         using enum binary_op;
 
-        void emit      (fn&  , ast&);
-        void emit_chain(node*, ast&);
-        void emit      (node&, ast&);
+        struct context {
+        };
+
+        void emit      (fn&  , context& ctx, ast&);
+        void emit_chain(node*, context& ctx, ast&);
+        void emit      (node&, context& ctx, ast&);
 
         void emit_local_set(uint offset, type_t, stream&);
     }
@@ -38,7 +41,8 @@ namespace asts {
         ref fns = ast.fns;
 
         for_arr_buck_begin(fns, fn, __fn_i) {
-            emit(fn, ast);
+            var ctx = context{};
+            emit(fn, ctx, ast);
             if (fn.id == bi_main_id) {
                 ref body = fn.body_wasm;
                 emit(op_i32_const, 0u, body);
@@ -119,41 +123,45 @@ namespace asts {
     namespace codegen {
         using enum fn::kind_t;
 
-        void emit(fn& fn, ast& ctx) {
+        void emit(fn& fn, context& ctx, ast& ast) {
             if (fn.kind == fk_regular); else return;
 
             if_ref(exp, fn.expansion); else { dbg_fail_return; }
-            emit_chain(exp.generated_chain, ctx);
+            emit_chain(exp.generated_chain, ctx, ast);
         }
 
-        void emit_chain(node* chain, ast& ctx) {
+        void emit_chain(node* chain, context& ctx, ast& ast) {
             for_chain(chain)
-                emit(*it, ctx);
+                emit(*it, ctx, ast);
         }
 
-        void emit(node& node, ast& ast) {
+        void emit(node& node, context& ctx, ast& ast) {
             using enum local::kind_t;
             using enum node::sem_kind_t;
 
-            if_ref(exp, node.expansion); else { node_error(node); return; }
-            if_ref(fn , exp .fn       ); else { node_error(node); return; }
+            if_ref(exp, node.exp); else { node_error(node); return; }
+            if_ref(fn , exp .fn ); else { node_error(node); return; }
 
             ref wasm = fn.body_wasm;
 
             if (node.sem_kind == sk_macro_decl) { return; }
 
-            if (node.sem_kind == sk_block) {
-                //emit(op_block, wasm_types_of(node.value_type, false), wasm);
-                emit_chain(node.child_chain, ast);
-                //emit(op_end, wasm);
+            if (node.sem_kind == sk_list) {
+                emit_chain(node.child_chain, ctx, ast);
+                return;
+            }
+
+            if (node.sem_kind == sk_scope) {
+                exp.wasm_block_depth += 1; defer { exp.wasm_block_depth -= 1; };
+                emit_chain(node.child_chain, ctx, ast);
                 return;
             }
 
             if (node.sem_kind == sk_ret) {
                 if_ref(value_node, node.child_chain)
-                    emit(value_node, ast);
+                    emit(value_node, ctx, ast);
 
-                emit(op_br, node.ret_depth, wasm);
+                emit(op_br, exp.wasm_block_depth, wasm);
                 return;
             }
 
@@ -185,9 +193,6 @@ namespace asts {
             if (node.sem_kind == sk_wasm_op) {
                 emit(node.wasm_op, wasm);
 
-                //if (node.wasm_op == op_block || node.wasm_op == op_loop || node.wasm_op == op_if) exp.block_depth += 1;
-                //if (node.wasm_op == op_end) exp.block_depth -= 1;
-
                 for_chain(node.child_chain) {
                     ref arg = *it;
                     assert(arg.sem_kind == sk_lit);
@@ -198,7 +203,7 @@ namespace asts {
 
             if (node.sem_kind == sk_local_decl) {
                 if_ref(init_node, node.init_node); else { node_error(node); return; }
-                emit(init_node, ast);
+                emit(init_node, ctx, ast);
                 emit_local_set(fn.local_offsets[node.decl_local_index_in_fn], init_node.value_type, wasm);
                 return;
             }
@@ -222,8 +227,10 @@ namespace asts {
             }
 
             if (node.sem_kind == sk_code_embed) {
-                if_ref (code, node.embedded_code); else { node_error(node); return; }
-                emit(code, ast);
+                if_ref(code, node.child_chain); else { node_error(node); return; }
+                if_ref(code_exp, code.exp); else { node_error(node); return; }
+                code_exp.wasm_block_depth += exp.wasm_block_depth; defer { code_exp.wasm_block_depth -= exp.wasm_block_depth; };
+                emit(code, ctx, ast);
                 return;
             }
 
@@ -239,11 +246,11 @@ namespace asts {
 
             if (node.sem_kind == sk_each) {
                 /*if_ref (l, node.each_list_local); else { node_error(node); return; }
-                if_ref (code, find_code(l.index_in_macro, ast)); else { node_error(node); return; }
+                if_ref (code, find_code(l.index_in_macro, ctx, ast)); else { node_error(node); return; }
                 //if (code.sem_kind == sk_block); else { printf("Only blocks can be used as arguments to 'each'\n"); node_error(node); return; }
 
                 for_chain(code.child_chain) {
-                    //emit(*it, ast);
+                    //emit(*it, ctx, ast);
                     //TODO: bind 'it', embed body
                     //TODO: need to type-check here...
                 }
@@ -261,20 +268,20 @@ namespace asts {
                     if (local.kind == lk_value); else continue;
                     ref b = macro_exp.bindings[i];
                     if_ref(init_node, b.init); else continue; //NOTE: we're using the passed local directly
-                    emit(init_node, ast);
+                    emit(init_node, ctx, ast);
                     emit_local_set(fn.local_offsets[b.index_in_fn], init_node.value_type, wasm);
                 }
 
-                if (macro.has_returns) emit(op_block, wasm_types_of(macro.result_type, false), wasm);
-                defer { if (macro.has_returns) emit(op_end, wasm); };
+                        if (macro.has_returns) { emit(op_block, wasm_types_of(macro.result_type, false), wasm); }
+                defer { if (macro.has_returns) { emit(op_end, wasm); }};
 
-                emit_chain(macro_exp.generated_chain, ast);
+                emit_chain(macro_exp.generated_chain, ctx, ast);
                 return;
             }
 
             if (node.sem_kind == sk_fn_call) {
                 if_ref(refed_fn, node.refed_fn); else { node_error(node); return; }
-                emit_chain(node.child_chain, ast);
+                emit_chain(node.child_chain, ctx, ast);
                 emit(op_call, refed_fn.index, wasm);
                 return;
             }

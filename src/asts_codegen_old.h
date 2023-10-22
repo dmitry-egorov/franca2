@@ -210,7 +210,7 @@ namespace asts {
 
             if (node.sem_kind == sk_macro_decl) { return; }
 
-            if (node.sem_kind == sk_block) {
+            if (node.sem_kind == sk_scope) {
                 emit(op_block, wasm_types_of(node.value_type, false), wasm); defer { emit(op_end, wasm); };
                 emit_chain(node.child_chain, ctx);
                 return;

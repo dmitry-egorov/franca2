@@ -1,0 +1,2 @@
+- maybe the name resolution should be done early
+    - the resolution binds to multiple definitions, the result is selected at the expansion stage

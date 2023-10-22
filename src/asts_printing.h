@@ -83,7 +83,8 @@ namespace asts {
             switch (node.sem_kind) {
                 case sk_ret: {
                     if_ref(scope, node.scope); else { dbg_fail_return; }
-                    printf("^%u\n", scope.depth);
+                    //printf("^%u", scope.depth);
+                    printf("\n");
                     if_ref(ret_node, node.child_chain)
                         print_exp_node(ret_node, level + 1, ast);
                     break;
@@ -108,7 +109,7 @@ namespace asts {
                 }
                 case sk_code_embed: {
                     printf(" <-\n");
-                    print_exp_node_chain(node.embedded_code, level + 1, ast);
+                    print_exp_node_chain(node.child_chain, level + 1, ast);
                     break;
                 }
                 case sk_local_decl: {

@@ -1,7 +1,4 @@
-- [ ] expansions at analysis stage
-    - [ ] generate expansions at analysis stage
-    - [ ] emit wasm from generated expansions
-    - [ ] implement ##
+- [ ] implement varargs
 - [ ] implement print
     - [+] use name[mode type] syntax for parameters
     - [+] def takes a list of definitions
@@ -84,7 +81,17 @@
 - [ ] wasm jit?
 
 done
-- [~] transition to separate analysis stage
+- [+] macro return depth
+    - [+] remove tracking depth by wasm ops (unreliable)
+        - [+] introduce 'scope' and 'list' builtin
+            - list is just a list of nodes without a scope
+                - needed for passing multiple nodes to a single parameter without creating a scope
+                - maybe remove later, when varargs are implemented
+        - [+] track depth by scopes in the expansions
+- [+] expansions at analysis stage
+    - [+] generate expansions at analysis stage
+    - [+] emit wasm from generated expansions
+- [+] transition to separate analysis stage
     - [+] def
     - [+] literals
     - [+] wasm op
@@ -96,7 +103,6 @@ done
     - [+] if   : in franca
     - [+] while: in franca
     - [+] as
-
 - [+] reimplement scopes
 - [+] analysis pipeline
 - [+] +=, -=, *=, /=, %= ...

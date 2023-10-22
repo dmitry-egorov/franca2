@@ -108,12 +108,12 @@ namespace asts {
 
             // TODO: record line and column
             // TODO: a clean way to do that is to make a separate iterator
-            ref result = add_node(ast, node {
+            ref result = add_node({
                 .text      = text,
                 .id = id_of(text, ast),
                 .is_string = text_is_quoted,
                 .file_path = file_path
-            });
+            }, ast);
 
             if (!text_is_quoted) {
                 var text_copy = text;
