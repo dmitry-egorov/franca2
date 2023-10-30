@@ -237,7 +237,6 @@ namespace asts {
         arr_dyn<asts::macro*> macros;
 
         lex_scope* parent;
-        uint depth;
     };
 
     struct macro {
@@ -287,8 +286,8 @@ namespace asts {
 
     struct var_binding {
         uint  index_in_fn;
-        node* code; // NOTE: lexical  node
-        node* init; // NOTE: expanded node
+        node* code; // NOTE: lexical code node
+        node* init; // NOTE: expanded init node
     };
 
     struct expansion {
@@ -422,9 +421,10 @@ namespace asts {
     inline auto is_uint_literal (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.can_be_uint && !node.is_string; }
     inline auto is_float_literal(const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.can_be_float && !node.is_string; }
     inline auto is_str_literal  (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.is_string; }
-    inline auto get_int  (const node& node   ) -> ret1<int  >  { if (is_int_literal  (node)) return ret1_ok(node.  int_value); else return ret1_fail; }
-    inline auto get_uint (const node& node   ) -> ret1<uint >  { if (is_uint_literal (node)) return ret1_ok(node. uint_value); else return ret1_fail; }
-    inline auto get_float(const node& node   ) -> ret1<float>  { if (is_float_literal(node)) return ret1_ok(node.float_value); else return ret1_fail; }
+
+    inline auto get_int  (const node& node) -> ret1<int  > { if (is_int_literal  (node)) return ret1_ok(node.  int_value); else return ret1_fail; }
+    inline auto get_uint (const node& node) -> ret1<uint > { if (is_uint_literal (node)) return ret1_ok(node. uint_value); else return ret1_fail; }
+    inline auto get_float(const node& node) -> ret1<float> { if (is_float_literal(node)) return ret1_ok(node.float_value); else return ret1_fail; }
 
     inline auto get_id(const node& n) -> ret1<string> { if (is_func(n)) return ret1_ok(n.text); else return ret1_fail; }
 
@@ -458,7 +458,6 @@ namespace asts {
             .locals = make_arr_dyn<local*>(16, ast.data_arena),
             .macros = make_arr_dyn<macro*>( 4, ast.data_arena),
             .parent = parent_scope,
-            .depth  = parent_scope ? parent_scope->depth + 1 : 0
         }, ast.scopes);
     }
 

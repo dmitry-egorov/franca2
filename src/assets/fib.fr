@@ -21,3 +21,4 @@ def[rec_fib_at istr["recursive fib at "$[n u32]] u32 {}[
     if[==[n 0] ret[0]]
     if[==[n 1] ret[1]]
     ret[+[()[rec_fib_at[()[-[n 1]]]] ()[rec_fib_at[()[-[n 2]]]]]]]]
+

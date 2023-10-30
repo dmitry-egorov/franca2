@@ -234,20 +234,6 @@ namespace asts {
                 return;
             }
 
-            if (node.id == bi_varargs_id) {
-                if_chain2(list_node, body_node, node.child_chain); else { dbg_fail_return; }
-                analyze(list_node, scope, ast);
-
-                if (list_node.sem_kind == sk_code_embed); else { printf("Only code vars can be used as arguments for 'each'.\n"); node_error(node); return; }
-                if_ref(l, list_node.refed_local); else { dbg_fail_return; }
-                if (l.kind == lk_code); else { printf("Only code vars can be used as arguments for 'each'.\n"); node_error(node); return; }
-
-                node.each_list_local = list_node.refed_local;
-                node.each_body_node  = &body_node;
-                complete(node, sk_each, t_void);
-                return;
-            }
-
             // macro invocation or function call
             {
                 var has_arg_of_type_any = false;
@@ -284,16 +270,18 @@ namespace asts {
         }
 
         void gather_param(node& prm_node, macro& macro) {
-            if_chain2(prm_kind_node, prm_type_node, prm_node.child_chain); else { dbg_fail_return; }
+            if_ref(prm_kind_node, prm_node.child_chain); else { dbg_fail_return; }
 
-            let is_ref  = prm_kind_node.id == bi_ref_id;
-            let is_val  = prm_kind_node.id == bi_in_id;
-            let is_code = prm_kind_node.id == bi_code_id;
+            let is_ref    = prm_kind_node.id == bi_ref_id;
+            let is_val    = prm_kind_node.id == bi_in_id;
+            let is_code   = prm_kind_node.id == bi_code_id;
             if (is_ref || is_val || is_code); else { dbg_fail_return; }
 
-            if_var1(value_type, find_type(prm_type_node.id)); else value_type = t_void;
+            var value_type = t_void;
+            if_ref (prm_type_node, prm_kind_node.next) {
+                if_set1(value_type, find_type(prm_type_node.id)) {}
+            }
 
-            //TODO: support other kinds
             let kind = is_ref ? lk_ref : is_val ? lk_value : lk_code;
             add_param(prm_node.id, kind, value_type, macro);
             prm_node.value_type = value_type;
@@ -412,7 +400,7 @@ namespace asts {
                             continue;
                         }
 
-                        if (arg_node.sem_kind != sk_local_get && param.kind == lk_value) {
+                        if (param.kind == lk_value && arg_node.sem_kind != sk_local_get) {
                             if_ref(exp_arg_node, expand(arg_node, parent_p, exp, ast)); else { node_error(src_node); break; }
                             let type = arg_node.value_type;
                             add_and_bind_fn_local(type, new_exp);

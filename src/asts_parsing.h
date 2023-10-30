@@ -101,7 +101,10 @@ namespace asts {
         node* parse_node(string& it, string file_path, ast& ast) {
             var text = string {};
             var text_is_quoted = true;
-            if_set1(text, take_str(it)); else {
+            if_set1(text, take_str(it)){
+                //TODO: unescape string
+
+            } else {
                 text = take_until_any(it, view(" \t\n\r[]\""));
                 text_is_quoted = false;
             }

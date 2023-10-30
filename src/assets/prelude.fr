@@ -1,16 +1,22 @@
 ////////////////////////////////////////
 def[
-    print_str[.[ptr[# u32] len[# u32]] . .[print_str[make_str[ptr len]]]]
+    print_u32[.[x[# u32]] . .[
+        var[dst u32 1024]
+        push_u32[x dst]
+        print_str[1024 -[dst 1024]]
+    ]]
 
-    push_str[.[n[$ u32] dst[& u32]] . .[
+    print_str[.[ptr[# u32] len[# u32]] . print_str[make_str[ptr len]]]
+
+    push_u32[.[n[$ u32] dst[& u32]] . .[
         if[==[n 0] .[push_chr[chr[0] dst] ret]]
 
         var[d u32 1000000000]
         while[>[d n] /=[d 10]]
 
-        while[>[d 0] .[
+        while[>[d 0] {}[.[
             push_chr[()[+[chr[0] %[()[/[n d]] 10]]] dst]
-            /=[d 10]]]]]
+            /=[d 10]]]]]]
 
     push_str[.[s[$ str] dst[& u32]] . .[copy_str[s dst] +=[dst sub[1 s]]]]
     push_chr[.[c[$ u32] dst[& u32]] . .[store_u8[c dst] +=[dst 1]]]
@@ -22,27 +28,25 @@ def[
     store_u8[.[ch [# u32]              dst[# u32]] . .[dst ch op_i32_store8[0 0]]]
 
     ()[.[a[# u32]] u32 a]
-    {}[.[a[# .]] vt_void .[
-        .[op_block vt_void
+    {}[.[a[#]] .
+        scope[op_block vt_void
             a
-        op_end]]]
+        op_end]]
 
-    if[.[a[# u32] b[# .]] . .[
+    if[.[a[# u32] b[#]] . .[
         a
-        .[op_if vt_void
+        scope[op_if vt_void
             b
         op_end]]]
 
-    while[.[a[# u32] b[# .]] . .[
-        {}[
-            .[op_loop vt_void
-                a
-                op_i32_eqz
-                op_br_if[1]
-                    b
-                op_br[0]
-            op_end]
-        ]]]
+    while[.[a[# u32] b[#]] . {}[.[
+        scope[op_loop vt_void
+            a
+            op_i32_eqz
+            op_br_if[1]
+                b
+            op_br[0]
+        op_end]]]]
 
     floor[.[a[# f32]] f32 .[a op_f32_nearest]]
 

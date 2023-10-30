@@ -1,16 +1,16 @@
-// print_str["Hello, world!"]
-//
-// var[dst u32 1024]
-//
-// var[x u32 123]
-// push_str["x = " dst]
+print_str["Hello, world!"]
+
+
+var[x u32 123]
+print_str["x = "] print_u32[x]
+
 // push_str[x      dst]
 //
 // print_str[1024 -[dst 1024]]
 //
 // ret[-[fib_at[40] fib_at[30]]]
 
-ret[-[foo[53] 11]]
+ret[-[foo[52] 11]]
 
 def[foo[.[x[$ u32]] u32 .[if[==[x 53] ret[+[x 1]]] ret[+[x 2]]]]]
 
@@ -41,10 +41,10 @@ def[fib_at[.[n[$ u32]] u32 .[
     var[i  u32 2]
     var[v0 u32 0]
     var[v1 u32 1]
-    while[<=[i n] .[
+    while[<=[i n] {}[.[
         var[t u32 v1]
          +=[v1 v0]
           =[v0 t ]
-         +=[i  1 ]]]
+         +=[i  1 ]]]]
 
     ret[v1]]]]

@@ -16,26 +16,4 @@ def[
         {}[ret]
         print_str["after foo block"]
     ]
-
-    {}[.[a[# .]] .
-        scope[op_block vt_void
-            a
-        op_end]]
-
-    // if[.[a[# u32] b[##]] .
-    //     a
-    //     scope[op_if vt_void
-    //         b
-    //     op_end]]
-    //
-    // while[.[a[# u32] b[##]] . .[
-    //     {}[
-    //         scope[op_loop vt_void
-    //             a
-    //             op_i32_eqz
-    //             op_br_if[1]
-    //                 b
-    //             op_br[0]
-    //         op_end]
-    //     ]]]
 ]
