@@ -50,6 +50,3 @@ Do as much as possible at compile time.
 - any function can be executed at compile time
   - execute with jit
 - can take it further with edit time execution
-
-
-- implicitly passed context
