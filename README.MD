@@ -15,7 +15,6 @@ The user sees and edits a representation of the language, its ast, not the text.
   - to look like 'blueprints'
   - to look like ui: color selectors, sliders, panels, etc.
 - customizeable on a level of a macro, file, module, program.
-- user edits the representation directly; it's similar to editing an ast
 
 ### Extensible core language 
 
