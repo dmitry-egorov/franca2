@@ -39,7 +39,7 @@ Low level core language with optional high-level abstractions on top.
 Separating representation and the core language allows to introduce "filters" or code lens
 
 - e.g. toggle displaying types of parameters and variables
-- e.g. toggle displaying parts related to memory allocation (passing the allocator, freeing, etc.)
+- e.g. toggle displaying memory management (passing the allocator, freeing, etc.)
 - TODO: others?
 
 ### Arbitrary compile-time execution
