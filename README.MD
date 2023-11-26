@@ -30,7 +30,7 @@ Low level core language with optional high-level abstractions on top.
   - a macro is an example of a custom node; it's similar to an inline functions
   - a macro can be turned into a function
   - nodes have parameters
-- strongly typed (maybe even structurally typed, similar to golang)
+- statically typed (maybe even structurally typed, similar to golang)
 - no garbage collection in the core
 
 ### Code lens
