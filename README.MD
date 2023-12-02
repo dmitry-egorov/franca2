@@ -25,11 +25,10 @@ Low level core language with optional high-level abstractions on top.
 - the core language is very close to a syntax tree
   - lisp-like
   - nesting is unambiguous
-  - e.g.: *[a +[b c]], which means a * (b + c)
+  - e.g.: '*[a +[b c]]', which is displayed and edited as 'a * (b + c)'
 - the user defines custom node types of the ast
   - a macro is an example of a custom node; it's similar to an inline functions
   - a macro can be turned into a function
-  - nodes have parameters
 - statically typed (maybe even structurally typed, similar to golang)
 - no garbage collection in the core
 
