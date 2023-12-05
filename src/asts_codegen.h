@@ -27,7 +27,7 @@ namespace asts {
         void emit_local_set(uint offset, type_t, stream&);
     }
 
-    arr_view<u8> emit_wasm(ast& ast) {
+    inline arr_view<u8> emit_wasm(ast& ast) {
         using namespace codegen;
         using namespace wasm_emit;
         using enum fn::kind_t;
@@ -71,7 +71,7 @@ namespace asts {
             };
 
             if (fn.kind == fk_imported) {
-                push(imports, wasm_func_import{.module = text_of(fn.import_module, ast), .name = text_of(fn.id, ast), .type_index = fn_i});
+                push(imports, wasm_func_import{.module = text_of(fn.import_module, ast), .name = text_of(fn.id, ast), .type_index = (uint)fn_i});
                 continue;
             }
 
@@ -118,14 +118,14 @@ namespace asts {
     namespace codegen {
         using enum fn::kind_t;
 
-        void emit(fn& fn, ast& ast) {
+        inline void emit(fn& fn, ast& ast) {
             if (fn.kind == fk_regular); else return;
 
             if_ref(exp, fn.expansion); else { dbg_fail_return; }
             for_chain(exp.generated_chain) emit(*it, ast);
         }
 
-        void emit(node& node, ast& ast) {
+        inline void emit(node& node, ast& ast) {
             using enum local::kind_t;
             using enum node::sem_kind_t;
 
@@ -279,7 +279,7 @@ namespace asts {
             node_error(node);
         }
 
-        void emit_local_set(uint offset, type_t type, stream& dst) {
+        inline void emit_local_set(uint offset, type_t type, stream& dst) {
             let size = size_32_of(type);
             for_rng(0u, size)
                 emit(op_local_set, offset + (size - 1 - i), dst);

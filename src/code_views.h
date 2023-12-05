@@ -3,7 +3,7 @@
 
 #ifndef FRANCA2_CODE_VIEWS_H
 #define FRANCA2_CODE_VIEWS_H
-#include <cstring>
+
 #include "utility/syntax.h"
 #include "utility/primitives.h"
 #include "utility/results.h"
@@ -43,7 +43,8 @@ namespace code_views {
 
 #define using_cv_iterator(code_view_iterator) ref [view, builder, cell_idx, indent] = code_view_iterator; ref [arena, glyphs, colors, inlays, size, line_count] = view; ref [x, y] = cell_idx
 #define tmp_indent(it) it.indent += 1; defer { it.indent -= 1; }
-    code_view make_code_vew(const usize2& size, arena& arena = arenas::gta) { return {
+
+    inline code_view make_code_vew(const usize2& size, arena& arena = arenas::gta) { return {
         .scratch_arena = arena,
         .glyphs = alloc<u8>(arena, size.w * size.h),
         .colors = alloc<u8>(arena, size.w * size.h),
@@ -51,10 +52,10 @@ namespace code_views {
         .size = size
     };}
 
-    code_view_iterator iterate(code_view& cv) { return { .view = cv, .builder = make_string_builder(1024, cv.scratch_arena) }; }
+    inline code_view_iterator iterate(code_view& cv) { return { .view = cv, .builder = make_string_builder(1024, cv.scratch_arena) }; }
 
-    bool finished (const code_view_iterator& it) { using_cv_iterator(it); return y >= size.h; }
-    void next_line(code_view_iterator &it) {
+    inline bool finished (const code_view_iterator& it) { using_cv_iterator(it); return y >= size.h; }
+    inline void next_line(code_view_iterator &it) {
         using_cv_iterator(it);
         if (finished(it)) return;
 
@@ -62,7 +63,7 @@ namespace code_views {
         y += 1;
     }
 
-    ret1<bool> next_cell(code_view_iterator &it) {
+    inline ret1<bool> next_cell(code_view_iterator &it) {
         using_cv_iterator(it);
         if (finished(it)) return ret1_ok(false);
 
@@ -80,20 +81,20 @@ namespace code_views {
     void set_inlay     (code_view_iterator &it, inlay_type inlay);
     void set_inlay_prev(code_view_iterator &it, inlay_type inlay);
 
-    u8* cell_at(arr_view<u8>& view, const uint2& idx, const code_view& cv) {
+    inline u8* cell_at(arr_view<u8>& view, const uint2& idx, const code_view& cv) {
         if (idx.x >= 0 && idx.x < cv.size.w && idx.y >= 0 && idx.y < cv.size.h); else return nullptr;
         return &view[idx.y * cv.size.w + idx.x];
     }
 
-    void put_float(code_view_iterator &it, palette_color color, float value) {
+    inline void put_float(code_view_iterator &it, palette_color color, float value) {
         put_text(it, color, "%.2f", value);
     }
 
-    void put_uint(code_view_iterator &it, palette_color color, uint value) {
+    inline void put_uint(code_view_iterator &it, palette_color color, uint value) {
         put_text(it, color, "%u", value);
     }
 
-    void put_int(code_view_iterator &it, palette_color color, int value) {
+    inline void put_int(code_view_iterator &it, palette_color color, int value) {
         put_text(it, color, "%d", value);
     }
 
@@ -101,14 +102,14 @@ namespace code_views {
         put_text(it, color, make_string(it.view.scratch_arena, format, args...));
     }
 
-    void put_text_in_brackets(code_view_iterator &it, palette_color color, const string& text) {
+    inline void put_text_in_brackets(code_view_iterator &it, palette_color color, const string& text) {
         using enum inlay_type;
         set_inlay(it, open);
         put_text(it, color, text);
         set_inlay_prev(it, close);
     }
 
-    void put_text(code_view_iterator &it, palette_color color, const string& text) {
+    inline void put_text(code_view_iterator &it, palette_color color, const string& text) {
         var text_it = text;
         while(!is_empty(text_it)) {
             var c = take(text_it).v0;
@@ -135,25 +136,25 @@ namespace code_views {
         }
     }
 
-    void set_glyph(code_view_iterator &it, u8 glyph) {
+    inline void set_glyph(code_view_iterator &it, u8 glyph) {
         using_cv_iterator(it);
         if_ref(cell, cell_at(glyphs, cell_idx, view)); else return;
         cell = glyph;
     }
 
-    void set_color(code_view_iterator &it, palette_color color) {
+    inline void set_color(code_view_iterator &it, palette_color color) {
         using_cv_iterator(it);
         if_ref(cell, cell_at(colors, cell_idx, view)); else return;
         cell = (u8)color;
     }
 
-    void set_inlay(code_view_iterator &it, inlay_type inlay) {
+    inline void set_inlay(code_view_iterator &it, inlay_type inlay) {
         using_cv_iterator(it);
         if_ref(cell, cell_at(inlays, cell_idx, view)); else return;
         cell |= (u8)inlay;
     }
 
-    void set_inlay_prev(code_view_iterator &it, inlay_type inlay) {
+    inline void set_inlay_prev(code_view_iterator &it, inlay_type inlay) {
         using_cv_iterator(it);
         var idx = cell_idx;
         idx.x -= 1;

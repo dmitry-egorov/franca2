@@ -4,7 +4,6 @@
 #ifndef FRANCA2_ASTS_PRINTING_H
 #define FRANCA2_ASTS_PRINTING_H
 
-#include "strings.h"
 #include "asts.h"
 
 namespace asts {
@@ -53,10 +52,10 @@ namespace asts {
     namespace printing {
         using namespace printing;
         using namespace strings;
-        using enum asts::node::sem_kind_t;
-        using enum asts::local::kind_t;
+        using enum node::sem_kind_t;
+        using enum local::kind_t;
 
-        void print_node_chain(const node* first_node) {
+        inline void print_node_chain(const node* first_node) {
             var node_p = first_node;
             if (node_p) printf(node_p->prefix);
             while (node_p) {
@@ -67,12 +66,12 @@ namespace asts {
             }
         }
 
-        void print_exp_node_chain(const node* chain, uint level, const ast& ast) {
+        inline void print_exp_node_chain(const node* chain, uint level, const ast& ast) {
             for_chain(chain)
                 print_exp_node(*it, level, ast);
         }
 
-        void print_exp_node(const node& node, uint level, const ast& ast) {
+        inline void print_exp_node(const node& node, uint level, const ast& ast) {
             //assert(node.expansion);
             assert(node.sem_kind != sk_macro_decl);
             printf("%*c", level * 4, ' ');

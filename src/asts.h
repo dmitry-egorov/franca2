@@ -124,8 +124,6 @@ namespace asts {
 
         type_t value_type;
 
-        func* declared_func; //TODO: remove with compilation
-
         string prefix;
         string infix ;
         string suffix;

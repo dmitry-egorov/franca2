@@ -142,8 +142,8 @@ static bool init() {
     var code_view   = make_code_vew(code_view_size);
     var source_files = make_arr_dyn<cstr>(16);
 
-    push(source_files, (cstr)"embedded/hello_world.fr");
-    //push(source_files, (cstr)"embedded/macro_test.fr");
+    //push(source_files, (cstr)"embedded/hello_world.fr");
+    push(source_files, (cstr)"embedded/macro_test.fr");
     //push(source_files, (cstr)"embedded/ret_depth.fr");
     push(source_files, (cstr)"embedded/prelude.fr");
 

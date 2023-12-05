@@ -10,7 +10,6 @@
 #include "utility/arrays.h"
 #include "utility/iterators.h"
 
-
 namespace line_view_gen {
     namespace {
         using namespace arrays;
@@ -18,7 +17,7 @@ namespace line_view_gen {
     }
 
     struct line_view {
-        arr_view <uint8_t> glyphs;
+        arr_view<uint8_t> glyphs;
         uint width;
     };
 

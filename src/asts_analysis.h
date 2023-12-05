@@ -4,7 +4,6 @@
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "misc-no-recursion"
 
-#include "utility/strings.h"
 #include "utility/swap_queuess.h"
 #include "utility/wasm_emit.h"
 
@@ -20,11 +19,11 @@ namespace asts {
         void enqueue (node&, ast&);
 
         void expand      (fn&, ast&);
-        auto expand_chain(node*, node* parent, expansion&, ast&) -> node*;
-        auto expand      (node&, node* parent, expansion&, ast&) -> node*;
+        auto expand_chain(node*, node* parent_p, expansion&, ast&) -> node*;
+        auto expand      (node&, node* parent_p, expansion&, ast&) -> node*;
     }
 
-    void analyze(ast& ast) {
+    inline void analyze(ast& ast) {
         using namespace analysis;
         using enum node::stage_t;
         using enum type_t;
@@ -45,7 +44,7 @@ namespace asts {
                 if (queues_identical(ast.pipeline)) {
                     printf("Unprocessed nodes: \n");
                     for_arr(ast.pipeline.push_queue) {
-                        if_ref(node, ast.pipeline.push_queue[i]); else { dbg_fail_return; }
+                        if_cref(node, ast.pipeline.push_queue[i]); else { dbg_fail_return; }
                         let macro_id = node.scope->macro->id;
                         let macro_id_text = text_of(macro_id, ast);
 
@@ -84,15 +83,15 @@ namespace asts {
         using enum node::stage_t;
         using enum local::kind_t;
 
-        void analyze_chain(node* first_node, lex_scope& scope, ast& ast) {
+        inline void analyze_chain(node* first_node, lex_scope& scope, ast& ast) {
             for_chain(first_node)
                 analyze(*it, scope, ast);
         }
 
-        void analyze(node& node, lex_scope& scope, ast& ast) {
+        inline void analyze(node& node, lex_scope& scope, ast& ast) {
             if (!node.queued); else return;
 
-            ref stage = node.stage;
+            cref stage = node.stage;
 
             if (stage == ns_scoping) {
                 node.scope = &scope;
@@ -269,7 +268,7 @@ namespace asts {
             //printf("BAM!!! Queued: %.*s\n", (int)node.text.count, node.text.data);
         }
 
-        void gather_param(node& prm_node, macro& macro) {
+        inline void gather_param(node& prm_node, macro& macro) {
             if_ref(prm_kind_node, prm_node.child_chain); else { dbg_fail_return; }
 
             let is_ref    = prm_kind_node.id == bi_ref_id;
@@ -287,19 +286,19 @@ namespace asts {
             prm_node.value_type = value_type;
         }
 
-        void complete(node& node, node::sem_kind_t kind, type_t type) {
+        inline void complete(node& node, node::sem_kind_t kind, type_t type) {
             node.sem_kind   = kind;
             node.value_type = type;
             node.stage      = ns_complete;
         }
 
-        void enqueue(node& node, ast& ast) {
+        inline void enqueue(node& node, ast& ast) {
             assert(!node.queued);
             node.queued = true;
             push(ast.pipeline, &node);
         }
 
-        void expand(fn& fn, ast& ast) {
+        inline void expand(fn& fn, ast& ast) {
             if_ref(macro, fn.macro); else { dbg_fail_return; }
             ref exp = add_expansion(fn, macro, nullptr, ast);
             fn.expansion = &exp;
@@ -309,7 +308,7 @@ namespace asts {
             exp.generated_chain = expand_chain(scope.chain, nullptr, exp, ast);
         }
 
-        auto expand_chain(node* chain, node* parent_p, expansion& exp, ast& ast) -> node* {
+        inline auto expand_chain(node* chain, node* parent_p, expansion& exp, ast& ast) -> node* {
             var first_node = (node*)nullptr;
             var  prev_node = (node*)nullptr;
 
@@ -325,7 +324,7 @@ namespace asts {
             return first_node;
         }
 
-        auto expand(node& src_node, node* parent_p, expansion& exp, ast& ast) -> node* {
+        inline auto expand(node& src_node, node* parent_p, expansion& exp, ast& ast) -> node* {
             if (src_node.exp == nullptr); else { dbg_fail_return nullptr; }
             if (src_node.sem_kind != sk_macro_decl); else return nullptr;
 
@@ -338,13 +337,12 @@ namespace asts {
 
             switch (src_node.sem_kind) {
                 case sk_ret: {
-                    if_ref(scope, node.scope); else { node_error(node); break; }
                     // TODO: calculate depth here
                     node.child_chain = expand_chain(src_node.child_chain, &node, exp, ast);
                     break;
                 }
                 case sk_local_decl: {
-                    if_ref(loc, node.decled_local); else { node_error(node); break; }
+                    if_cref(loc, node.decled_local); else { node_error(node); break; }
                     node.decl_local_index_in_fn = add_and_bind_fn_local(loc.value_type, exp);
                     if_ref(init_node, node.init_node); else { node_error(node); break; }
                     node.init_node = expand(init_node, &node, exp, ast);
@@ -352,13 +350,13 @@ namespace asts {
                 }
                 case sk_local_get:
                 case sk_local_ref: {
-                    if_ref(local, node.refed_local); else { node_error(node); break; }
+                    if_cref(local, node.refed_local); else { node_error(node); break; }
                     node.local_index_in_fn = find_local_index(local.index_in_macro, exp);
                     break;
                 }
                 case sk_code_embed: {
-                    if_ref(local, node.refed_local); else { node_error(node); break; }
-                    if_ref(code, find_code_node(local.index_in_macro, exp)); else {
+                    if_cref(local, node.refed_local); else { node_error(node); break; }
+                    if_ref (code, find_code_node(local.index_in_macro, exp)); else {
                         printf("Failed to find code param %u\n", local.index_in_macro);
                         print_exp_bindings(exp, ast);
                         node_error(node);
@@ -377,7 +375,7 @@ namespace asts {
                         node_error(src_node); break;
                     }
 
-                    if_ref (fn, exp.fn); else { node_error(node); return nullptr; }
+                    if_ref(fn, exp.fn); else { node_error(node); return nullptr; }
                     ref new_exp = add_expansion(fn, refed_macro, &exp, ast);
 
                     let params = params_of(refed_macro);
@@ -394,7 +392,7 @@ namespace asts {
                         }
 
                         if (arg_node.sem_kind == sk_local_get && param.kind != lk_code) {
-                            if_ref(refed_local, arg_node.refed_local); else { node_error(src_node); break; }
+                            if_cref(refed_local, arg_node.refed_local); else { node_error(src_node); break; }
                             let fn_index = find_local_index(refed_local.index_in_macro, exp);
                             bind(fn_index, new_exp);
                             continue;
@@ -411,15 +409,15 @@ namespace asts {
                         node_error(src_node); break;
                     }
 
-                    if_ref(body_scope, refed_macro.body_scope); else { node_error(src_node); break; }
+                    if_cref(body_scope, refed_macro.body_scope); else { node_error(src_node); break; }
                     node.macro_expansion = &new_exp;
                     new_exp.source_node = &node;
                     new_exp.generated_chain = expand_chain(body_scope.chain, parent_p, new_exp, ast);
                     break;
                 }
                 case sk_sub: {
-                    if_ref(n, node.sub_node); else { node_error(node); break; }
-                    if_ref(l, n.refed_local); else { node_error(node); break; }
+                    if_cref(n, node.sub_node); else { node_error(node); break; }
+                    if_cref(l, n.refed_local); else { node_error(node); break; }
                     node.sub_fn_offset = find_local_offset(l.index_in_macro, exp) + node.sub_index;
                     break;
                 }
