@@ -8,14 +8,11 @@
 #include "utility/syntax.h"
 #include "utility/primitives.h"
 #include "utility/results.h"
-#include "utility/maths2.h"
 #include "utility/arrays.h"
 #include "utility/arenas.h"
 #include "utility/arr_bucks.h"
 #include "utility/strings.h"
-#include "utility/iterators.h"
 #include "utility/swap_queuess.h"
-#include "utility/files.h"
 #include "code_views.h"
 #include "utility/wasm_emit.h"
 
@@ -305,43 +302,6 @@ namespace asts {
         uint wasm_block_depth;
     };
 
-//begin ---- old ----
-    struct variable {
-        string id;
-        uint   index;
-        node*  code_node;
-        type_t value_type;
-
-        enum struct kind_t {
-            vk_unknown    ,
-            vk_local      ,
-            vk_param_value,
-            vk_param_ref  ,
-            vk_param_code ,
-            vk_enum_size  ,
-        } kind;
-    };
-
-    struct func {
-        string id;
-        uint index;
-
-        node*  body_node;
-        stream body_wasm;
-
-        bool is_inline_wasm;
-
-        arr_dyn<variable> params ;
-        arr_dyn<type_t  > results;
-        arr_dyn<variable> locals ;
-
-        bool   imported;
-        string import_module;
-
-        bool exported;
-    };
-//end ---- old ----
-
 #define for_chain(first_node) for (var it = first_node; it; it = it->next)
 #define for_chain2(it_name, first_node) for (var it_name = first_node; it_name; it_name = it_name->next)
 
@@ -387,7 +347,7 @@ namespace asts {
     inline uint id_of(string symbol, ast& ast);
     uint size_32_of(type_t type, bool void_as_empty = true);
 
-    ast make_ast(arena& data_arena, arena& temp_arena = gta) {
+    inline ast make_ast(arena& data_arena, arena& temp_arena = gta) {
         var ast = asts::ast {
             .symbols    = make_string_table(32, data_arena),
 
@@ -422,11 +382,10 @@ namespace asts {
     inline auto is_float_literal(const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.can_be_float && !node.is_string; }
     inline auto is_str_literal  (const node& node) -> bool { return node.lex_kind == node::lex_kind_t::lk_leaf && node.is_string; }
 
-    inline auto get_int  (const node& node) -> ret1<int  > { if (is_int_literal  (node)) return ret1_ok(node.  int_value); else return ret1_fail; }
-    inline auto get_uint (const node& node) -> ret1<uint > { if (is_uint_literal (node)) return ret1_ok(node. uint_value); else return ret1_fail; }
-    inline auto get_float(const node& node) -> ret1<float> { if (is_float_literal(node)) return ret1_ok(node.float_value); else return ret1_fail; }
-
-    inline auto get_id(const node& n) -> ret1<string> { if (is_func(n)) return ret1_ok(n.text); else return ret1_fail; }
+    inline auto get_int  (const node& node) -> ret1<int   > { if (is_int_literal  (node)) return ret1_ok(node.  int_value); return ret1_fail; }
+    inline auto get_uint (const node& node) -> ret1<uint  > { if (is_uint_literal (node)) return ret1_ok(node. uint_value); return ret1_fail; }
+    inline auto get_float(const node& node) -> ret1<float > { if (is_float_literal(node)) return ret1_ok(node.float_value); return ret1_fail; }
+    inline auto get_id   (const node& node) -> ret1<string> { if (is_func         (node)) return ret1_ok(node.text       ); return ret1_fail; }
 
     inline bool is_func(const node& node, string id) {
         if     (is_func(node)); else return false;
@@ -434,7 +393,7 @@ namespace asts {
     }
 
     inline bool parent_is_func(const node& node, string id) {
-        if_ref(parent, node.parent); else return false;
+        if_cref(parent, node.parent); else return false;
         return is_func(parent, id);
     }
 
@@ -461,7 +420,7 @@ namespace asts {
         }, ast.scopes);
     }
 
-    macro& add_macro(string_id id, lex_scope* parent_scope, node* body_chain, ast& ast) {
+    inline macro& add_macro(string_id id, lex_scope* parent_scope, node* body_chain, ast& ast) {
         ref macro = push(asts::macro {
             .id           = id,
             .locals       = make_arr_dyn<local    >(16, ast.data_arena),
@@ -475,17 +434,18 @@ namespace asts {
 
         return macro;
     }
-    macro& add_macro(cstr id, lex_scope* parent_scope, node* body_chain, ast& ast) {
+
+    inline macro& add_macro(cstr id, lex_scope* parent_scope, node* body_chain, ast& ast) {
         return add_macro(id_of(view(id), ast), parent_scope, body_chain, ast);
     }
 
-    local& add_local(string_id id, local::kind_t kind, type_t type, lex_scope& scope) {
+    inline local& add_local(string_id id, local::kind_t kind, type_t type, lex_scope& scope) {
         if_ref(macro, scope.macro); else { assert(false); }
 
         var index = macro.locals.count;
         ref local = push(macro.locals, asts::local {
             .id = id,
-            .index_in_macro = index,
+            .index_in_macro = (uint)index,
             .kind = kind,
             .value_type = type
         });
@@ -499,11 +459,11 @@ namespace asts {
         return add_local(id, kind, value_type, *macro.body_scope);
     }
 
-    arr_view<local> params_of(macro& macro) {
+    inline arr_view<local> params_of(macro& macro) {
         return {macro.locals.data.data, macro.params_count };
     }
 
-    expansion& add_expansion(fn& fn, macro& macro, expansion* parent, ast& ast) {
+    inline expansion& add_expansion(fn& fn, macro& macro, expansion* parent, ast& ast) {
         return push({
             .fn    = &fn,
             .macro = &macro,
@@ -512,13 +472,13 @@ namespace asts {
         }, ast.expansions);
     }
 
-    fn& add_fn(macro& macro, bool exported, ast& ast) {
+    inline fn& add_fn(macro& macro, bool exported, ast& ast) {
         let index   = count_of(ast.fns);
         let params  = params_of(macro);
 
-        ref fn = push({
+        ref fn = push(asts::fn {
             .id            = macro.id,
-            .index         = index,
+            .index         = (uint)index,
             .param_types   = make_arr_dyn<type_t>(params .count, ast.data_arena),
             .result_type   = macro.result_type,
             .kind          = fn::kind_t::fk_regular,
@@ -536,7 +496,7 @@ namespace asts {
         return fn;
     }
 
-    uint add_fn_local(type_t type, fn& fn) {
+    inline uint add_fn_local(type_t type, fn& fn) {
         let index = (uint)fn.local_types.count;
         push(fn.local_types  , type);
         push(fn.local_offsets, fn.next_local_offset);
@@ -544,11 +504,11 @@ namespace asts {
         return index;
     }
 
-    fn& add_import(string_id module_id, string_id id, arr_view<type_t> params, type_t result_type, ast& ast) {
+    inline fn& add_import(string_id module_id, string_id id, arr_view<type_t> params, type_t result_type, ast& ast) {
         let index = count_of(ast.fns);
         ref fn = push(asts::fn {
             .id      = id,
-            .index   = index,
+            .index   = (uint)index,
             .param_types  = make_arr_dyn<type_t>(params .count, ast.data_arena),
             .result_type = result_type,
             .kind = fn::kind_t::fk_imported,
@@ -560,11 +520,11 @@ namespace asts {
         return fn;
     }
 
-    fn& add_import(cstr module_id, cstr id, init_list<type_t> params, type_t result_type, ast& ast) {
+    inline fn& add_import(cstr module_id, cstr id, init_list<type_t> params, type_t result_type, ast& ast) {
         return add_import(id_of(view(module_id), ast), id_of(view(id), ast), view(params), result_type, ast);
     }
 
-    fn* find_fn(string_id id, arr_view<type_t> param_types, ast& ast) {
+    inline fn* find_fn(string_id id, arr_view<type_t> param_types, ast& ast) {
         for_arr_buck_begin(ast.fns, fn, fn_i) {
             if (fn.id == id); else continue;
 
@@ -586,7 +546,7 @@ namespace asts {
         return nullptr;
     }
 
-    macro* find_macro(string_id id, arr_view<type_t> param_types, lex_scope& scope) {
+    inline macro* find_macro(string_id id, arr_view<type_t> param_types, lex_scope& scope) {
         for(var scope_p = &scope; scope_p; ) {
             ref sc = *scope_p;
             var macros = sc.macros.data;
@@ -618,7 +578,7 @@ namespace asts {
         return nullptr;
     }
 
-    local* find_local(string_id id, lex_scope& scope) {
+    inline local* find_local(string_id id, lex_scope& scope) {
         for(var scope_p = &scope; scope_p; scope_p = scope_p->parent) {
             var locals = scope_p->locals.data;
             for_arr(locals) {
@@ -664,7 +624,7 @@ namespace asts {
     #define if_chain3(n0, n1, n2, first_node) if_var3(n0, n1, n2, deref3(first_node))
     #define if_chain4(n0, n1, n2, n3, first_node) if_var4(n0, n1, n2, n3, deref4(first_node))
 
-    ret1<type_t> find_type(string_id id) {
+    inline ret1<type_t> find_type(string_id id) {
         if (id == t_any_id ) return ret1_ok(t_any );
         if (id == t_void_id) return ret1_ok(t_void);
         if (id == t_i8_id  ) return ret1_ok(t_i8  );
@@ -682,7 +642,7 @@ namespace asts {
         return ret1_fail;
     }
 
-    arr_view<wasm_emit::wasm_type> wasm_types_of(type_t type, bool void_as_empty = true) {
+    inline arr_view<wasm_emit::wasm_type> wasm_types_of(type_t type, bool void_as_empty = true) {
         using enum wasm_emit::wasm_type;
 
         static let wasm_types_arr = alloc(gta, {vt_void, vt_i32, vt_i64, vt_f32, vt_f64, /* str */ vt_i32, vt_i32});
@@ -706,27 +666,27 @@ namespace asts {
         }
     }
 
-    uint size_32_of(type_t type, bool void_as_empty) {
+    inline uint size_32_of(type_t type, bool void_as_empty) {
         return wasm_types_of(type, void_as_empty).count;
     }
 
-    void print_symbols(ast& ast) {
+    inline void print_symbols(ast& ast) {
         printf("Symbols:\n");
         for_arr_buck_begin(ast.symbols.strings_in_order, symbol, symbol_i) {
             printf("%zu: %.*s\n", symbol_i, (int)symbol.count, symbol.data);
         } for_arr_buck_end
     }
 
-    void bind(node* code, expansion& exp) {
+    inline void bind(node* code, expansion& exp) {
         push(exp.bindings, {.index_in_fn = (uint)-1, .code = code});
     }
 
-    void bind(uint index_in_fn, expansion& exp) {
+    inline void bind(uint index_in_fn, expansion& exp) {
         assert(index_in_fn != (uint)-1);
         push(exp.bindings, {.index_in_fn = index_in_fn});
     }
 
-    void bind_fn_params(expansion& exp) {
+    inline void bind_fn_params(expansion& exp) {
         if_ref(fn, exp.fn); else { dbg_fail_return; }
         ref params = fn.param_types.data;
 
@@ -734,14 +694,14 @@ namespace asts {
             bind(i, exp);
     }
 
-    auto add_and_bind_fn_local(type_t type, expansion& exp) -> uint /* index */ {
+    inline auto add_and_bind_fn_local(type_t type, expansion& exp) -> uint /* index */ {
         if_ref(fn, exp.fn); else { dbg_fail_return -1; }
         let index = add_fn_local(type, fn);
         bind(index, exp);
         return index;
     }
 
-    auto find_binding(uint index_in_macro, expansion& exp) -> var_binding {
+    inline auto find_binding(uint index_in_macro, expansion& exp) -> var_binding {
         let bindings = exp.bindings.data;
         if (index_in_macro < bindings.count); else {
             printf("Failed to find binding for macro local %u\n", index_in_macro);
@@ -751,31 +711,31 @@ namespace asts {
         return bindings[index_in_macro];
     }
 
-    auto find_local_index(uint index_in_macro, expansion& exp) -> uint {
+    inline auto find_local_index(uint index_in_macro, expansion& exp) -> uint {
         return find_binding(index_in_macro, exp).index_in_fn;
     }
 
-    auto find_local_offset(uint index_in_macro, expansion& exp) -> uint {
+    inline auto find_local_offset(uint index_in_macro, expansion& exp) -> uint {
         if_ref(fn, exp.fn); else { dbg_fail_return -1; }
         return fn.local_offsets[find_local_index(index_in_macro, exp)];
     }
 
-    auto find_code_node(uint index_in_macro, expansion& exp) -> node* {
+    inline auto find_code_node(uint index_in_macro, expansion& exp) -> node* {
         return find_binding(index_in_macro, exp).code;
     }
 
-    uint add_data(string text, ast& ast) {
+    inline uint add_data(string text, ast& ast) {
         var offset = count_of(ast.data);
         push({(u8*)text.data, text.count}, ast.data);
         return offset;
     }
 
-    void node_error(node& node) {
+    inline void node_error(node& node) {
         printf("%.*s: Failed to compile node %.*s, kind: %u\n", (int)node.file_path.count, node.file_path.data, (int)node.text.count, node.text.data, (uint)node.sem_kind);
         dbg_fail_return;
     }
 
-    void print_exp_bindings(const expansion& exp, const ast& ast) {
+    inline auto print_exp_bindings(const expansion& exp, const ast& ast) -> void {
         if (exp.parent) print_exp_bindings(*exp.parent, ast);
 
         if_ref(macro, exp.macro); else { dbg_fail_return; }

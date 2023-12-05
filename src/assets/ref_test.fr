@@ -1,6 +1,0 @@
-var[a u32 1]
-=  [&[a] 2]
-+= [&[a] 3]
-
-def_wasm[=  istr[&[a u32]" = " $[b u32]] void op_local_set[a]]
-def_wasm[+= istr[&[a u32]" += "$[b u32]] u32 op_local_get[a] op_i32_add op_local_set[a]]

@@ -82,7 +82,7 @@ namespace asts {
                 push(w_locals, wasm_types_of(locals[li]));
 
             var wasm_func = wasm_emit::wasm_func {
-                .type_index = fn_i,
+                .type_index = (uint)fn_i,
                 .locals     = w_locals.data,
                 .body       = fn.body_wasm.data,
             };
@@ -270,7 +270,7 @@ namespace asts {
             }
 
             if (node.sem_kind == sk_fn_call) {
-                if_ref(refed_fn, node.refed_fn); else { node_error(node); return; }
+                if_cref(refed_fn, node.refed_fn); else { node_error(node); return; }
                 for_chain(node.child_chain) emit(*it, ast);
                 emit(op_call, refed_fn.index, wasm);
                 return;

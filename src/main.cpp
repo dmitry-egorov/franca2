@@ -33,28 +33,19 @@
 
 #include "code_views.h"
 
-#include "visual_asts.h"
-#include "visual_parser.h"
-#include "visual_display.h"
 #include "line_view_gen.h"
 
 #include "asts.h"
 #include "asts_parsing.h"
 #include "asts_printing.h"
-#include "asts_storage.h"
 #include "asts_analysis.h"
 #include "asts_codegen.h"
-#include "asts_codegen_old.h"
-#include "asts_compilation.h"
-#include "asts_display.h"
 
 using namespace arenas;
 using namespace wgpu_ex;
 using namespace wgpu_ex::png;
 using namespace emsc_ex;
-using namespace visual_asts::view_gen;
 using namespace line_view_gen;
-using namespace visual_asts::parser;
 
 //const char *ascii_chars = R"end( !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~)end";
 
@@ -140,7 +131,7 @@ static bool init() {
     if ((queue    = get_queue      (device))); else return false;
 
     res.uni_buf       = make_buffer<gpu_uniforms>(device, (WGPUBufferUsage) (WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform | WGPUBufferUsage_QueryResolve));
-    res.diag_text_buf = make_buffer(device, (WGPUBufferUsage) (WGPUBufferUsage_Storage), 256);
+    res.diag_text_buf = make_buffer(device, WGPUBufferUsage_Storage, 256);
 
     tmp(wrap_sampler, make_wrap_sampler(device));
 
@@ -148,72 +139,39 @@ static bool init() {
 
     printf("Resources loaded. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
-    var code_view = make_code_vew(code_view_size);
-    var cv_it = iterate(code_view);
-
-    //if_var1(ast, parse_file("embedded/test_program.frv")) else return false;
-    //print_ast(&ast);
-    //display(ast, cv_it);
-
+    var code_view   = make_code_vew(code_view_size);
     var source_files = make_arr_dyn<cstr>(16);
 
-    //push(source_files, (cstr)"embedded/hello_world.fr");
-    //push(source_files, (cstr)"embedded/test0.fr");
-    //push(source_files, (cstr)"embedded/primitives_test.fr");
-    push(source_files, (cstr)"embedded/fib.fr");
-    push(source_files, (cstr)"embedded/prelude_old.fr");
-
-    //push(source_files, (cstr)"embedded/scope_vars_test.fr");
-    //push(source_files, (cstr)"embedded/ref_test.fr");
-
+    push(source_files, (cstr)"embedded/hello_world.fr");
     //push(source_files, (cstr)"embedded/macro_test.fr");
     //push(source_files, (cstr)"embedded/ret_depth.fr");
-    //push(source_files, (cstr)"embedded/prelude.fr");
-
-    //let old_compiler = false;
-    let old_compiler = true;
+    push(source_files, (cstr)"embedded/prelude.fr");
 
     wasm_emit::init();
 
     var ast_data_arena = arenas::make(4 * 1024 * 1024);
     var ast = make_ast(ast_data_arena);
-    let parsing_start = std::chrono::high_resolution_clock::now();
+    let parsing_start = high_resolution_clock::now();
     parse_files(source_files.data, ast);
     printf("AST parsed in %lldms. Nodes: %zu. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - parsing_start).count(), count_of(ast.nodes), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     print_ast(ast);
     print_symbols(ast);
 
-    arr_view<u8> old_wasm = {};
     arr_view<u8> wasm = {};
 
-    if (old_compiler) {
-        let old_compile_start = std::chrono::high_resolution_clock::now();
-        printf("\n(WASM) Compiling...\n");
-        old_wasm = compile(ast);
-        printf("(WASM) Compiled in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - old_compile_start).count(), old_wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+    let compile_start = high_resolution_clock::now();
+    printf("\nAnalyzing...\n");
+    analyze(ast);
+    printf("Analyzed in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
-        let old_view_gen_start = std::chrono::high_resolution_clock::now();
-        printf("\nGenerating code view...\n");
-        display(ast, cv_it);
-        code_view.line_count = cv_it.cell_idx.y + 1;
-        printf(cv_it.builder.data);
-        printf("Code view generated in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - old_view_gen_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
-    } else {
-        let compile_start = std::chrono::high_resolution_clock::now();
-        printf("\nAnalyzing...\n");
-        analyze(ast);
-        printf("Analyzed in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - compile_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
+    printf("\nExpansion:\n");
+    print_exp(*ast.fns[1].expansion, ast);
 
-        printf("\nExpansion:\n");
-        print_exp(*ast.fns[1].expansion, ast);
-
-        let generate_start = std::chrono::high_resolution_clock::now();
-        printf("\nGenerating WASM...\n");
-        wasm = emit_wasm(ast);
-        //wasm = emit_wasm_old(ast);
-        printf("Generated in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - generate_start).count(), wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
-    }
+    let generate_start = high_resolution_clock::now();
+    printf("\nGenerating WASM...\n");
+    wasm = emit_wasm(ast);
+    printf("Generated in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - generate_start).count(), wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     if_var1(line_view, generate_line_view(code_view.line_count, line_view_size)); else return false;
 
@@ -230,14 +188,14 @@ static bool init() {
     );
 
     let bind_group = make_bind_group(device, pipeline, {
-        {.buffer       = res.uni_buf      },
-        {.sampler      = wrap_sampler     },
-        {.texture_view = font_tv          },
-        {.texture_view = line_glyph_tv    },
-        {.texture_view = code_glyph_tv    },
-        {.texture_view = code_color_tv    },
-        {.texture_view = code_inlay_tv    },
-        {.buffer       = res.diag_text_buf},
+        { .buffer       = res.uni_buf       },
+        { .sampler      = wrap_sampler      },
+        { .texture_view = font_tv           },
+        { .texture_view = line_glyph_tv     },
+        { .texture_view = code_glyph_tv     },
+        { .texture_view = code_color_tv     },
+        { .texture_view = code_inlay_tv     },
+        { .buffer       = res.diag_text_buf },
     });
 
     res.bound_render_pipeline = {pipeline, bind_group};
@@ -250,35 +208,21 @@ static bool init() {
     });
 
     let timing_text_bind_group = make_bind_group(device, timing_text_pipeline, {
-        {.buffer = res.uni_buf      },
-        {.buffer = res.diag_text_buf},
+        { .buffer = res.uni_buf       },
+        { .buffer = res.diag_text_buf },
     });
 
     res.bound_timings_text_pipeline = {timing_text_pipeline, timing_text_bind_group};
-
-    //res.perf_query_set = make_query_set(device, {
-    //    .type  = WGPUQueryType_Timestamp,
-    //    .count = 2,
-    //});
 
     resize(); on_resize(resize);
 
     printf("WGPU ready. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
-    if (old_compiler) {
-        let wasm_start = std::chrono::high_resolution_clock::now();
-        printf("\n(WASM) Running...\n");
-        var wasm_result = run_wasm(old_wasm.data, old_wasm.count);
-        printf("(WASM) Exited with code: %d\n", wasm_result);
-        printf("(WASM) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - wasm_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
-    }
-    else {
-        let wasm_start = std::chrono::high_resolution_clock::now();
-        printf("\n(WASM) Running...\n");
-        var wasm_result = run_wasm(wasm.data, wasm.count);
-        printf("(WASM) Exited with code: %d\n", wasm_result);
-        printf("(WASM) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - wasm_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
-    }
+    let wasm_start = high_resolution_clock::now();
+    printf("\n(WASM) Running...\n");
+    var wasm_result = run_wasm(wasm.data, wasm.count);
+    printf("(WASM) Exited with code_fr: %d\n", wasm_result);
+    printf("(WASM) Finished in %lldms. Total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - wasm_start).count(), gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     return true;
 }

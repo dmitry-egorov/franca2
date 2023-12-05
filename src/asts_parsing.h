@@ -6,7 +6,6 @@
 #define FRANCA2_ASTS_PARSING_H
 
 #include "utility/syntax.h"
-#include "utility/primitives.h"
 #include "utility/arrays.h"
 #include "utility/strings.h"
 #include "utility/iterators.h"
@@ -71,13 +70,13 @@ namespace asts {
     namespace parser {
         using enum node::lex_kind_t;
 
-        ret2<node*, node*> parse_file_chain(cstr path, ast& ast) {
+        inline ret2<node*, node*> parse_file_chain(cstr path, ast& ast) {
             var code = files::read_file_as_string(path, ast.data_arena);
             var path_str = make_string(ast.data_arena, "%s", path);
             return parser::parse_chain(code, path_str, ast);
         }
 
-        ret2<node*, node*> parse_chain(string& it, string file_path, ast& ast) {
+        inline ret2<node*, node*> parse_chain(string& it, string file_path, ast& ast) {
             var first_node = (node*)nullptr;
             var  last_node = (node*)nullptr;
 
@@ -98,7 +97,7 @@ namespace asts {
             return ret2_ok(first_node, last_node);
         }
 
-        node* parse_node(string& it, string file_path, ast& ast) {
+        inline node* parse_node(string& it, string file_path, ast& ast) {
             var text = string {};
             var text_is_quoted = true;
             if_set1(text, take_str(it)){
@@ -144,7 +143,7 @@ namespace asts {
             return &result;
         }
 
-        ret1<string> take_line_comment(string& it) {
+        inline ret1<string> take_line_comment(string& it) {
             var result = string { it.data, 0 };
 
             static let line_comment_prefix = view("//");
@@ -157,7 +156,7 @@ namespace asts {
             return ret1_ok(result);
         }
 
-        string take_whitespaces_and_comments(string& it) {
+        inline string take_whitespaces_and_comments(string& it) {
             var result = string { it.data, 0 };
 
             while (true) {
@@ -173,7 +172,7 @@ namespace asts {
             return result;
         }
 
-        void set_parent_to_chain(node* first_child, node* parent) {
+        inline void set_parent_to_chain(node* first_child, node* parent) {
             var child = first_child;
             while (child) {
                 child->parent = parent;

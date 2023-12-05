@@ -1,6 +1,5 @@
 print_str["Hello, world!"]
 
-
 var[x u32 123]
 print_str["x = "] print_u32[x]
 

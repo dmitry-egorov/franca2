@@ -19,7 +19,7 @@ if (EMSCRIPTEN)
 	set(CMAKE_EXE_LINKER_FLAGS "-s ASSERTIONS=0 -s WASM=1 -s USE_STD=1 -s USE_WEBGPU=1 -s NO_EXIT_RUNTIME=1 -s STRICT=1 --shell-file ${CMAKE_CURRENT_LIST_DIR}/shell.html")
 	# -s EVAL_CTORS=1
 
-	# Linker flags to optimize for smallest output code size
+	# Linker flags to optimize for smallest output code_fr size
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s ENVIRONMENT=web -s TEXTDECODER=2 -s ABORTING_MALLOC=0 -s ALLOW_MEMORY_GROWTH=0 -s SUPPORT_ERRNO=0 -s MALLOC=emmalloc -s NO_FILESYSTEM=1 --output_eol=linux")
 	#  -s MINIMAL_RUNTIME=2
 endif()
