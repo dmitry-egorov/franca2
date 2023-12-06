@@ -13,7 +13,7 @@ if "%~1"=="/d" (
 )
 
 set CPP_FLAGS=-std=c++20 -Wall -Wextra -fno-exceptions -fno-rtti
-set EMS_FLAGS=--output_eol linux -s ALLOW_MEMORY_GROWTH=0 -s INITIAL_MEMORY=16MB -s ENVIRONMENT=web -s NO_EXIT_RUNTIME=1 -s STRICT=1 -s TEXTDECODER=2 -s USE_WEBGPU=1 -s WASM=1 --shell-file shell.html --embed-file embedded
+set EMS_FLAGS=--output_eol linux -s ALLOW_MEMORY_GROWTH=0 -s INITIAL_MEMORY=128MB -s ENVIRONMENT=web -s NO_EXIT_RUNTIME=1 -s STRICT=1 -s TEXTDECODER=2 -s USE_WEBGPU=1 -s WASM=1 --shell-file shell.html --embed-file embedded
 set OPT_FLAGS=
 
 if %DEBUG%==true (

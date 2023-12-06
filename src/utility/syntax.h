@@ -25,13 +25,13 @@ public:
 
 #define stx_concat_internal(x,y) x##y
 #define stx_concat(x,y) stx_concat_internal(x,y)
+#define line_var(prefix) stx_concat(prefix, __LINE__)
 #define defer [[maybe_unused]]let& stx_concat(line_var(defer_), __COUNTER__) = ExitScopeHelp() + [&]
 
 // release and reset a var_ at the end of the current scope
 #define defer_release(name) defer { release(name); }
 #define defer_release2(name0, name1) defer { release(name1); release(name0); }
 
-#define line_var(prefix) stx_concat(prefix, __LINE__)
 
 #define var auto
 #define let const auto

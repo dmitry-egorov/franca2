@@ -127,7 +127,7 @@ namespace asts {
                 node.decled_macros = make_arr_dyn<asts::macro*>(128, ast.data_arena);
 
                 for_chain(node.child_chain) {
-                    if_ref(id_node, it); else { dbg_fail_return; }
+                    if_cref(id_node, it); else { dbg_fail_return; }
                     if_chain3(params_node, results_node, body_node, id_node.child_chain); else { dbg_fail_return; }
 
                     ref decl_macro = add_macro(id_node.id, node.scope, &body_node, ast);
@@ -199,8 +199,8 @@ namespace asts {
             }
 
             if (node.id == bi_ref_id) {
-                if_ref(id_node, node.child_chain); else { dbg_fail_return; }
-                if_ref(local , find_local(id_node.id, scope)); else { dbg_fail_return; }
+                if_cref(id_node, node.child_chain); else { dbg_fail_return; }
+                if_ref (local , find_local(id_node.id, scope)); else { dbg_fail_return; }
                 if (local.kind == lk_ref); else { printf("Only mutable variables can be referenced.\n"); node_error(node); return; }
                 node.refed_local = &local;
                 complete(node, sk_local_ref, local.value_type);
@@ -269,7 +269,7 @@ namespace asts {
         }
 
         inline void gather_param(node& prm_node, macro& macro) {
-            if_ref(prm_kind_node, prm_node.child_chain); else { dbg_fail_return; }
+            if_cref(prm_kind_node, prm_node.child_chain); else { dbg_fail_return; }
 
             let is_ref    = prm_kind_node.id == bi_ref_id;
             let is_val    = prm_kind_node.id == bi_in_id;
@@ -277,7 +277,7 @@ namespace asts {
             if (is_ref || is_val || is_code); else { dbg_fail_return; }
 
             var value_type = t_void;
-            if_ref (prm_type_node, prm_kind_node.next) {
+            if_cref(prm_type_node, prm_kind_node.next) {
                 if_set1(value_type, find_type(prm_type_node.id)) {}
             }
 
@@ -304,7 +304,7 @@ namespace asts {
             fn.expansion = &exp;
             bind_fn_params(exp);
 
-            if_ref(scope, macro.body_scope); else { dbg_fail_return; }
+            if_cref(scope, macro.body_scope); else { dbg_fail_return; }
             exp.generated_chain = expand_chain(scope.chain, nullptr, exp, ast);
         }
 

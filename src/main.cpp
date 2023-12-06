@@ -126,26 +126,26 @@ static bool init() {
 
     var memory_used = gta.used_bytes;
 
-    if ((instance = make_instance  ({}    ))); else return false;
-    if ((device   = get_wgpu_device(      ))); else return false;
-    if ((queue    = get_queue      (device))); else return false;
+    if ((instance = make_instance  ({}    ))); else { dbg_fail_return false; };
+    if ((device   = get_wgpu_device(      ))); else { dbg_fail_return false; };
+    if ((queue    = get_queue      (device))); else { dbg_fail_return false; };
 
     res.uni_buf       = make_buffer<gpu_uniforms>(device, (WGPUBufferUsage) (WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform | WGPUBufferUsage_QueryResolve));
     res.diag_text_buf = make_buffer(device, WGPUBufferUsage_Storage, 256);
 
     tmp(wrap_sampler, make_wrap_sampler(device));
 
-    if_tmp2(font_texture, font_tv, load_8bit_texture_from_png_file(device, "embedded/jb.png")); else return(false);
+    if_tmp2(font_texture, font_tv, load_8bit_texture_from_png_file(device, "embedded/assets/jb.png")); else { dbg_fail_return false; };
 
     printf("Resources loaded. Total memory used: %zu, delta: %zu\n", gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
     var code_view   = make_code_vew(code_view_size);
     var source_files = make_arr_dyn<cstr>(16);
 
-    //push(source_files, (cstr)"embedded/hello_world.fr");
-    push(source_files, (cstr)"embedded/macro_test.fr");
-    //push(source_files, (cstr)"embedded/ret_depth.fr");
-    push(source_files, (cstr)"embedded/prelude.fr");
+    //push(source_files, (cstr)"embedded/assets/hello_world.fr");
+    push(source_files, (cstr)"embedded/assets/macro_test.fr");
+    //push(source_files, (cstr)"embedded/assets/ret_depth.fr");
+    push(source_files, (cstr)"embedded/assets/prelude.fr");
 
     wasm_emit::init();
 
@@ -173,12 +173,12 @@ static bool init() {
     wasm = emit_wasm(ast);
     printf("Generated in %lldms. Size: %zu, total memory used: %zu, delta: %zu\n", duration_cast<milliseconds>(high_resolution_clock::now() - generate_start).count(), wasm.count, gta.used_bytes, gta.used_bytes - memory_used); memory_used = gta.used_bytes;
 
-    if_var1(line_view, generate_line_view(code_view.line_count, line_view_size)); else return false;
+    if_var1(line_view, generate_line_view(code_view.line_count, line_view_size)); else { dbg_fail_return false; };
 
-    if_tmp2(_0, line_glyph_tv, make_texture_2d(device, line_view_size, WGPUTextureFormat_R8Uint, line_view.glyphs.data)); else return false;
-    if_tmp2(_1, code_glyph_tv, make_texture_2d(device, code_view_size, WGPUTextureFormat_R8Uint, code_view.glyphs.data)); else return false;
-    if_tmp2(_2, code_color_tv, make_texture_2d(device, code_view_size, WGPUTextureFormat_R8Uint, code_view.colors.data)); else return false;
-    if_tmp2(_3, code_inlay_tv, make_texture_2d(device, code_view_size, WGPUTextureFormat_R8Uint, code_view.inlays.data)); else return false;
+    if_tmp2(_0, line_glyph_tv, make_texture_2d(device, line_view_size, WGPUTextureFormat_R8Uint, line_view.glyphs.data)); else { dbg_fail_return false; };
+    if_tmp2(_1, code_glyph_tv, make_texture_2d(device, code_view_size, WGPUTextureFormat_R8Uint, code_view.glyphs.data)); else { dbg_fail_return false; };
+    if_tmp2(_2, code_color_tv, make_texture_2d(device, code_view_size, WGPUTextureFormat_R8Uint, code_view.colors.data)); else { dbg_fail_return false; };
+    if_tmp2(_3, code_inlay_tv, make_texture_2d(device, code_view_size, WGPUTextureFormat_R8Uint, code_view.inlays.data)); else { dbg_fail_return false; };
 
     tmp(shader_module, make_wgsl_shader_module_from_file(device, "embedded/main.wgsl"));
 
@@ -309,7 +309,7 @@ namespace impl {
     })
 }
 
-int main(int /*argc*/, char* /*argv*/[]) {
+int main(int, char*[]) {
     impl::glue_preint();
     return 0;
 }

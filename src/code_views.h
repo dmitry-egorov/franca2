@@ -82,7 +82,7 @@ namespace code_views {
     void set_inlay_prev(code_view_iterator &it, inlay_type inlay);
 
     inline u8* cell_at(arr_view<u8>& view, const uint2& idx, const code_view& cv) {
-        if (idx.x >= 0 && idx.x < cv.size.w && idx.y >= 0 && idx.y < cv.size.h); else return nullptr;
+        if (idx.x < cv.size.w && idx.y < cv.size.h); else return nullptr;
         return &view[idx.y * cv.size.w + idx.x];
     }
 

@@ -10,16 +10,12 @@ namespace files {
     using namespace arenas;
     using namespace strings;
 
-    void release(FILE*& f);
-    inline string read_file_as_string(cstr path, arena& arena = gta);
-    inline string read_files_as_string(const arr_view<cstr>& paths, string separator = view(""), arena& arena = gta);
-
-    void release(FILE*& f) {
+    inline void release(FILE*& f) {
         if (f) fclose(f);
         f = nullptr;
     }
 
-    string read_file_as_string(cstr path, arena& arena) {
+    inline string read_file_as_string(cstr path, arena& arena) {
         tmp(f, fopen (path, "rb"));
         if (f); else return {};
 
@@ -33,7 +29,7 @@ namespace files {
         return buffer;
     }
 
-    string read_files_as_string(const arr_view<cstr>& paths, string separator, arena& arena) {
+    inline string read_files_as_string(const arr_view<cstr>& paths, string separator, arena& arena) {
         var length = (size_t)0;
         for_arr(paths) {
             tmp(f, fopen (paths[i], "rb"));
@@ -57,9 +53,6 @@ namespace files {
 
         return buffer;
     }
-
-
-
 }
 
 #endif //FRANCA2_FILES_H
